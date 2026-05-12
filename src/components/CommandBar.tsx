@@ -65,21 +65,6 @@ export function CommandBar() {
 
   return (
     <div className="cb-row" data-tauri-drag-region>
-      {/* Compact drag affordance — purely visual. The whole capsule is
-          the actual drag region (data-tauri-drag-region above). This
-          icon is the universally-recognized "drag handle" pattern,
-          shrunk and tucked at the left so it reads as informative
-          without competing with the controls. */}
-      <span className="cb-grip" aria-hidden="true">
-        <svg viewBox="0 0 6 14" width="6" height="14">
-          <circle cx="1.5" cy="2" r="0.9" fill="currentColor" />
-          <circle cx="4.5" cy="2" r="0.9" fill="currentColor" />
-          <circle cx="1.5" cy="7" r="0.9" fill="currentColor" />
-          <circle cx="4.5" cy="7" r="0.9" fill="currentColor" />
-          <circle cx="1.5" cy="12" r="0.9" fill="currentColor" />
-          <circle cx="4.5" cy="12" r="0.9" fill="currentColor" />
-        </svg>
-      </span>
       <button
         type="button"
         role="switch"

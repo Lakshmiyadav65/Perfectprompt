@@ -54,31 +54,6 @@ body.cb-route * {
   cursor: grabbing;
 }
 
-/* ---------- Drag grip ---------- */
-
-.cb-grip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 22px;
-  padding: 0 4px 0 2px;
-  margin-right: 2px;
-  color: var(--pf-text-faint);
-  /* Inherit drag from .cb-row so clicking on the grip drags too. The
-     grip is purely visual; the entire capsule is the drag region. */
-  -webkit-app-region: drag;
-  pointer-events: none;
-  transition: color 0.15s var(--pf-ease);
-}
-
-.cb-row:hover .cb-grip {
-  color: var(--pf-text-subtle);
-}
-
-.cb-row:active .cb-grip {
-  color: var(--pf-text-muted);
-}
-
 /* ---------- Icon buttons ---------- */
 
 .cb-icon-btn {
