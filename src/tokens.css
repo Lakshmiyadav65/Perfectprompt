@@ -3,34 +3,34 @@
    Every component reads from these — never hard-code colors elsewhere. */
 
 :root {
-  /* ---- Color: surface (neutral grey, not pure black) ---- */
-  --pf-bg: #1a1a1a;            /* page background — sidebar + main */
-  --pf-surface: #242424;        /* cards, elevated panels */
-  --pf-surface-2: #2c2c2c;      /* hover, button bg */
-  --pf-surface-3: #333333;      /* deeper inputs/code blocks */
+  /* ---- Color: surface (warm dark — Claude-inspired) ---- */
+  --pf-bg: #1a1916;            /* page background — slightly warm dark */
+  --pf-surface: #252521;        /* cards, elevated panels */
+  --pf-surface-2: #2e2c27;      /* hover, button bg */
+  --pf-surface-3: #38362f;      /* deeper inputs/code blocks */
 
-  /* ---- Color: lines ---- */
-  --pf-border: #333333;
-  --pf-border-strong: #444444;
+  /* ---- Color: lines (warm-tinted) ---- */
+  --pf-border: #353330;
+  --pf-border-strong: #4a4740;
   --pf-border-focus: var(--pf-accent);
 
-  /* ---- Color: text ---- */
-  --pf-text: #fafafa;
-  --pf-text-muted: #a3a3a3;
-  --pf-text-subtle: #737373;
-  --pf-text-faint: #525252;
-  --pf-text-on-accent: #0a0a0a;
+  /* ---- Color: text (warm off-whites) ---- */
+  --pf-text: #f5f3ee;
+  --pf-text-muted: #b3afa3;
+  --pf-text-subtle: #807c70;
+  --pf-text-faint: #5e5a51;
+  --pf-text-on-accent: #1a1916;
 
-  /* ---- Color: accent (forge orange — used SPARINGLY) ---- */
-  --pf-accent: #ff6b35;
-  --pf-accent-hover: #ff8559;
-  --pf-accent-soft: rgba(255, 107, 53, 0.12);
-  --pf-accent-glow: rgba(255, 107, 53, 0.35);
-  --pf-accent-ring: rgba(255, 107, 53, 0.20);
+  /* ---- Color: accent (coral — softer than forge orange, used sparingly) ---- */
+  --pf-accent: #d97757;
+  --pf-accent-hover: #e0876a;
+  --pf-accent-soft: rgba(217, 119, 87, 0.13);
+  --pf-accent-glow: rgba(217, 119, 87, 0.30);
+  --pf-accent-ring: rgba(217, 119, 87, 0.20);
 
-  /* ---- Color: signals (also from the orange/white palette) ---- */
-  --pf-danger: #ff4444;
-  --pf-danger-soft: rgba(255, 68, 68, 0.10);
+  /* ---- Color: signals (warm-aligned reds) ---- */
+  --pf-danger: #e0625a;
+  --pf-danger-soft: rgba(224, 98, 90, 0.10);
 
   /* ---- Type ---- */
   --pf-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
