@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
@@ -37,6 +37,7 @@ pub struct QuestionSession {
 /// bank so the user always sees questions within the latency budget.
 #[tauri::command]
 pub async fn fetch_question_card_session(app: AppHandle) -> QuestionSession {
+    let t_fetch = Instant::now();
     let state = app.state::<crate::AppState>();
 
     let original = {
@@ -55,54 +56,45 @@ pub async fn fetch_question_card_session(app: AppHandle) -> QuestionSession {
         guard.take()
     };
 
-    let questions = match rx {
+    let (questions, source) = match rx {
         Some(rx) => {
             let timeout = Duration::from_secs(generation::GENERATION_TIMEOUT_SECS);
             match tokio::time::timeout(timeout, rx).await {
-                Ok(Ok(Ok(qs))) if qs.len() >= generation::MIN_VALID_QUESTIONS => {
-                    println!(
-                        "[clarify] using {} LLM-generated question(s)",
-                        qs.len()
-                    );
-                    qs
-                }
+                Ok(Ok(Ok(qs))) if qs.len() >= generation::MIN_VALID_QUESTIONS => (qs, "llm"),
                 Ok(Ok(Ok(qs))) => {
                     println!(
                         "[clarify] LLM returned only {} question(s) (< {}); using static bank",
                         qs.len(),
                         generation::MIN_VALID_QUESTIONS
                     );
-                    static_questions_for(domain)
+                    (static_questions_for(domain), "static (llm-empty)")
                 }
                 Ok(Ok(Err(e))) => {
-                    println!(
-                        "[clarify] LLM generation failed ({e}); using static bank"
-                    );
-                    static_questions_for(domain)
+                    println!("[clarify] LLM generation failed ({e}); using static bank");
+                    (static_questions_for(domain), "static (llm-error)")
                 }
                 Ok(Err(_canceled)) => {
                     println!("[clarify] LLM channel dropped; using static bank");
-                    static_questions_for(domain)
+                    (static_questions_for(domain), "static (channel-dropped)")
                 }
                 Err(_elapsed) => {
                     println!(
                         "[clarify] LLM generation exceeded {}s budget; using static bank",
                         generation::GENERATION_TIMEOUT_SECS
                     );
-                    static_questions_for(domain)
+                    (static_questions_for(domain), "static (timeout)")
                 }
             }
         }
-        None => {
-            // No in-flight generation — most likely the tray dev preview
-            // entry point. Serve the static bank directly.
-            println!(
-                "[clarify] no pending LLM generation — serving static bank for {:?}",
-                domain
-            );
-            static_questions_for(domain)
-        }
+        None => (static_questions_for(domain), "static (no-generation)"),
     };
+
+    println!(
+        "[latency] fetch_question_card_session ready in {}ms (source={}, {} question(s), PRD §12 target <3s)",
+        t_fetch.elapsed().as_millis(),
+        source,
+        questions.len()
+    );
 
     QuestionSession {
         original_input: original,
@@ -120,6 +112,7 @@ pub async fn submit_question_card_answers(
     app: AppHandle,
     answers: Vec<QuestionAnswer>,
 ) -> Result<(), String> {
+    let t_submit = Instant::now();
     println!(
         "[clarify] submit_question_card_answers: {} answer(s)",
         answers.len()
@@ -170,6 +163,10 @@ pub async fn submit_question_card_answers(
         .await
         .map_err(|e| format!("paste failed: {e}"))?;
 
+    println!(
+        "[latency] submit→pasted={}ms (PRD §12 latency budget for the enhance call is 1.5–3s)",
+        t_submit.elapsed().as_millis()
+    );
     Ok(())
 }
 

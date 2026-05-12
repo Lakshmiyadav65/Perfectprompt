@@ -306,6 +306,41 @@ function QuestionRow({
   );
 }
 
+// Arrow-key / Home / End navigation within a chip row (PRD §12 keyboard-first).
+// Moves focus among sibling chips; the user still uses Enter/Space (browser
+// default for <button>) to actually select.
+function handleChipKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
+  const parent = e.currentTarget.parentElement;
+  if (!parent) return;
+  const chips = Array.from(
+    parent.querySelectorAll<HTMLButtonElement>("button.qc-chip"),
+  );
+  const idx = chips.indexOf(e.currentTarget);
+  if (idx === -1) return;
+  let next: number | null = null;
+  switch (e.key) {
+    case "ArrowLeft":
+    case "ArrowUp":
+      next = idx === 0 ? chips.length - 1 : idx - 1;
+      break;
+    case "ArrowRight":
+    case "ArrowDown":
+      next = idx === chips.length - 1 ? 0 : idx + 1;
+      break;
+    case "Home":
+      next = 0;
+      break;
+    case "End":
+      next = chips.length - 1;
+      break;
+  }
+  if (next !== null) {
+    e.preventDefault();
+    e.stopPropagation();
+    chips[next].focus();
+  }
+}
+
 function renderWidget(
   question: GeneratedQuestion,
   value: string | string[] | undefined,
@@ -317,14 +352,17 @@ function renderWidget(
     case "single_select": {
       const current = typeof value === "string" ? value : "";
       return (
-        <div className="qc-chip-row">
+        <div className="qc-chip-row" role="radiogroup">
           {question.options.map((opt) => (
             <button
               key={opt}
               type="button"
+              role="radio"
+              aria-checked={current === opt}
               disabled={disabled}
               className={`qc-chip ${current === opt ? "selected" : ""}`}
               onClick={() => onChange(current === opt ? "" : opt)}
+              onKeyDown={handleChipKeyDown}
             >
               {opt}
             </button>
@@ -341,14 +379,17 @@ function renderWidget(
         onChange(next);
       };
       return (
-        <div className="qc-chip-row">
+        <div className="qc-chip-row" role="group">
           {question.options.map((opt) => (
             <button
               key={opt}
               type="button"
+              role="checkbox"
+              aria-checked={current.includes(opt)}
               disabled={disabled}
               className={`qc-chip ${current.includes(opt) ? "selected" : ""}`}
               onClick={() => toggle(opt)}
+              onKeyDown={handleChipKeyDown}
             >
               {opt}
             </button>

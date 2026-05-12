@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
 use tauri::{AppHandle, Manager, Runtime};
@@ -120,16 +120,18 @@ async fn run_capture_pipeline<R: Runtime>(
     app: &AppHandle<R>,
     force_bypass: bool,
 ) -> Result<()> {
+    let t0 = Instant::now();
     let input = clipboard::capture_selection(app)
         .await
         .map_err(|e| anyhow!("capture failed: {e}"))?;
+    let t_capture = t0.elapsed();
 
     if input.trim().is_empty() {
         return Err(anyhow!("captured selection is empty"));
     }
 
     let input_chars = input.chars().count();
-    println!("[capture] {input_chars} chars captured");
+    println!("[capture] {input_chars} chars captured in {}ms", t_capture.as_millis());
 
     // Store the captured prompt so command handlers can read it.
     {
@@ -141,7 +143,7 @@ async fn run_capture_pipeline<R: Runtime>(
     // Shift+hotkey bypass takes precedence over score / mode (PRD §5.1.7).
     if force_bypass {
         println!("[pipeline] Shift bypass — running silent path");
-        return run_silent_path(app, &input).await;
+        return run_silent_path(app, &input, t0).await;
     }
 
     // Decide path: silent (capture → enhance → paste) vs. card (question
@@ -165,27 +167,41 @@ async fn run_capture_pipeline<R: Runtime>(
     );
 
     if show_card {
-        run_card_path(app, &input).await
+        run_card_path(app, &input, t0).await
     } else {
-        run_silent_path(app, &input).await
+        run_silent_path(app, &input, t0).await
     }
 }
 
 /// Silent path: no card. Show the status pill, run the enhancement,
 /// paste. Used when the user has set `question_mode = Silent` or when
 /// the complexity scorer judges the input already specific enough.
-async fn run_silent_path<R: Runtime>(app: &AppHandle<R>, input: &str) -> Result<()> {
+async fn run_silent_path<R: Runtime>(
+    app: &AppHandle<R>,
+    input: &str,
+    t0: Instant,
+) -> Result<()> {
     let _ = status_window::show_near_cursor(app);
 
+    let t_enhance_start = Instant::now();
     let enhance_result = enhance::enhance_prompt(app, input).await;
+    let t_enhance = t_enhance_start.elapsed();
     let _ = status_window::hide(app);
 
     let enhanced = enhance_result.map_err(|e| anyhow!("enhance failed: {e:#}"))?;
 
+    let t_paste_start = Instant::now();
     clipboard::replace_selection(app, &enhanced)
         .await
         .map_err(|e| anyhow!("paste failed: {e}"))?;
+    let t_paste = t_paste_start.elapsed();
 
+    println!(
+        "[latency] silent path hotkey→pasted={}ms (enhance={}ms paste={}ms)",
+        t0.elapsed().as_millis(),
+        t_enhance.as_millis(),
+        t_paste.as_millis(),
+    );
     Ok(())
 }
 
@@ -193,7 +209,11 @@ async fn run_silent_path<R: Runtime>(app: &AppHandle<R>, input: &str) -> Result<
 /// then show the question-card window. The card's `fetch_question_card_session`
 /// command will await the in-flight generation (with a 3s budget) and fall
 /// back to the static bank if generation fails or times out.
-async fn run_card_path<R: Runtime>(app: &AppHandle<R>, input: &str) -> Result<()> {
+async fn run_card_path<R: Runtime>(
+    app: &AppHandle<R>,
+    input: &str,
+    t0: Instant,
+) -> Result<()> {
     let domain = question_bank::detect_domain(input);
 
     // Set up the oneshot so the card command can await the LLM result.
@@ -229,7 +249,12 @@ async fn run_card_path<R: Runtime>(app: &AppHandle<R>, input: &str) -> Result<()
     window
         .set_focus()
         .map_err(|e| anyhow!("failed to focus question-card window: {e}"))?;
-    println!("[pipeline] question-card window shown and focused");
+    let elapsed_ms = t0.elapsed().as_millis();
+    println!(
+        "[latency] card path hotkey→shown={}ms (PRD §12 target <600ms){}",
+        elapsed_ms,
+        if elapsed_ms > 600 { "  ⚠ over budget" } else { "" }
+    );
 
     Ok(())
 }
