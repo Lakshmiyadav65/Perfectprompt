@@ -5,6 +5,7 @@ use tauri::{AppHandle, Manager, Runtime};
 mod clarify;
 mod clipboard;
 mod enhance;
+mod generation;
 mod hotkey;
 mod projects;
 mod question_bank;
@@ -13,8 +14,18 @@ mod status_window;
 mod tray;
 mod updater;
 
+/// Receiver for the in-flight question-generation LLM call. The hotkey
+/// pipeline fires the call immediately after capture and stores the
+/// receiver here; `clarify::fetch_question_card_session` later awaits it
+/// (with timeout) when the card mounts. This is what makes question
+/// generation run in parallel with the card render (PRD §6.4).
+pub type PendingQuestionsRx = tokio::sync::oneshot::Receiver<
+    Result<Vec<question_bank::GeneratedQuestion>, String>,
+>;
+
 pub struct AppState {
     pub pending_prompt: std::sync::Mutex<String>,
+    pub pending_questions: std::sync::Mutex<Option<PendingQuestionsRx>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -26,6 +37,7 @@ pub fn run() {
     tauri::Builder::default()
         .manage(AppState {
             pending_prompt: std::sync::Mutex::new(String::new()),
+            pending_questions: std::sync::Mutex::new(None),
         })
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())

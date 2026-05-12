@@ -6,7 +6,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use crate::question_bank::{
     detect_domain, static_questions_for, GeneratedQuestion, ImpactDimension,
 };
-use crate::{clipboard, enhance};
+use crate::{clipboard, enhance, generation};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestionAnswer {
@@ -23,22 +23,75 @@ pub struct QuestionSession {
     pub answers: Vec<QuestionAnswer>,
 }
 
-/// Reads the captured input from `AppState.pending_prompt` (populated by the
-/// hotkey pipeline), runs the keyword classifier, and returns the matching
-/// static question set. Task 3 will layer LLM-generated questions on top of
-/// this same shape.
+/// Reads the captured input from `AppState.pending_prompt`, then waits up
+/// to PRD §6.5's 3s budget for the in-flight LLM question-generation call
+/// to complete. If the LLM returns at least `MIN_VALID_QUESTIONS`, those
+/// are shown. Otherwise — on timeout, channel drop, error, or too-few
+/// valid questions — the card falls back to the domain-specific static
+/// bank so the user always sees questions within the latency budget.
 #[tauri::command]
-pub fn fetch_question_card_session<R: Runtime>(app: AppHandle<R>) -> QuestionSession {
+pub async fn fetch_question_card_session(app: AppHandle) -> QuestionSession {
     let state = app.state::<crate::AppState>();
-    let original = state.pending_prompt.lock().unwrap().clone();
 
+    let original = {
+        let pending = state.pending_prompt.lock().unwrap();
+        pending.clone()
+    };
     let domain = detect_domain(&original);
-    let questions = static_questions_for(domain);
-    println!(
-        "[clarify] fetch session — domain={:?}, {} question(s)",
-        domain,
-        questions.len()
-    );
+
+    let rx = {
+        let mut guard = state.pending_questions.lock().unwrap();
+        guard.take()
+    };
+
+    let questions = match rx {
+        Some(rx) => {
+            let timeout = Duration::from_secs(generation::GENERATION_TIMEOUT_SECS);
+            match tokio::time::timeout(timeout, rx).await {
+                Ok(Ok(Ok(qs))) if qs.len() >= generation::MIN_VALID_QUESTIONS => {
+                    println!(
+                        "[clarify] using {} LLM-generated question(s)",
+                        qs.len()
+                    );
+                    qs
+                }
+                Ok(Ok(Ok(qs))) => {
+                    println!(
+                        "[clarify] LLM returned only {} question(s) (< {}); using static bank",
+                        qs.len(),
+                        generation::MIN_VALID_QUESTIONS
+                    );
+                    static_questions_for(domain)
+                }
+                Ok(Ok(Err(e))) => {
+                    println!(
+                        "[clarify] LLM generation failed ({e}); using static bank"
+                    );
+                    static_questions_for(domain)
+                }
+                Ok(Err(_canceled)) => {
+                    println!("[clarify] LLM channel dropped; using static bank");
+                    static_questions_for(domain)
+                }
+                Err(_elapsed) => {
+                    println!(
+                        "[clarify] LLM generation exceeded {}s budget; using static bank",
+                        generation::GENERATION_TIMEOUT_SECS
+                    );
+                    static_questions_for(domain)
+                }
+            }
+        }
+        None => {
+            // No in-flight generation — most likely the tray dev preview
+            // entry point. Serve the static bank directly.
+            println!(
+                "[clarify] no pending LLM generation — serving static bank for {:?}",
+                domain
+            );
+            static_questions_for(domain)
+        }
+    };
 
     QuestionSession {
         original_input: original,

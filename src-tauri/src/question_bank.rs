@@ -128,6 +128,84 @@ fn tokens_of(lower: &str) -> HashSet<&str> {
         .collect()
 }
 
+/// Heuristic complexity score in [0.0, 1.0] for "enhancement ambiguity"
+/// (PRD §5.1.1). Higher = more value in asking clarifying questions.
+///
+/// Combines four factors:
+/// - **length**: short inputs leave more room for misinterpretation.
+/// - **domain**: Generic gets a bump (no specific question set to lean on);
+///   classified domains get a small base.
+/// - **vagueness**: pronouns like "it"/"this"/"that"/"thing" with no clear
+///   referent indicate missing context.
+/// - **constraints**: tone/audience/format keywords already in the input
+///   reduce the need to ask.
+///
+/// Tuned so that the canonical PRD examples — "fix bug", "tell me a joke",
+/// "explain it" — clear the default 0.6 threshold while specific, well-
+/// constrained prompts fall safely below it.
+pub fn score_complexity(input: &str) -> f32 {
+    let trimmed = input.trim();
+    if trimmed.is_empty() {
+        return 0.0;
+    }
+
+    let lower = trimmed.to_lowercase();
+    let word_count = lower.split_whitespace().count();
+
+    let length_factor: f32 = match word_count {
+        0 => 0.0,
+        1..=3 => 0.55,
+        4..=6 => 0.45,
+        7..=10 => 0.35,
+        11..=20 => 0.2,
+        21..=40 => 0.1,
+        _ => 0.0,
+    };
+
+    let domain_factor: f32 = match detect_domain(trimmed) {
+        Domain::Generic => 0.2,
+        _ => 0.1,
+    };
+
+    let tokens = tokens_of(&lower);
+
+    let vagueness_factor: f32 = if ["it", "this", "that", "thing", "stuff", "something"]
+        .iter()
+        .any(|w| tokens.contains(*w))
+    {
+        0.15
+    } else {
+        0.0
+    };
+
+    let constraint_signals = [
+        "formal",
+        "informal",
+        "casual",
+        "concise",
+        "detailed",
+        "bullet",
+        "table",
+        "tone",
+        "audience",
+        "professional",
+        "polite",
+        "executive",
+        "technical",
+    ];
+    let constraint_count = constraint_signals
+        .iter()
+        .filter(|w| tokens.contains(*w))
+        .count();
+    let constraint_factor: f32 = match constraint_count {
+        0 => 0.0,
+        1 => -0.1,
+        _ => -0.2,
+    };
+
+    (length_factor + domain_factor + vagueness_factor + constraint_factor).clamp(0.0, 1.0)
+}
+
 /// Returns the static question set for a given domain (PRD §14). These act
 /// as the fallback when LLM question generation fails or times out — and in
 /// Phase 1 they are the primary source until Phase 2 layers LLM generation
@@ -399,5 +477,51 @@ mod tests {
         assert_eq!(ImpactDimension::Tone.as_str(), "tone");
         assert_eq!(ImpactDimension::Audience.as_str(), "audience");
         assert_eq!(ImpactDimension::Constraints.as_str(), "constraints");
+    }
+
+    #[test]
+    fn empty_input_scores_zero() {
+        assert_eq!(score_complexity(""), 0.0);
+        assert_eq!(score_complexity("   "), 0.0);
+    }
+
+    #[test]
+    fn short_ambiguous_inputs_clear_default_threshold() {
+        // PRD-canonical short/vague inputs should land >= 0.6 so Adaptive
+        // mode shows the card.
+        assert!(score_complexity("fix it") >= 0.6, "fix it");
+        assert!(score_complexity("explain this") >= 0.6, "explain this");
+        assert!(score_complexity("tell me a joke") >= 0.6, "tell me a joke");
+    }
+
+    #[test]
+    fn well_constrained_inputs_fall_below_threshold() {
+        let s = score_complexity(
+            "write a formal professional email to my executive team summarising Q3 in bullet points",
+        );
+        assert!(s < 0.6, "score was {s}, expected < 0.6");
+    }
+
+    #[test]
+    fn longer_inputs_score_lower_than_short_in_same_domain() {
+        let short = score_complexity("fix bug");
+        let long = score_complexity(
+            "fix the off-by-one bug in the pagination cursor of the list endpoint that breaks when the page size equals the total count",
+        );
+        assert!(short > long, "short {short} should exceed long {long}");
+    }
+
+    #[test]
+    fn score_is_clamped_to_unit_interval() {
+        for input in [
+            "",
+            "x",
+            "fix it now",
+            "tell me a story about the future of computing",
+            "compare the architecture of React Server Components against Solid's signals",
+        ] {
+            let s = score_complexity(input);
+            assert!((0.0..=1.0).contains(&s), "{input:?} scored {s}");
+        }
     }
 }
