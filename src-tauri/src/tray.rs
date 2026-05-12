@@ -8,10 +8,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let home_item = MenuItem::with_id(app, "home", "Open PromptForge", true, None::<&str>)?;
     let projects_item = MenuItem::with_id(app, "projects", "Projects", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-    let cmdbar_show_item =
-        MenuItem::with_id(app, "cmdbar_show", "Show command bar", true, None::<&str>)?;
-    let cmdbar_hide_item =
-        MenuItem::with_id(app, "cmdbar_hide", "Hide command bar", true, None::<&str>)?;
     let question_card_item = MenuItem::with_id(
         app,
         "question_card_dev",
@@ -26,8 +22,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             &home_item,
             &projects_item,
             &settings_item,
-            &cmdbar_show_item,
-            &cmdbar_hide_item,
             &question_card_item,
             &quit_item,
         ],
@@ -47,18 +41,6 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
             "home" => open_main_route(app, "/home"),
             "projects" => open_main_route(app, "/projects"),
             "settings" => open_main_route(app, "/settings"),
-            "cmdbar_show" => {
-                println!("[tray] Show command bar");
-                if let Err(e) = crate::command_bar::show(app) {
-                    println!("[tray] cmdbar show failed: {e}");
-                }
-            }
-            "cmdbar_hide" => {
-                println!("[tray] Hide command bar");
-                if let Err(e) = crate::command_bar::hide(app) {
-                    println!("[tray] cmdbar hide failed: {e}");
-                }
-            }
             "question_card_dev" => {
                 println!("[tray] Question Card (dev preview) clicked");
                 if let Some(window) = app.get_webview_window("question-card") {
@@ -99,4 +81,11 @@ fn open_main_route<R: Runtime>(app: &AppHandle<R>, route: &str) {
     let _ = window.eval(&script);
     let _ = window.show();
     let _ = window.set_focus();
+
+    // Opening the app re-surfaces the floating command bar too.
+    // Single entry point — user never needs to think about the bar
+    // separately from the app itself.
+    if let Err(e) = crate::command_bar::show(app) {
+        println!("[tray] command bar show failed: {e}");
+    }
 }

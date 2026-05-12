@@ -55,11 +55,16 @@ pub fn run() {
         // CLI args of the second instance, but we don't take args today —
         // we just surface the window.
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
-            println!("[single-instance] another launch attempted — focusing main window");
+            println!("[single-instance] another launch attempted — surfacing app");
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+            // Re-surface the floating command bar too — opening the app
+            // is a single action, not two.
+            if let Err(e) = command_bar::show(app) {
+                println!("[single-instance] command bar show failed: {e}");
             }
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
