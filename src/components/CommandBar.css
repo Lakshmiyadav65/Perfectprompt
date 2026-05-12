@@ -77,6 +77,23 @@ body.cb-route * {
   cursor: grab;
   color: var(--pf-text-faint);
   -webkit-app-region: drag;
+  /* Hide the dots at rest — the capsule reads cleaner. The button
+     element stays in the DOM so the drag region (-webkit-app-region:
+     drag, plus data-tauri-drag-region on the SVG container) is always
+     active. The dots fade in on capsule hover purely as an
+     affordance hint. */
+  opacity: 0;
+  transition: opacity 0.18s var(--pf-ease), color 0.12s var(--pf-ease);
+}
+
+.cb-row:hover .cb-drag {
+  opacity: 1;
+}
+
+.cb-drag:focus-visible {
+  /* Keyboard focus must always reveal the handle so the user can see
+     where focus is, even when not hovering. */
+  opacity: 1;
 }
 
 .cb-drag:hover {
