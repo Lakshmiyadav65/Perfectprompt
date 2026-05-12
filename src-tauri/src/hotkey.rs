@@ -23,15 +23,92 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()
             println!("[hotkey] pressed");
             let app = app_handle.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = run_capture_pipeline(&app).await {
+                if let Err(e) = run_capture_pipeline(&app, false).await {
                     println!("[pipeline] capture failed: {e:#}");
                 }
             });
         })
         .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!("failed to register hotkey: {e}")))?;
 
-    println!("[hotkey] registered: {combo}");
+    // Shift+hotkey bypass (PRD §5.1.7): skip the question card and go
+    // straight to silent enhance + paste, regardless of question_mode.
+    // The bypass uses the same chord plus Shift so it's discoverable from
+    // the main hotkey. We register best-effort — if the combo can't accept
+    // a Shift overlay (rare), the main shortcut still works.
+    let bypass_combo = bypass_variant(combo);
+    match Shortcut::from_str(&bypass_combo) {
+        Ok(bypass_shortcut) => {
+            let res = app.global_shortcut().on_shortcut(
+                bypass_shortcut,
+                |app_handle, _shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    println!("[hotkey] bypass pressed (Shift held)");
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = run_capture_pipeline(&app, true).await {
+                            println!("[pipeline] bypass capture failed: {e:#}");
+                        }
+                    });
+                },
+            );
+            match res {
+                Ok(()) => println!("[hotkey] registered: {combo} (bypass: {bypass_combo})"),
+                Err(e) => println!(
+                    "[hotkey] registered {combo}; bypass {bypass_combo} failed: {e}"
+                ),
+            }
+        }
+        Err(e) => println!(
+            "[hotkey] registered {combo}; could not parse bypass {bypass_combo}: {e}"
+        ),
+    }
+
     Ok(())
+}
+
+/// Returns the Shift-modified variant of `combo`. We avoid duplicating an
+/// existing Shift in the combo, and place the new modifier at the front
+/// so it parses cleanly.
+fn bypass_variant(combo: &str) -> String {
+    if combo
+        .split('+')
+        .any(|p| p.eq_ignore_ascii_case("shift"))
+    {
+        combo.to_string()
+    } else {
+        format!("Shift+{combo}")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bypass_variant_prepends_shift_when_absent() {
+        assert_eq!(
+            bypass_variant("CommandOrControl+Alt+E"),
+            "Shift+CommandOrControl+Alt+E"
+        );
+    }
+
+    #[test]
+    fn bypass_variant_is_idempotent_when_shift_already_present() {
+        // If the user already bound a shift-inclusive hotkey, don't
+        // double-add the modifier — the main and bypass coincide.
+        let already = "Shift+CommandOrControl+Alt+E";
+        assert_eq!(bypass_variant(already), already);
+    }
+
+    #[test]
+    fn bypass_variant_case_insensitive_shift_detection() {
+        assert_eq!(
+            bypass_variant("commandorcontrol+alt+shift+e"),
+            "commandorcontrol+alt+shift+e"
+        );
+    }
 }
 
 pub fn reregister<R: Runtime>(app: &AppHandle<R>, combo: &str) -> Result<()> {
@@ -39,7 +116,10 @@ pub fn reregister<R: Runtime>(app: &AppHandle<R>, combo: &str) -> Result<()> {
     register(app, combo).map_err(|e| anyhow!("{e}"))
 }
 
-async fn run_capture_pipeline<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+async fn run_capture_pipeline<R: Runtime>(
+    app: &AppHandle<R>,
+    force_bypass: bool,
+) -> Result<()> {
     let input = clipboard::capture_selection(app)
         .await
         .map_err(|e| anyhow!("capture failed: {e}"))?;
@@ -56,6 +136,12 @@ async fn run_capture_pipeline<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
         let state = app.state::<AppState>();
         let mut pending = state.pending_prompt.lock().unwrap();
         *pending = input.clone();
+    }
+
+    // Shift+hotkey bypass takes precedence over score / mode (PRD §5.1.7).
+    if force_bypass {
+        println!("[pipeline] Shift bypass — running silent path");
+        return run_silent_path(app, &input).await;
     }
 
     // Decide path: silent (capture → enhance → paste) vs. card (question

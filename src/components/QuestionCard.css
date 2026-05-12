@@ -95,6 +95,21 @@ body,
   font-weight: 500;
   margin-bottom: 6px;
   color: var(--qc-text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* PRD §7.4 — "remembered" badge tokens. */
+.qc-remembered {
+  background: #f0fdf4;
+  color: #166534;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 1px 6px;
+  border-radius: 999px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
 }
 
 .qc-chip-row {
@@ -212,6 +227,28 @@ body,
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   word-break: break-word;
+}
+
+.qc-copy-raw {
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--qc-error);
+  color: var(--qc-error);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.qc-copy-raw:hover:not(:disabled) {
+  background: var(--qc-error);
+  color: #ffffff;
+}
+
+.qc-copy-raw:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .qc-skeleton {

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Runtime};
@@ -26,6 +27,10 @@ pub type PendingQuestionsRx = tokio::sync::oneshot::Receiver<
 pub struct AppState {
     pub pending_prompt: std::sync::Mutex<String>,
     pub pending_questions: std::sync::Mutex<Option<PendingQuestionsRx>>,
+    /// Session-scoped answer memory (PRD §5.1.6). Keyed by
+    /// `ImpactDimension::as_str()` (e.g. "tone", "audience"). Lives only as
+    /// long as the tray process; persistent memory is a V2 feature.
+    pub remembered_answers: std::sync::Mutex<HashMap<String, String>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -38,6 +43,7 @@ pub fn run() {
         .manage(AppState {
             pending_prompt: std::sync::Mutex::new(String::new()),
             pending_questions: std::sync::Mutex::new(None),
+            remembered_answers: std::sync::Mutex::new(HashMap::new()),
         })
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())

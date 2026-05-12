@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -21,6 +22,11 @@ pub struct QuestionSession {
     pub questions: Vec<GeneratedQuestion>,
     #[serde(default)]
     pub answers: Vec<QuestionAnswer>,
+    /// Session-scoped memory keyed by `impact_dimension` (e.g. "tone",
+    /// "audience"). Frontend pre-fills matching questions with these
+    /// values and shows a "remembered" badge (PRD §5.1.6 / §7.3).
+    #[serde(default)]
+    pub remembered_values: HashMap<String, String>,
 }
 
 /// Reads the captured input from `AppState.pending_prompt`, then waits up
@@ -38,6 +44,11 @@ pub async fn fetch_question_card_session(app: AppHandle) -> QuestionSession {
         pending.clone()
     };
     let domain = detect_domain(&original);
+
+    let remembered_values = {
+        let map = state.remembered_answers.lock().unwrap();
+        map.clone()
+    };
 
     let rx = {
         let mut guard = state.pending_questions.lock().unwrap();
@@ -97,6 +108,7 @@ pub async fn fetch_question_card_session(app: AppHandle) -> QuestionSession {
         original_input: original,
         questions,
         answers: Vec::new(),
+        remembered_values,
     }
 }
 
@@ -132,6 +144,20 @@ pub async fn submit_question_card_answers(
     let enhanced = enhance::enhance_prompt(&app, &combined_input)
         .await
         .map_err(|e| format!("enhancement failed: {e:#}"))?;
+
+    // Record successful answers in session-scoped memory (PRD §5.1.6).
+    // Empty answers are ignored — leaving a dimension blank should not
+    // overwrite a previously remembered value.
+    {
+        let state = app.state::<crate::AppState>();
+        let mut mem = state.remembered_answers.lock().unwrap();
+        for a in &answers {
+            let trimmed = a.value.trim();
+            if !trimmed.is_empty() {
+                mem.insert(a.impact_dimension.as_str().to_string(), trimmed.to_string());
+            }
+        }
+    }
 
     if let Some(window) = app.get_webview_window("question-card") {
         let _ = window.hide();

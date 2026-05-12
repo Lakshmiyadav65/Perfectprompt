@@ -29,6 +29,7 @@ interface QuestionSession {
   original_input: string;
   questions: GeneratedQuestion[];
   answers: unknown[];
+  remembered_values: Record<string, string>;
 }
 
 interface QuestionAnswer {
@@ -44,8 +45,11 @@ type AnswerMap = Record<string, string | string[]>;
 export function QuestionCard() {
   const [questions, setQuestions] = useState<GeneratedQuestion[]>([]);
   const [answers, setAnswers] = useState<AnswerMap>({});
+  const [rememberedIds, setRememberedIds] = useState<Set<string>>(new Set());
+  const [originalInput, setOriginalInput] = useState<string>("");
   const [state, setState] = useState<CardState>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
@@ -54,8 +58,12 @@ export function QuestionCard() {
       try {
         const session = await invoke<QuestionSession>("fetch_question_card_session");
         if (cancelled) return;
+        const remembered = session.remembered_values ?? {};
+        const { initial, prefilled } = prefillFromMemory(session.questions, remembered);
         setQuestions(session.questions);
-        setAnswers(initialiseAnswers(session.questions));
+        setAnswers(initial);
+        setRememberedIds(prefilled);
+        setOriginalInput(session.original_input ?? "");
         setState("loaded");
       } catch (err) {
         if (cancelled) return;
@@ -88,6 +96,17 @@ export function QuestionCard() {
     return () => window.removeEventListener("keydown", onKeydown);
   }, [handleSkipAll]);
 
+  const updateAnswer = (questionId: string, next: string | string[]) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: next }));
+    // Manual edits override the "remembered" provenance.
+    setRememberedIds((prev) => {
+      if (!prev.has(questionId)) return prev;
+      const copy = new Set(prev);
+      copy.delete(questionId);
+      return copy;
+    });
+  };
+
   const handleSubmit = async () => {
     if (state === "submitting" || state === "loading") return;
     setState("submitting");
@@ -114,6 +133,16 @@ export function QuestionCard() {
     } catch (err) {
       setErrorMsg(String(err));
       setState("error");
+    }
+  };
+
+  const handleCopyRaw = async () => {
+    try {
+      await navigator.clipboard.writeText(originalInput);
+      setCopyState("copied");
+      setTimeout(() => setCopyState("idle"), 1500);
+    } catch (err) {
+      console.error("copy failed", err);
     }
   };
 
@@ -147,8 +176,16 @@ export function QuestionCard() {
         {state === "loading" && <SkeletonBlock />}
         {state === "error" && (
           <div className="qc-error">
-            <p>Couldn't load questions.</p>
+            <p>Couldn't enhance your prompt.</p>
             <p className="qc-error-detail">{errorMsg}</p>
+            <button
+              type="button"
+              className="qc-copy-raw"
+              onClick={() => void handleCopyRaw()}
+              disabled={!originalInput}
+            >
+              {copyState === "copied" ? "Copied!" : "Copy raw input"}
+            </button>
           </div>
         )}
         {(state === "loaded" || state === "submitting") &&
@@ -157,8 +194,9 @@ export function QuestionCard() {
               key={q.id}
               question={q}
               value={answers[q.id]}
+              remembered={rememberedIds.has(q.id)}
               disabled={state === "submitting"}
-              onChange={(v) => setAnswers((prev) => ({ ...prev, [q.id]: v }))}
+              onChange={(v) => updateAnswer(q.id, v)}
             />
           ))}
       </div>
@@ -187,25 +225,82 @@ export function QuestionCard() {
   );
 }
 
-function initialiseAnswers(questions: GeneratedQuestion[]): AnswerMap {
-  const out: AnswerMap = {};
+function prefillFromMemory(
+  questions: GeneratedQuestion[],
+  remembered: Record<string, string>,
+): { initial: AnswerMap; prefilled: Set<string> } {
+  const initial: AnswerMap = {};
+  const prefilled = new Set<string>();
+
   for (const q of questions) {
-    out[q.id] = q.type === "multi_select" ? [] : "";
+    const memVal = remembered[q.impact_dimension];
+    if (memVal === undefined || memVal.trim() === "") {
+      initial[q.id] = q.type === "multi_select" ? [] : "";
+      continue;
+    }
+
+    switch (q.type) {
+      case "chips":
+      case "single_select": {
+        const match = q.options.find(
+          (opt) => opt.toLowerCase() === memVal.toLowerCase(),
+        );
+        if (match) {
+          initial[q.id] = match;
+          prefilled.add(q.id);
+        } else {
+          initial[q.id] = "";
+        }
+        break;
+      }
+      case "multi_select": {
+        const parts = memVal
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0);
+        const matches = q.options.filter((opt) =>
+          parts.some((p) => p.toLowerCase() === opt.toLowerCase()),
+        );
+        if (matches.length > 0) {
+          initial[q.id] = matches;
+          prefilled.add(q.id);
+        } else {
+          initial[q.id] = [];
+        }
+        break;
+      }
+      case "free_text": {
+        initial[q.id] = memVal;
+        prefilled.add(q.id);
+        break;
+      }
+    }
   }
-  return out;
+
+  return { initial, prefilled };
 }
 
 interface QuestionRowProps {
   question: GeneratedQuestion;
   value: string | string[] | undefined;
+  remembered: boolean;
   disabled: boolean;
   onChange: (next: string | string[]) => void;
 }
 
-function QuestionRow({ question, value, disabled, onChange }: QuestionRowProps) {
+function QuestionRow({
+  question,
+  value,
+  remembered,
+  disabled,
+  onChange,
+}: QuestionRowProps) {
   return (
     <div className="qc-row">
-      <div className="qc-question">{question.question}</div>
+      <div className="qc-question">
+        {question.question}
+        {remembered && <span className="qc-remembered">remembered</span>}
+      </div>
       {renderWidget(question, value, disabled, onChange)}
     </div>
   );
