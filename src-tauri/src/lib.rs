@@ -79,11 +79,47 @@ pub fn run() {
             let user_settings = settings::load(app.handle());
             tray::build(app.handle())?;
             hotkey::register(app.handle(), &user_settings.hotkey)?;
+            install_keep_alive_close_handlers(app.handle());
             maybe_show_settings_on_first_run(app.handle(), &user_settings);
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// PromptForge is a system-tray app, so the auxiliary windows must outlive
+/// the user clicking their X buttons. Tauri 2's default behavior on
+/// `CloseRequested` is to *destroy* the WebviewWindow, after which
+/// `get_webview_window(label)` returns `None` and the tray menu can no
+/// longer re-open it.
+///
+/// We register a close handler per window that calls `api.prevent_close()`
+/// and hides instead. The window remains in the WebviewWindowManager so
+/// subsequent shows/focuses succeed. Applies to every non-main window we
+/// surface from the tray; the invisible `main` window keeps Tauri's
+/// default behavior.
+fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
+    const KEEP_ALIVE_LABELS: &[&str] =
+        &["settings", "projects", "clarify", "question-card", "status"];
+
+    for label in KEEP_ALIVE_LABELS {
+        let Some(window) = app.get_webview_window(label) else {
+            println!("[lifecycle] keep-alive: window {label:?} not found at setup");
+            continue;
+        };
+        let win_for_handler = window.clone();
+        let label_for_handler = label.to_string();
+        window.on_window_event(move |event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                if let Err(e) = win_for_handler.hide() {
+                    println!(
+                        "[lifecycle] hide failed for {label_for_handler:?}: {e}"
+                    );
+                }
+            }
+        });
+    }
 }
 
 /// First-run UX: if there is no API key in either the GROQ_API_KEY env var or

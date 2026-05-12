@@ -5,6 +5,13 @@ body,
   color: #e6e6e6;
   margin: 0;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  height: 100%;
+}
+
+body {
+  /* Settings has outgrown the original 480px window; let the body scroll
+     vertically rather than clipping the new Smart Question Engine section. */
+  overflow-y: auto;
 }
 
 .pf-settings {

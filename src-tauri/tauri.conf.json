@@ -39,8 +39,8 @@
         "url": "index.html#/settings",
         "title": "PromptForge Settings",
         "width": 540,
-        "height": 480,
-        "resizable": false,
+        "height": 720,
+        "resizable": true,
         "visible": false,
         "center": true,
         "decorations": true

@@ -52,6 +52,16 @@ export function QuestionCard() {
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const appWindow = getCurrentWebviewWindow();
 
+  // Scope the transparent body background to the question-card route only.
+  // Without this guard, QuestionCard.css's global body rule would leak into
+  // Settings / Projects / Clarify and break their dark theme + scrolling.
+  useEffect(() => {
+    document.body.classList.add("qc-route");
+    return () => {
+      document.body.classList.remove("qc-route");
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
