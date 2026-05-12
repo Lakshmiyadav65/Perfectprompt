@@ -3,8 +3,11 @@ use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Runtime};
 
+mod active_app;
+mod app_classifier;
 mod clarify;
 mod clipboard;
+mod developer_enhance;
 mod enhance;
 mod generation;
 mod hotkey;
@@ -59,6 +62,9 @@ pub fn run() {
             settings::open_settings,
             settings::get_question_engine_settings,
             settings::save_question_engine_settings,
+            settings::get_app_classification_settings,
+            settings::save_app_classification_settings,
+            settings::get_default_classification_lists,
             updater::check_for_updates,
             enhance::get_pending_prompt,
             enhance::generate_clarifying_questions,

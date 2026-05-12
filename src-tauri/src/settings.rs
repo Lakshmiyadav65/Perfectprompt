@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use std::collections::HashMap;
 
+use crate::app_classifier::AppClassification;
 use crate::{enhance, hotkey};
 
 const SETTINGS_FILE: &str = "settings.json";
@@ -44,6 +45,11 @@ pub struct UserSettings {
     pub question_mode: QuestionMode,
     #[serde(default)]
     pub remembered_contexts: HashMap<String, String>,
+    /// Context-aware enhancement (active-app routing). Defaults preserve
+    /// the legacy "always show questionnaire" behaviour for unknown
+    /// surfaces while letting known IDEs/terminals skip the popup.
+    #[serde(default)]
+    pub app_classification: AppClassificationSettings,
 }
 
 impl Default for UserSettings {
@@ -54,6 +60,48 @@ impl Default for UserSettings {
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
             question_mode: QuestionMode::default(),
             remembered_contexts: HashMap::new(),
+            app_classification: AppClassificationSettings::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppClassificationSettings {
+    /// Extra process names (case-insensitive, includes ".exe") that should
+    /// always be treated as developer environments. Merged with the
+    /// built-in defaults at classification time.
+    #[serde(default)]
+    pub developer_apps: Vec<String>,
+    /// Extra process names that should always show the questionnaire,
+    /// overriding the built-in developer list.
+    #[serde(default)]
+    pub general_apps: Vec<String>,
+    /// What to do when the active app matches neither list. Defaults to
+    /// the safer questionnaire path (FR-007).
+    #[serde(default = "default_unknown_app_behavior")]
+    pub default_unknown_app_behavior: AppClassification,
+    /// Whether to inject the active project's description and links into
+    /// the developer-direct enhancement call. Off-by-default would force
+    /// users to discover the toggle, so we default-on (FR-004).
+    #[serde(default = "default_use_project_awareness")]
+    pub use_project_awareness_in_developer_apps: bool,
+}
+
+fn default_unknown_app_behavior() -> AppClassification {
+    AppClassification::General
+}
+
+fn default_use_project_awareness() -> bool {
+    true
+}
+
+impl Default for AppClassificationSettings {
+    fn default() -> Self {
+        Self {
+            developer_apps: Vec::new(),
+            general_apps: Vec::new(),
+            default_unknown_app_behavior: default_unknown_app_behavior(),
+            use_project_awareness_in_developer_apps: default_use_project_awareness(),
         }
     }
 }
@@ -266,6 +314,56 @@ pub fn save_question_engine_settings<R: Runtime>(
     settings.question_threshold = payload.question_threshold;
     settings.question_mode = payload.question_mode;
     save(&app, &settings).map_err(|e| format!("{e:#}"))
+}
+
+#[tauri::command]
+pub fn get_app_classification_settings<R: Runtime>(
+    app: AppHandle<R>,
+) -> AppClassificationSettings {
+    load(&app).app_classification
+}
+
+#[tauri::command]
+pub fn save_app_classification_settings<R: Runtime>(
+    app: AppHandle<R>,
+    payload: AppClassificationSettings,
+) -> std::result::Result<(), String> {
+    let mut settings = load(&app);
+    settings.app_classification = AppClassificationSettings {
+        developer_apps: dedupe_lower(payload.developer_apps),
+        general_apps: dedupe_lower(payload.general_apps),
+        default_unknown_app_behavior: payload.default_unknown_app_behavior,
+        use_project_awareness_in_developer_apps: payload
+            .use_project_awareness_in_developer_apps,
+    };
+    save(&app, &settings).map_err(|e| format!("{e:#}"))
+}
+
+#[derive(Serialize)]
+pub struct DefaultClassificationLists {
+    pub developer_apps: Vec<&'static str>,
+    pub general_apps: Vec<&'static str>,
+}
+
+/// Exposes the built-in lists so the Settings UI can show users which
+/// apps are recognised out of the box. Useful guidance when deciding
+/// whether to add an override.
+#[tauri::command]
+pub fn get_default_classification_lists() -> DefaultClassificationLists {
+    DefaultClassificationLists {
+        developer_apps: crate::app_classifier::DEFAULT_DEVELOPER_APPS.to_vec(),
+        general_apps: crate::app_classifier::DEFAULT_GENERAL_APPS.to_vec(),
+    }
+}
+
+fn dedupe_lower(items: Vec<String>) -> Vec<String> {
+    let mut seen = std::collections::HashSet::new();
+    items
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .filter(|s| seen.insert(s.to_lowercase()))
+        .collect()
 }
 
 #[tauri::command]

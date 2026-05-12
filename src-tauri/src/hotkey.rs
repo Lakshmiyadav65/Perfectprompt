@@ -5,8 +5,12 @@ use anyhow::{anyhow, Result};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
+use crate::active_app::{self, ActiveAppContext};
+use crate::app_classifier::{self, AppClassification};
 use crate::settings::QuestionMode;
-use crate::{clipboard, enhance, generation, question_bank, settings, status_window};
+use crate::{
+    clipboard, developer_enhance, enhance, generation, question_bank, settings, status_window,
+};
 use crate::AppState;
 
 pub const DEFAULT_HOTKEY: &str = "CommandOrControl+Alt+E";
@@ -121,6 +125,13 @@ async fn run_capture_pipeline<R: Runtime>(
     force_bypass: bool,
 ) -> Result<()> {
     let t0 = Instant::now();
+
+    // Detect the active foreground app BEFORE the clipboard capture so
+    // we don't pick up a transient focus change. The synthetic Ctrl+C
+    // doesn't move focus on Windows, but reading early also keeps
+    // logging in trigger order.
+    let active_app = active_app::detect_active_app().unwrap_or_default();
+
     let input = clipboard::capture_selection(app)
         .await
         .map_err(|e| anyhow!("capture failed: {e}"))?;
@@ -140,17 +151,32 @@ async fn run_capture_pipeline<R: Runtime>(
         *pending = input.clone();
     }
 
-    // Shift+hotkey bypass takes precedence over score / mode (PRD §5.1.7).
+    let user_settings = settings::load(app);
+
+    // Shift+hotkey bypass takes precedence over score / mode / classifier
+    // (PRD §5.1.7). It still uses the developer-direct path when the
+    // active app is a developer surface so the user gets project context
+    // for free.
     if force_bypass {
         println!("[pipeline] Shift bypass — running silent path");
-        return run_silent_path(app, &input, t0).await;
+        return run_silent_path(app, &input, &active_app, t0).await;
     }
 
-    // Decide path: silent (capture → enhance → paste) vs. card (question
-    // card → enhance → paste). PRD §5.1.1: Adaptive mode compares the
-    // complexity score to `question_threshold`; AlwaysAsk and Silent
-    // short-circuit that.
-    let user_settings = settings::load(app);
+    // Context-aware routing (FR-002, FR-003): if the foreground app is a
+    // developer environment, skip the questionnaire entirely and run the
+    // developer-direct enhancement.
+    let classification = app_classifier::classify(&active_app, &user_settings.app_classification);
+    println!(
+        "[pipeline] active app: process={:?} title={:?} → {:?}",
+        active_app.process_name, active_app.window_title, classification,
+    );
+
+    if matches!(classification, AppClassification::Developer) {
+        println!("[pipeline] developer environment — skipping questionnaire");
+        return run_developer_path(app, &input, &active_app, t0).await;
+    }
+
+    // General environment: keep the existing question-engine routing.
     let score = question_bank::score_complexity(&input);
     let show_card = match user_settings.question_mode {
         QuestionMode::Silent => false,
@@ -169,16 +195,19 @@ async fn run_capture_pipeline<R: Runtime>(
     if show_card {
         run_card_path(app, &input, t0).await
     } else {
-        run_silent_path(app, &input, t0).await
+        run_silent_path(app, &input, &active_app, t0).await
     }
 }
 
 /// Silent path: no card. Show the status pill, run the enhancement,
 /// paste. Used when the user has set `question_mode = Silent` or when
-/// the complexity scorer judges the input already specific enough.
+/// the complexity scorer judges the input already specific enough. The
+/// active-app context is unused by the plain silent path today but is
+/// kept on the signature so future routing tweaks don't need a re-wire.
 async fn run_silent_path<R: Runtime>(
     app: &AppHandle<R>,
     input: &str,
+    _active_app: &ActiveAppContext,
     t0: Instant,
 ) -> Result<()> {
     let _ = status_window::show_near_cursor(app);
@@ -198,6 +227,41 @@ async fn run_silent_path<R: Runtime>(
 
     println!(
         "[latency] silent path hotkey→pasted={}ms (enhance={}ms paste={}ms)",
+        t0.elapsed().as_millis(),
+        t_enhance.as_millis(),
+        t_paste.as_millis(),
+    );
+    Ok(())
+}
+
+/// Developer-direct path: skip the questionnaire, inject project
+/// awareness context (when enabled), enhance, paste. Triggered when the
+/// active foreground app is classified as a developer environment
+/// (FR-003). The status pill still appears so the user gets feedback
+/// (UI-001 / AC-009).
+async fn run_developer_path<R: Runtime>(
+    app: &AppHandle<R>,
+    input: &str,
+    active_app: &ActiveAppContext,
+    t0: Instant,
+) -> Result<()> {
+    let _ = status_window::show_near_cursor(app);
+
+    let t_enhance_start = Instant::now();
+    let enhance_result = developer_enhance::enhance_for_developer(app, input, active_app).await;
+    let t_enhance = t_enhance_start.elapsed();
+    let _ = status_window::hide(app);
+
+    let enhanced = enhance_result.map_err(|e| anyhow!("developer enhance failed: {e:#}"))?;
+
+    let t_paste_start = Instant::now();
+    clipboard::replace_selection(app, &enhanced)
+        .await
+        .map_err(|e| anyhow!("paste failed: {e}"))?;
+    let t_paste = t_paste_start.elapsed();
+
+    println!(
+        "[latency] developer path hotkey→pasted={}ms (enhance={}ms paste={}ms)",
         t0.elapsed().as_millis(),
         t_enhance.as_millis(),
         t_paste.as_millis(),
