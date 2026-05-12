@@ -1,6 +1,7 @@
 import { StatusIndicator } from "./components/StatusIndicator";
 import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
+import { CommandBar } from "./components/CommandBar";
 import { Shell } from "./components/Shell";
 
 function App() {
@@ -10,6 +11,7 @@ function App() {
   if (hash === "#/status") return <StatusIndicator />;
   if (hash === "#/clarify") return <ClarifyPopup />;
   if (hash === "#/question-card") return <QuestionCard />;
+  if (hash === "#/command-bar") return <CommandBar />;
 
   // Anything else (main / home / settings / projects, plus the legacy
   // "/settings" or "/projects" deep-links from the tray) renders the

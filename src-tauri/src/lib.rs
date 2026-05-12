@@ -6,6 +6,7 @@ mod active_app;
 mod app_classifier;
 mod clarify;
 mod clipboard;
+mod command_bar;
 mod developer_enhance;
 mod enhance;
 mod generation;
@@ -95,6 +96,9 @@ pub fn run() {
             clarify::submit_question_card_answers,
             clarify::open_question_card,
             clarify::cancel_question_card,
+            command_bar::show_command_bar,
+            command_bar::hide_command_bar,
+            command_bar::open_main_window,
         ])
         .setup(|app| {
             let user_settings = settings::load(app.handle());
@@ -110,6 +114,12 @@ pub fn run() {
                 println!("[hotkey] start-up: master toggle is OFF — not registering");
             }
             install_keep_alive_close_handlers(app.handle());
+            // Float the command bar at the top of the primary monitor on
+            // startup. The window is created hidden in tauri.conf.json so
+            // we get to position it before the first paint.
+            if let Err(e) = command_bar::show(app.handle()) {
+                println!("[command-bar] startup show failed: {e}");
+            }
             // First-run onboarding is handled by the Home screen's banner
             // — no need to spawn a separate Settings window on top of it.
             Ok(())
@@ -130,8 +140,15 @@ pub fn run() {
 /// surface from the tray; the invisible `main` window keeps Tauri's
 /// default behavior.
 fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
-    const KEEP_ALIVE_LABELS: &[&str] =
-        &["main", "settings", "projects", "clarify", "question-card", "status"];
+    const KEEP_ALIVE_LABELS: &[&str] = &[
+        "main",
+        "settings",
+        "projects",
+        "clarify",
+        "question-card",
+        "status",
+        "command-bar",
+    ];
 
     for label in KEEP_ALIVE_LABELS {
         let Some(window) = app.get_webview_window(label) else {

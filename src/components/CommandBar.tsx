@@ -1,0 +1,135 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import "./CommandBar.css";
+
+/// Always-on-top floating widget — Wispr-style mic widget pattern.
+/// Shows the user the global hotkey, current state (active/paused),
+/// and a quick affordance to open the main Home window.
+export function CommandBar() {
+  const [hotkey, setHotkey] = useState("Alt+E");
+  const [enabled, setEnabled] = useState(true);
+  const appWindow = getCurrentWebviewWindow();
+
+  // Scope a transparent body background to this route only.
+  useEffect(() => {
+    document.body.classList.add("cb-route");
+    return () => {
+      document.body.classList.remove("cb-route");
+    };
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+    // Poll so the bar stays in sync if the user flips the toggle from
+    // the main Home sidebar.
+    const id = window.setInterval(() => void refresh(), 1500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  async function refresh() {
+    try {
+      const [hk, en] = await Promise.all([
+        invoke<string>("get_hotkey"),
+        invoke<boolean>("get_hotkey_enabled"),
+      ]);
+      setHotkey(hk);
+      setEnabled(en);
+    } catch (e) {
+      console.error("CommandBar refresh failed", e);
+    }
+  }
+
+  async function handleToggle() {
+    const next = !enabled;
+    setEnabled(next);
+    try {
+      await invoke("set_hotkey_enabled", { enabled: next });
+    } catch (e) {
+      console.error("toggle failed", e);
+      setEnabled(!next);
+    }
+  }
+
+  async function handleOpen() {
+    try {
+      await invoke("open_main_window");
+    } catch (e) {
+      console.error("open main failed", e);
+    }
+  }
+
+  async function handleHide() {
+    await appWindow.hide();
+  }
+
+  const parts = hotkey.split("+");
+
+  return (
+    <div className="cb-root">
+      {/* ---- Top pill: brand + hotkey ---- */}
+      <div className="cb-pill cb-primary" data-tauri-drag-region>
+        <span className="cb-label">Refine</span>
+        <span className="cb-keys">
+          {parts.map((part, i, arr) => (
+            <span key={i} className="cb-keypair">
+              <kbd className="cb-kbd">{part}</kbd>
+              {i < arr.length - 1 && <span className="cb-plus">+</span>}
+            </span>
+          ))}
+        </span>
+      </div>
+
+      {/* ---- Bottom row: drag handle + status toggle + open + close ---- */}
+      <div className="cb-row">
+        <button
+          type="button"
+          className="cb-icon-btn cb-drag"
+          data-tauri-drag-region
+          aria-label="Drag the command bar"
+          tabIndex={-1}
+        >
+          <svg viewBox="0 0 24 8" width="22" height="8" aria-hidden="true">
+            <circle cx="3" cy="4" r="1.2" fill="currentColor" />
+            <circle cx="8" cy="4" r="1.2" fill="currentColor" />
+            <circle cx="13" cy="4" r="1.2" fill="currentColor" />
+            <circle cx="18" cy="4" r="1.2" fill="currentColor" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className={`cb-icon-btn cb-toggle ${enabled ? "on" : "off"}`}
+          aria-label={enabled ? "Pause PromptForge" : "Activate PromptForge"}
+          aria-pressed={enabled}
+          onClick={() => void handleToggle()}
+          title={enabled ? "Active — click to pause" : "Paused — click to activate"}
+        >
+          <span className="cb-toggle-dot" />
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn"
+          aria-label="Open PromptForge"
+          onClick={() => void handleOpen()}
+          title="Open PromptForge"
+        >
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="4" y="6" width="16" height="14" rx="2" />
+            <path d="M8 10h8M8 14h5" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn"
+          aria-label="Hide command bar"
+          onClick={() => void handleHide()}
+          title="Hide (re-open from tray)"
+        >
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}

@@ -89,6 +89,21 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "shadow": true
+      },
+      {
+        "label": "command-bar",
+        "url": "index.html#/command-bar",
+        "title": "PromptForge",
+        "width": 320,
+        "height": 110,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {
