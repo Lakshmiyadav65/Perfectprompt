@@ -1,0 +1,69 @@
+/* ===== PromptForge design tokens =====
+   Single source of truth for the dark, monochrome + forge-orange theme.
+   Every component reads from these — never hard-code colors elsewhere. */
+
+:root {
+  /* ---- Color: surface ---- */
+  --pf-bg: #0a0a0a;            /* page background */
+  --pf-surface: #141414;        /* cards, sidebar */
+  --pf-surface-2: #1c1c1c;      /* hover/elevated */
+  --pf-surface-3: #232323;      /* deeper inputs/code */
+
+  /* ---- Color: lines ---- */
+  --pf-border: #262626;
+  --pf-border-strong: #3a3a3a;
+  --pf-border-focus: var(--pf-accent);
+
+  /* ---- Color: text ---- */
+  --pf-text: #fafafa;
+  --pf-text-muted: #a3a3a3;
+  --pf-text-subtle: #737373;
+  --pf-text-faint: #525252;
+  --pf-text-on-accent: #0a0a0a;
+
+  /* ---- Color: accent (forge orange — used SPARINGLY) ---- */
+  --pf-accent: #ff6b35;
+  --pf-accent-hover: #ff8559;
+  --pf-accent-soft: rgba(255, 107, 53, 0.12);
+  --pf-accent-glow: rgba(255, 107, 53, 0.35);
+  --pf-accent-ring: rgba(255, 107, 53, 0.20);
+
+  /* ---- Color: signals (also from the orange/white palette) ---- */
+  --pf-danger: #ff4444;
+  --pf-danger-soft: rgba(255, 68, 68, 0.10);
+
+  /* ---- Type ---- */
+  --pf-font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --pf-font-mono: "JetBrains Mono", "Geist Mono", ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  --pf-font-display: "Inter", system-ui, sans-serif;
+
+  /* ---- Radius ---- */
+  --pf-radius-sm: 6px;
+  --pf-radius: 10px;
+  --pf-radius-lg: 14px;
+  --pf-radius-xl: 18px;
+
+  /* ---- Shadow ---- */
+  --pf-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --pf-shadow-md: 0 4px 14px rgba(0, 0, 0, 0.35);
+  --pf-shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --pf-glow: 0 0 0 1px var(--pf-accent), 0 0 24px var(--pf-accent-glow);
+
+  /* ---- Motion ---- */
+  --pf-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Hairline divider helper */
+.pf-divider {
+  height: 1px;
+  background: var(--pf-border);
+  border: none;
+  width: 100%;
+}
+
+/* Reset for any popup window using these tokens */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}

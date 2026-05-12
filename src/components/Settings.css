@@ -1,39 +1,38 @@
-/* Light Wispr-Flow theme. The Shell owns body/root background;
-   Settings only paints its own pane content. */
+/* Settings — dark theme via tokens. Lives inside Shell. */
 
 .pf-settings {
-  padding: 36px 44px 48px;
-  max-width: 720px;
+  padding: 44px 56px 56px;
+  max-width: 760px;
   margin: 0 auto;
-  color: #1c1c1e;
+  color: var(--pf-text);
 }
 
 .pf-settings h1 {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 6px;
-  color: #1c1c1e;
+  letter-spacing: -0.025em;
+  margin: 0 0 8px;
+  color: var(--pf-text);
 }
 
 .pf-welcome {
-  background: linear-gradient(135deg, #fff7e0 0%, #fff1c8 100%);
-  border: 1px solid #f0d99c;
-  border-radius: 12px;
+  background: var(--pf-accent-soft);
+  border: 1px solid var(--pf-accent);
+  border-radius: var(--pf-radius);
   padding: 18px 20px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .pf-welcome-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   margin: 0 0 6px;
-  color: #6a4f0a;
+  color: var(--pf-text);
 }
 
 .pf-welcome-body {
   margin: 0 0 12px;
-  color: #876417;
+  color: var(--pf-text-muted);
   font-size: 13px;
   line-height: 1.55;
 }
@@ -41,24 +40,25 @@
 .pf-cta {
   display: inline-block;
   padding: 9px 16px;
-  background: #1c1c1e;
-  color: #f6f5f1;
+  background: var(--pf-accent);
+  color: var(--pf-text-on-accent);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--pf-radius);
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
   font-weight: 600;
+  transition: background 0.12s var(--pf-ease);
 }
 
 .pf-cta:hover {
-  background: #2a2a2c;
+  background: var(--pf-accent-hover);
 }
 
 .pf-settings section {
-  margin-bottom: 28px;
-  padding-bottom: 22px;
-  border-bottom: 1px solid #ece9df;
+  margin-bottom: 32px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--pf-border);
 }
 
 .pf-settings section:last-child {
@@ -66,31 +66,37 @@
 }
 
 .pf-settings h2 {
-  font-size: 12px;
-  font-weight: 600;
-  margin: 0 0 4px;
-  color: #8a8a8a;
+  font-family: var(--pf-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  margin: 0 0 6px;
+  color: var(--pf-text-subtle);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
 }
 
 .pf-hint {
-  color: #6b6b6b;
+  color: var(--pf-text-muted);
   font-size: 13px;
-  margin: 4px 0 12px;
-  line-height: 1.5;
+  margin: 4px 0 14px;
+  line-height: 1.55;
 }
 
 .pf-sub {
-  color: #8a8a8a;
+  color: var(--pf-text-subtle);
   font-size: 12px;
   margin: 0 0 8px;
   line-height: 1.5;
 }
 
 .pf-sub a {
-  color: #1c1c1e;
+  color: var(--pf-text);
   text-decoration: underline;
+  text-decoration-color: var(--pf-text-subtle);
+}
+
+.pf-sub a:hover {
+  text-decoration-color: var(--pf-accent);
 }
 
 .pf-row {
@@ -102,60 +108,70 @@
 .pf-row input {
   flex: 1;
   padding: 9px 12px;
-  background: #fff;
-  color: #1c1c1e;
-  border: 1px solid #d8d6cc;
-  border-radius: 8px;
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-sm);
   font-size: 13px;
   font-family: inherit;
   min-width: 0;
+  transition: border-color 0.12s var(--pf-ease);
 }
 
 .pf-row input.pf-recording {
-  border-color: #1c1c1e;
-  background: #faf9f5;
+  border-color: var(--pf-accent);
+  background: var(--pf-surface-2);
 }
 
 .pf-row input:focus {
   outline: none;
-  border-color: #1c1c1e;
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
 }
 
 .pf-row input:disabled {
   opacity: 0.5;
 }
 
+.pf-row input::placeholder {
+  color: var(--pf-text-faint);
+}
+
 .pf-row button {
   padding: 9px 16px;
-  background: #1c1c1e;
-  color: #f6f5f1;
+  background: var(--pf-text);
+  color: var(--pf-bg);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--pf-radius-sm);
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
   font-weight: 600;
   white-space: nowrap;
+  transition: background 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
 }
 
 .pf-row button:hover:not(:disabled) {
-  background: #2a2a2c;
+  background: var(--pf-accent);
+  color: var(--pf-text);
 }
 
 .pf-row button:disabled {
-  background: #d8d6cc;
-  color: #8a8a8a;
+  background: var(--pf-surface-2);
+  color: var(--pf-text-faint);
   cursor: not-allowed;
 }
 
 .pf-row button.pf-secondary {
   background: transparent;
-  border: 1px solid #d8d6cc;
-  color: #1c1c1e;
+  border: 1px solid var(--pf-border);
+  color: var(--pf-text-muted);
 }
 
 .pf-row button.pf-secondary:hover:not(:disabled) {
-  background: #faf9f5;
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  border-color: var(--pf-border-strong);
 }
 
 .pf-msg {
@@ -166,31 +182,31 @@
 }
 
 .pf-ok {
-  color: #2f8a4f;
+  color: var(--pf-accent);
 }
 
 .pf-err {
-  color: #c0392b;
+  color: var(--pf-danger);
 }
 
 /* ----- Smart Question Engine section ----- */
 
 .pf-settings kbd {
-  background: #f1efe8;
-  border: 1px solid #d8d6cc;
+  background: var(--pf-surface-2);
+  border: 1px solid var(--pf-border-strong);
   border-bottom-width: 2px;
-  border-radius: 5px;
+  border-radius: var(--pf-radius-sm);
   padding: 2px 6px;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-family: var(--pf-font-mono);
   font-size: 11px;
-  color: #1c1c1e;
+  color: var(--pf-text);
 }
 
 .pf-segmented {
   display: inline-flex;
-  background: #f1efe8;
-  border: 1px solid #d8d6cc;
-  border-radius: 9px;
+  background: var(--pf-surface);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
   padding: 3px;
   margin: 4px 0 8px;
   gap: 2px;
@@ -199,28 +215,28 @@
 .pf-segment {
   background: transparent;
   border: none;
-  color: #6b6b6b;
+  color: var(--pf-text-muted);
   font-size: 12.5px;
   font-family: inherit;
   font-weight: 500;
   padding: 6px 14px;
-  border-radius: 6px;
+  border-radius: var(--pf-radius-sm);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
 }
 
 .pf-segment:hover:not(:disabled):not(.selected) {
-  background: rgba(0, 0, 0, 0.04);
-  color: #1c1c1e;
+  background: var(--pf-surface-2);
+  color: var(--pf-text);
 }
 
 .pf-segment.selected {
-  background: #1c1c1e;
-  color: #f6f5f1;
+  background: var(--pf-text);
+  color: var(--pf-bg);
 }
 
 .pf-segment:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
@@ -230,9 +246,9 @@
 }
 
 .pf-threshold {
-  background: #faf9f5;
-  border: 1px solid #ece9df;
-  border-radius: 10px;
+  background: var(--pf-surface);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
   padding: 12px 14px;
   margin: 6px 0 14px;
 }
@@ -242,23 +258,23 @@
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #6b6b6b;
+  color: var(--pf-text-muted);
   margin-bottom: 6px;
 }
 
 .pf-threshold-value {
-  font-family: ui-monospace, Menlo, monospace;
+  font-family: var(--pf-font-mono);
   font-size: 12px;
-  color: #1c1c1e;
-  background: #fff;
-  border: 1px solid #d8d6cc;
-  border-radius: 5px;
+  color: var(--pf-text);
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: 4px;
   padding: 1px 8px;
 }
 
 .pf-threshold input[type="range"] {
   width: 100%;
-  accent-color: #1c1c1e;
+  accent-color: var(--pf-accent);
   cursor: pointer;
 }
 
@@ -271,23 +287,28 @@
   display: flex;
   justify-content: space-between;
   font-size: 10.5px;
-  color: #8a8a8a;
+  color: var(--pf-text-faint);
   margin-top: 4px;
   letter-spacing: 0.02em;
 }
 
 .pf-privacy {
-  color: #6b6b6b;
+  color: var(--pf-text-subtle);
   font-size: 11.5px;
   line-height: 1.55;
   margin: 12px 0 0;
   padding: 10px 12px;
-  background: #faf9f5;
-  border-left: 2px solid #d8d6cc;
-  border-radius: 0 6px 6px 0;
+  background: var(--pf-surface);
+  border-left: 2px solid var(--pf-accent);
+  border-radius: 0 var(--pf-radius-sm) var(--pf-radius-sm) 0;
 }
 
 .pf-privacy a {
-  color: #1c1c1e;
+  color: var(--pf-text);
   text-decoration: underline;
+  text-decoration-color: var(--pf-text-subtle);
+}
+
+.pf-privacy a:hover {
+  text-decoration-color: var(--pf-accent);
 }

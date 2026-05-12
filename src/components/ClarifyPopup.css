@@ -1,4 +1,4 @@
-/* Clarify popup — older flow, lives in its own transparent floating window. */
+/* ClarifyPopup — older flow, separate transparent floating window. */
 
 html,
 body,
@@ -6,39 +6,38 @@ body,
   margin: 0;
   background: transparent;
   height: 100%;
+  font-family: var(--pf-font-sans);
 }
 
 .clarify-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: #ffffff;
-  color: #1c1c1e;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  font-family: var(--pf-font-sans);
   overflow: hidden;
   box-sizing: border-box;
-  border: 1px solid #e2e0d8;
-  border-radius: 16px;
-  box-shadow:
-    0 24px 64px rgba(0, 0, 0, 0.18),
-    0 4px 12px rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-lg);
+  box-shadow: var(--pf-shadow-lg);
 }
 
 .clarify-header {
   padding: 18px 24px 14px;
-  border-bottom: 1px solid #ece9df;
+  border-bottom: 1px solid var(--pf-border);
   flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff;
+  background: var(--pf-surface);
 }
 
 .clarify-header-title {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #1c1c1e;
+  color: var(--pf-text);
   letter-spacing: -0.01em;
 }
 
@@ -46,14 +45,14 @@ body,
   flex: 1;
   overflow-y: auto;
   padding: 18px 24px;
-  background: #faf9f5;
+  background: var(--pf-bg);
 }
 
 .clarify-content::-webkit-scrollbar {
   width: 8px;
 }
 .clarify-content::-webkit-scrollbar-thumb {
-  background: #d8d6cc;
+  background: var(--pf-border-strong);
   border-radius: 4px;
 }
 
@@ -63,7 +62,7 @@ body,
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #6b6b6b;
+  color: var(--pf-text-muted);
   gap: 14px;
   font-size: 13px;
 }
@@ -71,8 +70,8 @@ body,
 .spinner {
   width: 28px;
   height: 28px;
-  border: 2.5px solid #ece9df;
-  border-top-color: #1c1c1e;
+  border: 2.5px solid var(--pf-border-strong);
+  border-top-color: var(--pf-accent);
   border-radius: 50%;
   animation: spin 0.9s linear infinite;
 }
@@ -84,23 +83,23 @@ body,
 }
 
 .question-block {
-  background: #ffffff;
-  border: 1px solid #ece9df;
-  border-radius: 12px;
+  background: var(--pf-surface);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius);
   padding: 16px 18px;
   margin-bottom: 12px;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s var(--pf-ease);
 }
 
 .question-block:hover {
-  border-color: #d8d6cc;
+  border-color: var(--pf-border-strong);
 }
 
 .question-text {
   font-weight: 600;
   margin-bottom: 12px;
   font-size: 14px;
-  color: #1c1c1e;
+  color: var(--pf-text);
   letter-spacing: -0.01em;
 }
 
@@ -116,20 +115,20 @@ body,
   gap: 10px;
   cursor: pointer;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: var(--pf-radius-sm);
   font-size: 13.5px;
-  color: #4d4d4f;
-  transition: background-color 0.12s, color 0.12s;
+  color: var(--pf-text-muted);
+  transition: background-color 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
 }
 
 .option-label:hover {
-  background: #faf9f5;
-  color: #1c1c1e;
+  background: var(--pf-surface-2);
+  color: var(--pf-text);
 }
 
 .option-input {
   margin: 0;
-  accent-color: #1c1c1e;
+  accent-color: var(--pf-accent);
   cursor: pointer;
   width: 14px;
   height: 14px;
@@ -140,75 +139,81 @@ body,
   margin-top: 8px;
   margin-left: 24px;
   padding: 8px 12px;
-  background: #ffffff;
-  border: 1px solid #d8d6cc;
-  border-radius: 8px;
-  color: #1c1c1e;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-text);
   font-family: inherit;
   font-size: 13px;
   width: calc(100% - 24px);
   box-sizing: border-box;
-  transition: border-color 0.15s;
+  transition: border-color 0.15s var(--pf-ease);
 }
 
 .other-input:focus {
   outline: none;
-  border-color: #1c1c1e;
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+.other-input::placeholder {
+  color: var(--pf-text-faint);
 }
 
 .clarify-footer {
   padding: 14px 24px 18px;
-  border-top: 1px solid #ece9df;
+  border-top: 1px solid var(--pf-border);
   display: flex;
   justify-content: flex-end;
   gap: 10px;
   flex-shrink: 0;
-  background: #ffffff;
+  background: var(--pf-surface);
 }
 
 .btn {
   padding: 9px 18px;
-  border-radius: 8px;
+  border-radius: var(--pf-radius-sm);
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: all 0.15s;
+  transition: all 0.15s var(--pf-ease);
 }
 
 .btn-secondary {
   background: transparent;
-  color: #6b6b6b;
-  border: 1px solid #d8d6cc;
+  color: var(--pf-text-muted);
+  border: 1px solid var(--pf-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #faf9f5;
-  color: #1c1c1e;
+  background: var(--pf-surface-2);
+  color: var(--pf-text);
+  border-color: var(--pf-border-strong);
 }
 
 .btn-primary {
-  background: #1c1c1e;
-  color: #f6f5f1;
+  background: var(--pf-accent);
+  color: var(--pf-text-on-accent);
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #2a2a2c;
+  background: var(--pf-accent-hover);
   transform: translateY(-1px);
 }
 
 .btn:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .error-message {
-  color: #c0392b;
-  background: #fbecec;
+  color: var(--pf-danger);
+  background: var(--pf-danger-soft);
   padding: 12px 14px;
-  border-radius: 8px;
+  border-radius: var(--pf-radius-sm);
   margin-bottom: 14px;
-  border: 1px solid #e8b8b8;
+  border: 1px solid var(--pf-danger);
   font-size: 13px;
 }

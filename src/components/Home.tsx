@@ -47,138 +47,152 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
 
   const active = store.projects.find((p) => p.id === store.active_project_id);
   const totalProjects = store.projects.length;
-  const hasKey = keyStatus?.from_env || keyStatus?.from_settings;
+  const hasKey = !!(keyStatus?.from_env || keyStatus?.from_settings);
 
   return (
     <div className="ph-page">
+      {/* ---- Header ---- */}
       <header className="ph-header">
-        <div>
-          <h1 className="ph-title">Welcome back</h1>
-          <p className="ph-subtitle">
-            Your context-aware prompt enhancer is ready. Select text in any
-            app, press your hotkey, and get a polished prompt back.
-          </p>
-        </div>
+        <div className="ph-eyebrow">Welcome back</div>
+        <h1 className="ph-title">Refine prompts in place.</h1>
+        <p className="ph-subtitle">
+          Select rough text in any app, press your hotkey, and PromptForge
+          rewrites it into a precise prompt — using your project context
+          when you&apos;re coding, asking a few questions when you&apos;re not.
+        </p>
       </header>
 
+      {/* ---- Hero: terminal-inspired card with the hotkey as the focal element ---- */}
       <section className="ph-hero">
-        <div className="ph-hero-text">
-          <h2>Make every prompt sound like <em>you</em></h2>
-          <p>
-            PromptForge skips the questionnaire when you're in your IDE and
-            uses your project context. In writing apps it asks a few quick
-            questions to nail the tone, audience, and goal.
-          </p>
-          <button className="ph-cta" onClick={() => onNavigate("projects")}>
-            Manage projects →
-          </button>
-        </div>
-        <div className="ph-hero-art" aria-hidden>
-          <div className="ph-glow" />
-          <div className="ph-hero-glyph">
-            <span>⌘</span>
-            <strong>{hotkey.split("+").pop()}</strong>
+        <div className="ph-hero-grid" aria-hidden />
+        <div className="ph-hero-content">
+          <div className="ph-hero-label">Global hotkey</div>
+          <div className="ph-hero-keys">
+            {hotkey.split("+").map((part, i, arr) => (
+              <span key={i} className="ph-hero-keypair">
+                <kbd className="ph-hero-kbd">{part}</kbd>
+                {i < arr.length - 1 && <span className="ph-hero-plus">+</span>}
+              </span>
+            ))}
           </div>
+          <div className="ph-hero-meta">
+            <span className="ph-hero-meta-dot" />
+            <span>Listening system-wide</span>
+          </div>
+        </div>
+        <div className="ph-hero-aside">
+          <pre className="ph-hero-code">
+{`> select text
+> press ${hotkey.toLowerCase()}
+> ▌`}
+          </pre>
         </div>
       </section>
 
-      <section className="ph-stats">
-        <div className="ph-stat">
-          <div className="ph-stat-num">{totalProjects}</div>
-          <div className="ph-stat-label">project{totalProjects === 1 ? "" : "s"}</div>
-        </div>
-        <div className="ph-stat">
-          <div className="ph-stat-num">{hotkey.split("+").length}</div>
-          <div className="ph-stat-label">key combo</div>
-        </div>
-        <div className="ph-stat">
-          <div className={`ph-stat-num ${hasKey ? "ok" : "warn"}`}>
-            {hasKey ? "Ready" : "Setup"}
-          </div>
-          <div className="ph-stat-label">
-            {hasKey ? "API key configured" : "Add a Groq API key"}
-          </div>
-        </div>
+      {/* ---- Status grid: 3 dense info tiles ---- */}
+      <section className="ph-tiles">
+        <Tile
+          label="Projects"
+          value={String(totalProjects)}
+          caption={totalProjects === 0 ? "none added yet" : "stored locally"}
+          actionLabel={totalProjects === 0 ? "Add" : "Manage"}
+          onAction={() => onNavigate("projects")}
+        />
+        <Tile
+          label="API key"
+          value={hasKey ? "Connected" : "Missing"}
+          caption={
+            keyStatus?.from_env
+              ? "from .env"
+              : keyStatus?.from_settings
+                ? "from settings"
+                : "not configured"
+          }
+          accent={!hasKey}
+          actionLabel="Settings"
+          onAction={() => onNavigate("settings")}
+        />
+        <Tile
+          label="Active project"
+          value={active?.name ?? "—"}
+          caption={active ? "in use as context" : "no context attached"}
+          actionLabel={active ? "Change" : "Add"}
+          onAction={() => onNavigate("projects")}
+        />
       </section>
 
+      {/* ---- Active project deep card ---- */}
       <section className="ph-section">
         <div className="ph-section-head">
           <h3>Active project</h3>
           {active && (
             <button className="ph-link-btn" onClick={() => onNavigate("projects")}>
-              Change →
+              Open Projects ↗
             </button>
           )}
         </div>
 
         {active ? (
           <div className="ph-active-card">
-            <div className="ph-active-dot" />
-            <div className="ph-active-body">
-              <div className="ph-active-name">{active.name}</div>
-              <div className="ph-active-desc">
-                {active.description
-                  ? active.description.split("\n")[0].slice(0, 180) +
-                    (active.description.length > 180 ? "…" : "")
-                  : "No description yet."}
-              </div>
-              {active.links.length > 0 && (
-                <div className="ph-active-links">
-                  {active.links.length} link
-                  {active.links.length === 1 ? "" : "s"} attached
-                </div>
-              )}
+            <div className="ph-active-name">
+              {active.name}
+              <span className="ph-active-flag">active</span>
             </div>
+            <div className="ph-active-desc">
+              {active.description
+                ? active.description.split("\n")[0].slice(0, 220) +
+                  (active.description.length > 220 ? "…" : "")
+                : "No description yet — add one so prompts have something to chew on."}
+            </div>
+            {active.links.length > 0 && (
+              <div className="ph-active-links">
+                {active.links.length} link
+                {active.links.length === 1 ? "" : "s"} attached
+              </div>
+            )}
           </div>
         ) : (
           <div className="ph-empty-card">
-            <div className="ph-empty-emoji">📁</div>
-            <div>
-              <strong>No active project</strong>
-              <p>
-                Add a project so PromptForge can use it as context when you're
-                coding.
-              </p>
+            <div className="ph-empty-text">
+              <strong>No active project.</strong>
+              <span>
+                Add one to give PromptForge codebase awareness when you&apos;re in
+                an IDE. The questionnaire still works without it.
+              </span>
             </div>
             <button
-              className="ph-link-btn ph-link-btn--strong"
+              className="ph-cta"
               onClick={() => onNavigate("projects")}
             >
-              Add project →
+              Add project
             </button>
           </div>
         )}
       </section>
 
+      {/* ---- Keyboard reference ---- */}
       <section className="ph-section">
         <div className="ph-section-head">
-          <h3>How it works</h3>
+          <h3>Keyboard</h3>
         </div>
-        <div className="ph-steps">
-          <Step n={1} title="Select text">
-            Highlight a rough prompt in any app — IDE, browser, Notepad,
-            anywhere.
-          </Step>
-          <Step n={2} title={`Press ${hotkey}`}>
-            PromptForge captures the selection and detects which app you're in.
-          </Step>
-          <Step n={3} title="Get an enhanced prompt">
-            In dev tools you get an instant rewrite. Elsewhere a small popup
-            asks a few quick questions first.
-          </Step>
+        <div className="ph-kbd-rows">
+          <KbdRow keys={hotkey.split("+")}>Capture and enhance the selected text.</KbdRow>
+          <KbdRow keys={["Shift", ...hotkey.split("+")]}>
+            Bypass the questionnaire even in non-developer apps.
+          </KbdRow>
+          <KbdRow keys={["Esc"]}>
+            Dismiss the question card without enhancing.
+          </KbdRow>
         </div>
       </section>
 
       {!hasKey && (
-        <section className="ph-section ph-banner">
+        <section className="ph-banner">
           <div>
-            <strong>One last thing</strong>
-            <p>You need a Groq API key before the first enhancement.</p>
+            <strong>Add a Groq API key to start.</strong>
+            <p>Free at console.groq.com — takes about 30 seconds.</p>
           </div>
-          <button
-            className="ph-cta ph-cta--small"
-            onClick={() => onNavigate("settings")}
-          >
+          <button className="ph-cta" onClick={() => onNavigate("settings")}>
             Open Settings
           </button>
         </section>
@@ -187,14 +201,47 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
   );
 }
 
-function Step({ n, title, children }: { n: number; title: string; children: React.ReactNode }) {
+function Tile({
+  label,
+  value,
+  caption,
+  actionLabel,
+  onAction,
+  accent,
+}: {
+  label: string;
+  value: string;
+  caption: string;
+  actionLabel: string;
+  onAction: () => void;
+  accent?: boolean;
+}) {
   return (
-    <div className="ph-step">
-      <div className="ph-step-n">{n}</div>
-      <div>
-        <div className="ph-step-title">{title}</div>
-        <div className="ph-step-body">{children}</div>
+    <div className={`ph-tile ${accent ? "accent" : ""}`}>
+      <div className="ph-tile-label">{label}</div>
+      <div className="ph-tile-value">{value}</div>
+      <div className="ph-tile-row">
+        <span className="ph-tile-caption">{caption}</span>
+        <button className="ph-tile-action" onClick={onAction}>
+          {actionLabel} →
+        </button>
       </div>
+    </div>
+  );
+}
+
+function KbdRow({ keys, children }: { keys: string[]; children: React.ReactNode }) {
+  return (
+    <div className="ph-kbd-row">
+      <div className="ph-kbd-row-keys">
+        {keys.map((k, i, arr) => (
+          <span key={i} className="ph-kbd-keypair">
+            <kbd className="ph-kbd-mini">{k}</kbd>
+            {i < arr.length - 1 && <span className="ph-kbd-plus">+</span>}
+          </span>
+        ))}
+      </div>
+      <div className="ph-kbd-row-text">{children}</div>
     </div>
   );
 }

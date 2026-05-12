@@ -8,36 +8,37 @@ body,
   -webkit-user-select: none;
   cursor: default;
   overflow: hidden;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: var(--pf-font-sans);
 }
 
 .pf-status-pill {
   display: inline-flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 20px;
+  padding: 12px 18px;
   margin: 8px;
-  background: rgba(20, 20, 22, 0.94);
-  color: #f2f2f4;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
-  font-size: 14px;
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius);
+  box-shadow: var(--pf-shadow-md);
+  font-size: 13px;
   font-weight: 500;
   width: fit-content;
 }
 
 .pf-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.18);
-  border-top-color: #ffffff;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--pf-border-strong);
+  border-top-color: var(--pf-accent);
   border-radius: 50%;
   animation: pf-spin 0.65s linear infinite;
 }
 
 .pf-status-text {
   letter-spacing: 0.01em;
+  color: var(--pf-text);
 }
 
 @keyframes pf-spin {
