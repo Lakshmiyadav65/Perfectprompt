@@ -56,16 +56,23 @@ async fn run_capture_pipeline<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
         println!("[pipeline] stored prompt in state ({} chars)", input.len());
     }
 
-    // Open/navigate Clarify window
-    if let Some(window) = app.get_webview_window("clarify") {
-        // Navigate to a fresh URL to force React to re-mount & fetch state
-        let _ = window.eval("window.location.hash = '#/clarify'; window.location.reload();");
+    // Open the Smart Question Engine card (Phase 1+). The PRD makes this the
+    // default destination for the hotkey; the legacy clarify window remains
+    // reachable via its hash route but is no longer hotkey-triggered.
+    if let Some(window) = app.get_webview_window("question-card") {
+        let _ = window.eval(
+            "window.location.hash = '#/question-card'; window.location.reload();",
+        );
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        window.show().map_err(|e| anyhow!("failed to show clarify window: {e}"))?;
-        window.set_focus().map_err(|e| anyhow!("failed to focus clarify window: {e}"))?;
-        println!("[pipeline] clarify window shown and focused");
+        window
+            .show()
+            .map_err(|e| anyhow!("failed to show question-card window: {e}"))?;
+        window
+            .set_focus()
+            .map_err(|e| anyhow!("failed to focus question-card window: {e}"))?;
+        println!("[pipeline] question-card window shown and focused");
     } else {
-        return Err(anyhow!("clarify window not found"));
+        return Err(anyhow!("question-card window not found"));
     }
 
     Ok(())

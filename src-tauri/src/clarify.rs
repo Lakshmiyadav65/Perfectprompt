@@ -1,7 +1,12 @@
+use std::time::Duration;
+
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Manager, Runtime};
 
-use crate::question_bank::{GeneratedQuestion, ImpactDimension, QuestionType};
+use crate::question_bank::{
+    detect_domain, static_questions_for, GeneratedQuestion, ImpactDimension,
+};
+use crate::{clipboard, enhance};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestionAnswer {
@@ -18,48 +23,79 @@ pub struct QuestionSession {
     pub answers: Vec<QuestionAnswer>,
 }
 
-/// Returns a placeholder session so the QuestionCard shell renders during
-/// scaffolding. Task 2 replaces this with `question_bank::detect_domain` +
-/// `question_bank::static_questions_for`. Task 3 layers LLM generation on top.
+/// Reads the captured input from `AppState.pending_prompt` (populated by the
+/// hotkey pipeline), runs the keyword classifier, and returns the matching
+/// static question set. Task 3 will layer LLM-generated questions on top of
+/// this same shape.
 #[tauri::command]
-pub fn fetch_question_card_session<R: Runtime>(_app: AppHandle<R>) -> QuestionSession {
-    let state = _app.state::<crate::AppState>();
+pub fn fetch_question_card_session<R: Runtime>(app: AppHandle<R>) -> QuestionSession {
+    let state = app.state::<crate::AppState>();
     let original = state.pending_prompt.lock().unwrap().clone();
 
+    let domain = detect_domain(&original);
+    let questions = static_questions_for(domain);
+    println!(
+        "[clarify] fetch session — domain={:?}, {} question(s)",
+        domain,
+        questions.len()
+    );
+
     QuestionSession {
-        original_input: if original.is_empty() {
-            "(scaffolding) no captured input yet".into()
-        } else {
-            original
-        },
-        questions: scaffolding_questions(),
+        original_input: original,
+        questions,
         answers: Vec::new(),
     }
 }
 
-/// Receives the user's answers. For scaffolding this just logs the payload —
-/// Task 2 wires it into `enhance::assemble_context` + the existing
-/// enhancement pipeline.
+/// Receives the user's answers, builds the [CONTEXT] block, runs the
+/// enhancement LLM call, hides the question-card window, and pastes the
+/// enhanced text in place of the user's original selection.
 #[tauri::command]
-pub fn submit_question_card_answers<R: Runtime>(
-    _app: AppHandle<R>,
+pub async fn submit_question_card_answers(
+    app: AppHandle,
     answers: Vec<QuestionAnswer>,
 ) -> Result<(), String> {
     println!(
-        "[clarify] received {} answer(s) (scaffolding stub)",
+        "[clarify] submit_question_card_answers: {} answer(s)",
         answers.len()
     );
-    for answer in &answers {
-        println!(
-            "[clarify]   {:?} ({}): {}",
-            answer.impact_dimension, answer.question_id, answer.value
-        );
+
+    let original = {
+        let state = app.state::<crate::AppState>();
+        let pending = state.pending_prompt.lock().unwrap();
+        pending.clone()
+    };
+
+    if original.trim().is_empty() {
+        return Err("no captured input to enhance — press the hotkey first".into());
     }
+
+    let combined_input = assemble_context(&original, &answers);
+    println!(
+        "[clarify] assembled context block ({} chars including original)",
+        combined_input.len()
+    );
+
+    let enhanced = enhance::enhance_prompt(&app, &combined_input)
+        .await
+        .map_err(|e| format!("enhancement failed: {e:#}"))?;
+
+    if let Some(window) = app.get_webview_window("question-card") {
+        let _ = window.hide();
+        // Brief settle so the OS restores focus to the user's target app
+        // before we synthesize Ctrl+V.
+        tokio::time::sleep(Duration::from_millis(150)).await;
+    }
+
+    clipboard::replace_selection(&app, &enhanced)
+        .await
+        .map_err(|e| format!("paste failed: {e}"))?;
+
     Ok(())
 }
 
-/// Opens the question-card window. Wired to the tray menu during scaffolding;
-/// Task 3 will invoke this from the hotkey pipeline after complexity scoring.
+/// Shows the question-card window. Used by the tray dev menu and by the
+/// hotkey pipeline.
 #[tauri::command]
 pub fn open_question_card<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     let window = app
@@ -70,9 +106,8 @@ pub fn open_question_card<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     Ok(())
 }
 
-/// Cancels the card and hides the window. The PRD requires that closing the
-/// card preserves the original clipboard — we just hide for now since the
-/// scaffolding doesn't touch the clipboard yet.
+/// Cancels the card and hides the window. The clipboard is not touched
+/// during card display, so there is nothing to restore.
 #[tauri::command]
 pub fn cancel_question_card<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("question-card") {
@@ -81,34 +116,85 @@ pub fn cancel_question_card<R: Runtime>(app: AppHandle<R>) -> Result<(), String>
     Ok(())
 }
 
-fn scaffolding_questions() -> Vec<GeneratedQuestion> {
-    vec![
-        GeneratedQuestion {
-            id: "q1".into(),
-            question: "Who is this for?".into(),
-            question_type: QuestionType::Chips,
-            options: vec!["Manager".into(), "Client".into(), "Team".into()],
-            placeholder: None,
-            impact_dimension: ImpactDimension::Audience,
-            required: false,
-        },
-        GeneratedQuestion {
-            id: "q2".into(),
-            question: "What tone?".into(),
-            question_type: QuestionType::Chips,
-            options: vec!["Formal".into(), "Neutral".into(), "Casual".into()],
-            placeholder: None,
-            impact_dimension: ImpactDimension::Tone,
-            required: false,
-        },
-        GeneratedQuestion {
-            id: "q3".into(),
-            question: "Any extra context?".into(),
-            question_type: QuestionType::FreeText,
-            options: Vec::new(),
-            placeholder: Some("e.g. follow-up to last week's call".into()),
-            impact_dimension: ImpactDimension::Other,
-            required: false,
-        },
-    ]
+/// Builds the `[CONTEXT]` block per PRD §5.1.5, with the user's original
+/// captured input and any answers they supplied. Empty/whitespace-only
+/// answers are dropped. The trailing instruction line is what the existing
+/// meta-prompt expects to act on.
+pub fn assemble_context(original: &str, answers: &[QuestionAnswer]) -> String {
+    let mut out = String::new();
+    out.push_str("[CONTEXT]\n");
+    out.push_str(&format!("Original input: {}\n", original.trim()));
+
+    let non_empty: Vec<&QuestionAnswer> = answers
+        .iter()
+        .filter(|a| !a.value.trim().is_empty())
+        .collect();
+
+    if !non_empty.is_empty() {
+        out.push_str("User-provided context:\n");
+        for a in non_empty {
+            out.push_str(&format!(
+                "- {}: {}\n",
+                a.impact_dimension.as_str(),
+                a.value.trim()
+            ));
+        }
+    }
+    out.push_str("[/CONTEXT]\n\n");
+    out.push_str("Enhance the above input into a high-quality, precise prompt for an LLM.");
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn assemble_context_includes_original_and_dimensions() {
+        let answers = vec![
+            QuestionAnswer {
+                question_id: "q1".into(),
+                impact_dimension: ImpactDimension::Audience,
+                value: "Manager".into(),
+            },
+            QuestionAnswer {
+                question_id: "q2".into(),
+                impact_dimension: ImpactDimension::Tone,
+                value: "Formal".into(),
+            },
+        ];
+        let ctx = assemble_context("write a leave mail", &answers);
+        assert!(ctx.contains("[CONTEXT]"));
+        assert!(ctx.contains("Original input: write a leave mail"));
+        assert!(ctx.contains("- audience: Manager"));
+        assert!(ctx.contains("- tone: Formal"));
+        assert!(ctx.contains("[/CONTEXT]"));
+        assert!(ctx.contains("Enhance the above input"));
+    }
+
+    #[test]
+    fn assemble_context_omits_empty_answers() {
+        let answers = vec![
+            QuestionAnswer {
+                question_id: "q1".into(),
+                impact_dimension: ImpactDimension::Audience,
+                value: "Client".into(),
+            },
+            QuestionAnswer {
+                question_id: "q2".into(),
+                impact_dimension: ImpactDimension::Tone,
+                value: "   ".into(),
+            },
+        ];
+        let ctx = assemble_context("draft something", &answers);
+        assert!(ctx.contains("- audience: Client"));
+        assert!(!ctx.contains("tone:"));
+    }
+
+    #[test]
+    fn assemble_context_drops_user_context_section_when_no_answers() {
+        let ctx = assemble_context("hello", &[]);
+        assert!(ctx.contains("Original input: hello"));
+        assert!(!ctx.contains("User-provided context:"));
+    }
 }

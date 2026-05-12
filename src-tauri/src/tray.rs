@@ -10,7 +10,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let question_card_item = MenuItem::with_id(
         app,
         "question_card_dev",
-        "Open Question Card (dev preview)",
+        "Preview Question Card (no capture)",
         true,
         None::<&str>,
     )?;

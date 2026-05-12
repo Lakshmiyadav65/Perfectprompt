@@ -89,7 +89,7 @@ export function QuestionCard() {
   }, [handleSkipAll]);
 
   const handleSubmit = async () => {
-    if (state !== "loaded") return;
+    if (state === "submitting" || state === "loading") return;
     setState("submitting");
     setErrorMsg(null);
 
@@ -174,9 +174,13 @@ export function QuestionCard() {
         <button
           className="qc-primary"
           onClick={() => void handleSubmit()}
-          disabled={state !== "loaded"}
+          disabled={state === "loading" || state === "submitting"}
         >
-          {state === "submitting" ? "Enhancing…" : "Enhance Now →"}
+          {state === "submitting"
+            ? "Enhancing…"
+            : state === "error"
+              ? "Retry"
+              : "Enhance Now →"}
         </button>
       </footer>
     </div>
