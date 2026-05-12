@@ -71,6 +71,8 @@ pub fn run() {
             settings::clear_api_key,
             settings::get_hotkey,
             settings::save_hotkey,
+            settings::get_hotkey_enabled,
+            settings::set_hotkey_enabled,
             settings::test_connection,
             settings::open_settings,
             settings::get_question_engine_settings,
@@ -97,7 +99,16 @@ pub fn run() {
         .setup(|app| {
             let user_settings = settings::load(app.handle());
             tray::build(app.handle())?;
-            hotkey::register(app.handle(), &user_settings.hotkey)?;
+            // Honour the persisted master toggle on startup. When the
+            // user has paused PromptForge, we still build the tray and
+            // window but skip global-shortcut registration so the
+            // hotkey is genuinely dormant. Flipping the toggle back on
+            // from the sidebar re-registers it.
+            if user_settings.enabled {
+                hotkey::register(app.handle(), &user_settings.hotkey)?;
+            } else {
+                println!("[hotkey] start-up: master toggle is OFF — not registering");
+            }
             install_keep_alive_close_handlers(app.handle());
             // First-run onboarding is handled by the Home screen's banner
             // — no need to spawn a separate Settings window on top of it.

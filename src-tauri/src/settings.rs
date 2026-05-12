@@ -34,6 +34,10 @@ fn default_question_threshold() -> f32 {
     DEFAULT_QUESTION_THRESHOLD
 }
 
+fn default_enabled() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub hotkey: String,
@@ -50,6 +54,11 @@ pub struct UserSettings {
     /// surfaces while letting known IDEs/terminals skip the popup.
     #[serde(default)]
     pub app_classification: AppClassificationSettings,
+    /// Master enable/disable switch surfaced as the sidebar toggle.
+    /// When false, the global shortcut is unregistered and the hotkey
+    /// pipeline is dormant. Persisted across launches.
+    #[serde(default = "default_enabled")]
+    pub enabled: bool,
 }
 
 impl Default for UserSettings {
@@ -61,6 +70,7 @@ impl Default for UserSettings {
             question_mode: QuestionMode::default(),
             remembered_contexts: HashMap::new(),
             app_classification: AppClassificationSettings::default(),
+            enabled: default_enabled(),
         }
     }
 }
@@ -364,6 +374,34 @@ fn dedupe_lower(items: Vec<String>) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .filter(|s| seen.insert(s.to_lowercase()))
         .collect()
+}
+
+#[tauri::command]
+pub fn get_hotkey_enabled<R: Runtime>(app: AppHandle<R>) -> bool {
+    load(&app).enabled
+}
+
+/// Master enable/disable toggle. When set to false, all global
+/// shortcuts are unregistered so the hotkey stops capturing
+/// system-wide. When flipped back to true, the saved hotkey is
+/// re-registered. The flag is persisted so the state survives a
+/// restart.
+#[tauri::command]
+pub fn set_hotkey_enabled<R: Runtime>(
+    app: AppHandle<R>,
+    enabled: bool,
+) -> std::result::Result<(), String> {
+    let mut settings = load(&app);
+    settings.enabled = enabled;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+
+    if enabled {
+        hotkey::reregister(&app, &settings.hotkey).map_err(|e| format!("{e:#}"))?;
+        println!("[hotkey] enabled — registered {}", settings.hotkey);
+    } else {
+        hotkey::unregister_all(&app);
+    }
+    Ok(())
 }
 
 #[tauri::command]

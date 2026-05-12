@@ -25,21 +25,28 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
   const [hotkey, setHotkey] = useState("Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
+  const [enabled, setEnabled] = useState(true);
 
   useEffect(() => {
     void refresh();
+    // Poll for changes from the sidebar toggle so the hero status stays
+    // in sync without a full page navigation.
+    const id = window.setInterval(() => void refresh(), 2000);
+    return () => window.clearInterval(id);
   }, []);
 
   async function refresh() {
     try {
-      const [projects, hk, status] = await Promise.all([
+      const [projects, hk, status, en] = await Promise.all([
         invoke<ProjectStore>("list_projects"),
         invoke<string>("get_hotkey"),
         invoke<ApiKeyStatus>("api_key_status"),
+        invoke<boolean>("get_hotkey_enabled"),
       ]);
       setStore(projects);
       setHotkey(hk);
       setKeyStatus(status);
+      setEnabled(en);
     } catch (e) {
       console.error("Home refresh failed", e);
     }
@@ -75,9 +82,11 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
               </span>
             ))}
           </div>
-          <div className="ph-hero-meta">
+          <div className={`ph-hero-meta ${enabled ? "" : "paused"}`}>
             <span className="ph-hero-meta-dot" />
-            <span>Listening system-wide</span>
+            <span>
+              {enabled ? "Listening system-wide" : "Paused — toggle on to resume"}
+            </span>
           </div>
         </div>
         <div className="ph-hero-aside">

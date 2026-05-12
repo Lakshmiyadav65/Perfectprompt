@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
+import { Toggle } from "./Toggle";
 import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
@@ -67,11 +68,31 @@ export function Shell({ initial }: { initial: Route }) {
   const [route, setRoute] = useState<Route>(initial);
   const [hotkey, setHotkey] = useState<string>("Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
+  const [enabled, setEnabled] = useState<boolean>(true);
+  const [toggling, setToggling] = useState(false);
 
   useEffect(() => {
     invoke<string>("get_hotkey").then(setHotkey).catch(() => {});
     invoke<ApiKeyStatus>("api_key_status").then(setKeyStatus).catch(() => {});
+    invoke<boolean>("get_hotkey_enabled").then(setEnabled).catch(() => {});
   }, [route]);
+
+  async function handleToggle(next: boolean) {
+    if (toggling) return;
+    setToggling(true);
+    // Optimistic update so the capsule snaps immediately; revert on
+    // failure since the persisted state would still be the old value.
+    const prev = enabled;
+    setEnabled(next);
+    try {
+      await invoke("set_hotkey_enabled", { enabled: next });
+    } catch (e) {
+      console.error("toggle failed", e);
+      setEnabled(prev);
+    } finally {
+      setToggling(false);
+    }
+  }
 
   // Tray menu items navigate by setting `window.location.hash`. Listen for
   // those changes so the sidebar stays in sync without a full reload.
@@ -96,6 +117,7 @@ export function Shell({ initial }: { initial: Route }) {
   }, [route]);
 
   const ready = !!(keyStatus?.from_env || keyStatus?.from_settings);
+  const statusLabel = !ready ? "Setup" : enabled ? "Active" : "Paused";
 
   return (
     <div className="pf-shell">
@@ -121,9 +143,16 @@ export function Shell({ initial }: { initial: Route }) {
         </nav>
 
         <div className="pf-sidebar-footer">
-          <div className={`pf-sb-pill ${ready ? "ready" : "setup"}`}>
-            <span className="pf-sb-dot" aria-hidden />
-            <span>{ready ? "Ready" : "Setup needed"}</span>
+          <div className="pf-toggle-row">
+            <Toggle
+              checked={enabled && ready}
+              disabled={toggling || !ready}
+              onChange={handleToggle}
+              ariaLabel={enabled ? "Pause PromptForge" : "Activate PromptForge"}
+            />
+            <span className={`pf-toggle-row-label ${enabled && ready ? "on" : ""}`}>
+              {statusLabel}
+            </span>
           </div>
           <div className="pf-hotkey-block" aria-label="Global hotkey">
             <div className="pf-hotkey-caption">Press from anywhere</div>

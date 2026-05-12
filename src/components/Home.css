@@ -146,6 +146,15 @@
   box-shadow: 0 0 8px var(--pf-accent-glow);
 }
 
+.ph-hero-meta.paused .ph-hero-meta-dot {
+  background: var(--pf-text-faint);
+  box-shadow: none;
+}
+
+.ph-hero-meta.paused {
+  color: var(--pf-text-subtle);
+}
+
 .ph-hero-aside {
   position: relative;
   z-index: 1;

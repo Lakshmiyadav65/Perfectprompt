@@ -120,6 +120,14 @@ pub fn reregister<R: Runtime>(app: &AppHandle<R>, combo: &str) -> Result<()> {
     register(app, combo).map_err(|e| anyhow!("{e}"))
 }
 
+/// Drop every registered global shortcut. Used by the master "paused"
+/// toggle so the hotkey stops capturing system-wide without quitting
+/// the app.
+pub fn unregister_all<R: Runtime>(app: &AppHandle<R>) {
+    let _ = app.global_shortcut().unregister_all();
+    println!("[hotkey] all global shortcuts unregistered");
+}
+
 async fn run_capture_pipeline<R: Runtime>(
     app: &AppHandle<R>,
     force_bypass: bool,
