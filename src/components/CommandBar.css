@@ -38,10 +38,11 @@ body.cb-route * {
   background: var(--pf-bg);
   border: 1px solid var(--pf-border-strong);
   border-radius: 999px;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.5),
-    0 2px 4px rgba(0, 0, 0, 0.3);
   width: fit-content;
+  /* No box-shadow on purpose. The drop shadow renders inside the
+     webview, which on Windows shows up as a soft rectangle around the
+     capsule when the surrounding pixels are transparent. The border
+     alone is enough to make the capsule legible against any desktop. */
 }
 
 /* ---------- Icon buttons ---------- */
