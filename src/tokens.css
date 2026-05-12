@@ -3,15 +3,15 @@
    Every component reads from these — never hard-code colors elsewhere. */
 
 :root {
-  /* ---- Color: surface ---- */
-  --pf-bg: #0a0a0a;            /* page background */
-  --pf-surface: #141414;        /* cards, sidebar */
-  --pf-surface-2: #1c1c1c;      /* hover/elevated */
-  --pf-surface-3: #232323;      /* deeper inputs/code */
+  /* ---- Color: surface (neutral grey, not pure black) ---- */
+  --pf-bg: #1a1a1a;            /* page background — sidebar + main */
+  --pf-surface: #242424;        /* cards, elevated panels */
+  --pf-surface-2: #2c2c2c;      /* hover, button bg */
+  --pf-surface-3: #333333;      /* deeper inputs/code blocks */
 
   /* ---- Color: lines ---- */
-  --pf-border: #262626;
-  --pf-border-strong: #3a3a3a;
+  --pf-border: #333333;
+  --pf-border-strong: #444444;
   --pf-border-focus: var(--pf-accent);
 
   /* ---- Color: text ---- */
