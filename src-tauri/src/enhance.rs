@@ -281,7 +281,7 @@ pub(crate) fn load_api_key<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
     ))
 }
 
-fn load_meta_prompt<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
+pub(crate) fn load_meta_prompt<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
     let path = resolve_prompt_path(app)?;
     std::fs::read_to_string(&path)
         .with_context(|| format!("failed to read meta-prompt from {}", path.display()))
@@ -294,4 +294,44 @@ fn resolve_prompt_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
             BaseDirectory::Resource,
         )
         .context("failed to resolve meta-prompt resource path")
+}
+
+#[cfg(test)]
+mod meta_prompt_tests {
+    /// Compile-time snapshot of the shipped meta-prompt. Picks up changes
+    /// on rebuild so these tests fail loudly if PRD §8's mode sections are
+    /// accidentally deleted or renamed.
+    const META_PROMPT: &str = include_str!("../../prompts/enhancer-system-prompt.md");
+
+    #[test]
+    fn meta_prompt_contains_question_generation_mode_section() {
+        assert!(
+            META_PROMPT.contains("## Question Generation Mode"),
+            "missing PRD §8 Addition 1 — Question Generation Mode section"
+        );
+        assert!(
+            META_PROMPT.contains("[GENERATE_QUESTIONS]"),
+            "Question Generation Mode section must reference the [GENERATE_QUESTIONS] tag"
+        );
+        assert!(
+            META_PROMPT.contains("\"questions\""),
+            "schema must mention the questions array key"
+        );
+    }
+
+    #[test]
+    fn meta_prompt_contains_context_integration_section() {
+        assert!(
+            META_PROMPT.contains("## Context Integration"),
+            "missing PRD §8 Addition 2 — Context Integration section"
+        );
+        assert!(
+            META_PROMPT.contains("[CONTEXT]") && META_PROMPT.contains("[/CONTEXT]"),
+            "Context Integration section must reference the [CONTEXT] / [/CONTEXT] tags"
+        );
+        assert!(
+            META_PROMPT.contains("Never echo"),
+            "Context Integration must instruct the model not to leak block contents"
+        );
+    }
 }

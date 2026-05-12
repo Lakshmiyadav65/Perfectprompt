@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Runtime};
 
-use crate::enhance::load_api_key;
+use crate::enhance::{load_api_key, load_meta_prompt};
 use crate::question_bank::{Domain, GeneratedQuestion, ImpactDimension, QuestionType};
 
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
@@ -26,33 +26,6 @@ pub const MAX_QUESTIONS: usize = 4;
 /// PRD §5.1.2 minimum threshold — if the LLM returns fewer valid questions
 /// than this, the card falls back to the static domain bank.
 pub const MIN_VALID_QUESTIONS: usize = 2;
-
-const SYSTEM_PROMPT: &str = r#"You generate clarifying questions for a prompt-enhancement tool.
-
-The user's message contains a rough prompt they're about to send to an LLM. Your job is to figure out what's missing — what would most improve the quality of the enhanced prompt — and ask 2 to 4 short questions to surface that context.
-
-Respond with a single JSON object: {"questions": [...]}.
-
-Each item in the questions array must match this schema:
-{
-  "id": "q1",
-  "question": "Who is this for?",
-  "type": "chips" | "single_select" | "multi_select" | "free_text",
-  "options": ["Manager", "Client", "Team"],
-  "placeholder": null,
-  "impact_dimension": "tone" | "audience" | "goal" | "constraints" | "format" | "length" | "domain" | "other",
-  "required": false
-}
-
-Rules:
-- Output ONLY the JSON object. No preamble. No markdown fences. No explanation.
-- Generate 2 to 4 questions, each targeting a DISTINCT impact_dimension.
-- Do not ask questions that are already answered in the input.
-- Prefer "chips" or "single_select" with 3-5 short option labels (1-3 words each).
-- Use "free_text" only when no fixed options would make sense.
-- Question text must be short (max ~50 chars) and conversational, not robotic.
-- If the input is already specific and well-constrained, return {"questions": []}.
-"#;
 
 #[derive(Serialize)]
 struct ChatRequest<'a> {
@@ -124,6 +97,11 @@ pub async fn generate_questions_via_llm<R: Runtime>(
     domain: Domain,
 ) -> Result<Vec<GeneratedQuestion>> {
     let api_key = load_api_key(app)?;
+    // Same meta-prompt as enhancement (PRD §8). The model branches on the
+    // `[GENERATE_QUESTIONS]` tag in the user message — see the "Question
+    // Generation Mode" section in prompts/enhancer-system-prompt.md.
+    let system_prompt = load_meta_prompt(app)
+        .context("failed to load meta-prompt for question generation")?;
 
     let user_message = format!(
         "[GENERATE_QUESTIONS]\nDetected domain: {:?}\n\nInput:\n{}",
@@ -137,7 +115,7 @@ pub async fn generate_questions_via_llm<R: Runtime>(
         messages: vec![
             Message {
                 role: "system",
-                content: SYSTEM_PROMPT,
+                content: &system_prompt,
             },
             Message {
                 role: "user",
