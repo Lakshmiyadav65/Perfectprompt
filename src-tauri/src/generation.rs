@@ -69,7 +69,7 @@ struct QuestionsEnvelope {
     questions: Vec<RawQuestion>,
 }
 
-#[derive(Deserialize)]
+#[derive(Debug, Deserialize)]
 struct RawQuestion {
     #[serde(default)]
     id: Option<String>,
@@ -77,8 +77,11 @@ struct RawQuestion {
     question: String,
     #[serde(rename = "type", default)]
     question_type: Option<String>,
+    // Tolerate `"options": null` from the small model on free_text questions —
+    // serde would otherwise reject null into Vec<String> and fail the whole
+    // parse. Unwrapped to Vec<String> in validate_and_dedupe.
     #[serde(default)]
-    options: Vec<String>,
+    options: Option<Vec<String>>,
     #[serde(default)]
     placeholder: Option<String>,
     #[serde(default)]
@@ -161,10 +164,56 @@ pub async fn generate_questions_via_llm<R: Runtime>(
         .and_then(|c| c.message.content)
         .ok_or_else(|| anyhow!("question-generation response had no content"))?;
 
-    let envelope: QuestionsEnvelope = serde_json::from_str(&raw_content)
-        .context("question-generation output was not a JSON object with a questions array")?;
+    let raw_questions = parse_questions_response(&raw_content).map_err(|e| {
+        // Log a truncated preview of the raw model output so we can
+        // diagnose future failures without re-running the eval.
+        let preview: String = raw_content.chars().take(500).collect();
+        println!(
+            "[generation] parse failed: {e}\n[generation] raw output (first 500 chars): {preview}"
+        );
+        e
+    })?;
 
-    Ok(validate_and_dedupe(envelope.questions))
+    Ok(validate_and_dedupe(raw_questions))
+}
+
+/// Parses the LLM's question-generation response permissively. Accepts:
+/// - `{"questions": [...]}`           — what our meta-prompt asks for.
+/// - `[...]`                           — bare array, PRD §8 literally calls for
+///                                        "a JSON array" so small models often
+///                                        emit this even when told otherwise.
+/// - Either of the above wrapped in   — small models occasionally ignore the
+///   ```json ... ``` or ``` ... ```      "no markdown fences" instruction.
+///
+/// Returns the raw question list before validation; `validate_and_dedupe`
+/// is still the gate that drops bad entries.
+fn parse_questions_response(raw: &str) -> Result<Vec<RawQuestion>> {
+    let trimmed = strip_markdown_fences(raw.trim());
+
+    // Object form first (what our prompt asks for).
+    if let Ok(env) = serde_json::from_str::<QuestionsEnvelope>(trimmed) {
+        return Ok(env.questions);
+    }
+
+    // Bare array fallback (what PRD §8 literally describes).
+    if let Ok(arr) = serde_json::from_str::<Vec<RawQuestion>>(trimmed) {
+        return Ok(arr);
+    }
+
+    Err(anyhow!(
+        "question-generation output matched neither {{\"questions\": [...]}} nor [...]"
+    ))
+}
+
+fn strip_markdown_fences(s: &str) -> &str {
+    let s = s.trim();
+    let after_open = s
+        .strip_prefix("```json")
+        .or_else(|| s.strip_prefix("```JSON"))
+        .or_else(|| s.strip_prefix("```"))
+        .unwrap_or(s)
+        .trim_start();
+    after_open.strip_suffix("```").unwrap_or(after_open).trim()
 }
 
 fn validate_and_dedupe(raw: Vec<RawQuestion>) -> Vec<GeneratedQuestion> {
@@ -187,17 +236,18 @@ fn validate_and_dedupe(raw: Vec<RawQuestion>) -> Vec<GeneratedQuestion> {
         }
 
         // Option-based widgets must have options. Otherwise demote to free_text.
+        let raw_options = q.options.unwrap_or_default();
         let (final_type, options) = if matches!(
             qt,
             QuestionType::Chips | QuestionType::SingleSelect | QuestionType::MultiSelect
         ) {
-            if q.options.is_empty() {
+            if raw_options.is_empty() {
                 (QuestionType::FreeText, Vec::new())
             } else {
-                (qt, q.options)
+                (qt, raw_options)
             }
         } else {
-            (qt, q.options)
+            (qt, raw_options)
         };
 
         out.push(GeneratedQuestion {
@@ -262,7 +312,7 @@ mod tests {
             id: None,
             question: question.to_string(),
             question_type: Some(ty.to_string()),
-            options: options.iter().map(|s| s.to_string()).collect(),
+            options: Some(options.iter().map(|s| s.to_string()).collect()),
             placeholder: None,
             impact_dimension: Some(dim.to_string()),
             required: false,
@@ -337,7 +387,7 @@ mod tests {
             id: None,
             question: "Who?".into(),
             question_type: Some("chips".into()),
-            options: vec!["A".into()],
+            options: Some(vec!["A".into()]),
             placeholder: None,
             impact_dimension: Some("audience".into()),
             required: false,
@@ -345,5 +395,97 @@ mod tests {
         let out = validate_and_dedupe(raw);
         assert_eq!(out.len(), 1);
         assert!(!out[0].id.is_empty());
+    }
+
+    #[test]
+    fn parse_accepts_object_envelope() {
+        let raw = r#"{"questions": [
+            {"id":"q1","question":"Who is this for?","type":"chips",
+             "options":["Manager","Team"],"impact_dimension":"audience","required":false}
+        ]}"#;
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].question, "Who is this for?");
+    }
+
+    #[test]
+    fn parse_accepts_bare_array() {
+        // Small models often emit this shape despite the prompt asking for
+        // an object — PRD §8 literally says "JSON array".
+        let raw = r#"[
+            {"id":"q1","question":"Who is this for?","type":"chips",
+             "options":["Manager","Team"],"impact_dimension":"audience","required":false},
+            {"id":"q2","question":"What tone?","type":"chips",
+             "options":["Formal","Casual"],"impact_dimension":"tone","required":false}
+        ]"#;
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 2);
+    }
+
+    #[test]
+    fn parse_strips_json_markdown_fences() {
+        let raw = "```json\n{\"questions\":[\
+            {\"id\":\"q1\",\"question\":\"Tone?\",\"type\":\"chips\",\
+             \"options\":[\"Formal\",\"Casual\"],\"impact_dimension\":\"tone\",\"required\":false}\
+        ]}\n```";
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 1);
+    }
+
+    #[test]
+    fn parse_strips_plain_markdown_fences_around_array() {
+        let raw = "```\n[\
+            {\"id\":\"q1\",\"question\":\"Tone?\",\"type\":\"chips\",\
+             \"options\":[\"Formal\",\"Casual\"],\"impact_dimension\":\"tone\",\"required\":false}\
+        ]\n```";
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 1);
+    }
+
+    #[test]
+    fn parse_rejects_garbage_with_diagnostic() {
+        let err = parse_questions_response("hello, world").unwrap_err();
+        let msg = format!("{err:#}");
+        assert!(
+            msg.contains("neither") && msg.contains("[...]"),
+            "expected helpful diagnostic, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn parse_accepts_null_options_on_free_text() {
+        // Regression: the small model emits `"options": null` for free_text
+        // questions. Prior to the fix, serde rejected null into Vec<String>
+        // and the whole parse failed, falling back to the static bank.
+        let raw = r#"{
+          "questions": [
+            {
+              "id": "q1",
+              "question": "What is the primary issue?",
+              "type": "free_text",
+              "options": null,
+              "placeholder": null,
+              "impact_dimension": "goal",
+              "required": true
+            }
+          ]
+        }"#;
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 1);
+        assert_eq!(parsed[0].question, "What is the primary issue?");
+
+        // validate_and_dedupe keeps free_text questions with no options.
+        let validated = validate_and_dedupe(parsed);
+        assert_eq!(validated.len(), 1);
+        assert_eq!(validated[0].question_type, QuestionType::FreeText);
+        assert!(validated[0].options.is_empty());
+    }
+
+    #[test]
+    fn parse_tolerates_leading_and_trailing_whitespace() {
+        let raw = "   \n\n  [{\"id\":\"q1\",\"question\":\"X?\",\"type\":\"chips\",\
+            \"options\":[\"a\"],\"impact_dimension\":\"tone\",\"required\":false}]  \n  ";
+        let parsed = parse_questions_response(raw).unwrap();
+        assert_eq!(parsed.len(), 1);
     }
 }

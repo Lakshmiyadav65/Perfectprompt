@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./QuestionCard.css";
@@ -51,6 +51,13 @@ export function QuestionCard() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
   const appWindow = getCurrentWebviewWindow();
+  // Guards against StrictMode running the effect twice in dev. The Rust-side
+  // pending_questions receiver is one-shot — if the second effect fire also
+  // invokes fetch_question_card_session, the first fire would have already
+  // consumed the receiver, and the second's static fallback overwrites the
+  // first's (cancelled) LLM result in the UI. Refs persist across StrictMode's
+  // synthetic double-mount, so the second run returns early.
+  const hasFetched = useRef(false);
 
   // Scope the transparent body background to the question-card route only.
   // Without this guard, QuestionCard.css's global body rule would leak into
@@ -63,11 +70,16 @@ export function QuestionCard() {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
+    if (hasFetched.current) return;
+    hasFetched.current = true;
+    // No `cancelled` flag here: StrictMode's synthetic unmount would set it
+    // true before the fetch resolves, dropping the LLM result on the floor.
+    // The hasFetched ref already guarantees exactly one fetch per logical
+    // mount; React 18+ silently ignores setState on a truly-unmounted
+    // component, so we lose nothing by trusting it to handle that case.
     async function load() {
       try {
         const session = await invoke<QuestionSession>("fetch_question_card_session");
-        if (cancelled) return;
         const remembered = session.remembered_values ?? {};
         const { initial, prefilled } = prefillFromMemory(session.questions, remembered);
         setQuestions(session.questions);
@@ -76,15 +88,11 @@ export function QuestionCard() {
         setOriginalInput(session.original_input ?? "");
         setState("loaded");
       } catch (err) {
-        if (cancelled) return;
         setErrorMsg(String(err));
         setState("error");
       }
     }
     load();
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   const handleSkipAll = useCallback(async () => {
