@@ -39,10 +39,19 @@ body.cb-route * {
   border: 1px solid var(--pf-border-strong);
   border-radius: 999px;
   width: fit-content;
-  /* No box-shadow on purpose. The drop shadow renders inside the
-     webview, which on Windows shows up as a soft rectangle around the
-     capsule when the surrounding pixels are transparent. The border
-     alone is enough to make the capsule legible against any desktop. */
+  /* The whole capsule is the drag handle. Inner buttons opt out via
+     -webkit-app-region: no-drag below, so clicks on the toggle/open/X
+     still fire normally. Cursor switches to grab so the user reads
+     the capsule as movable on hover. */
+  cursor: grab;
+  -webkit-app-region: drag;
+  /* No box-shadow on purpose — soft drop shadows render as a visible
+     rectangular halo inside the transparent webview on Windows. The
+     border alone is enough to make the capsule legible. */
+}
+
+.cb-row:active {
+  cursor: grabbing;
 }
 
 /* ---------- Icon buttons ---------- */
@@ -71,38 +80,6 @@ body.cb-route * {
 .cb-icon-btn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--pf-accent-ring);
-}
-
-.cb-drag {
-  cursor: grab;
-  color: var(--pf-text-faint);
-  -webkit-app-region: drag;
-  /* Hide the dots at rest — the capsule reads cleaner. The button
-     element stays in the DOM so the drag region (-webkit-app-region:
-     drag, plus data-tauri-drag-region on the SVG container) is always
-     active. The dots fade in on capsule hover purely as an
-     affordance hint. */
-  opacity: 0;
-  transition: opacity 0.18s var(--pf-ease), color 0.12s var(--pf-ease);
-}
-
-.cb-row:hover .cb-drag {
-  opacity: 1;
-}
-
-.cb-drag:focus-visible {
-  /* Keyboard focus must always reveal the handle so the user can see
-     where focus is, even when not hovering. */
-  opacity: 1;
-}
-
-.cb-drag:hover {
-  background: transparent;
-  color: var(--pf-text-subtle);
-}
-
-.cb-drag:active {
-  cursor: grabbing;
 }
 
 /* ---------- Toggle ---------- */

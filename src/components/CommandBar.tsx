@@ -64,21 +64,7 @@ export function CommandBar() {
   }
 
   return (
-    <div className="cb-row">
-      <button
-        type="button"
-        className="cb-icon-btn cb-drag"
-        data-tauri-drag-region
-        aria-label="Drag the command bar"
-        tabIndex={-1}
-      >
-        <svg viewBox="0 0 24 8" width="22" height="8" aria-hidden="true">
-          <circle cx="3" cy="4" r="1.2" fill="currentColor" />
-          <circle cx="8" cy="4" r="1.2" fill="currentColor" />
-          <circle cx="13" cy="4" r="1.2" fill="currentColor" />
-          <circle cx="18" cy="4" r="1.2" fill="currentColor" />
-        </svg>
-      </button>
+    <div className="cb-row" data-tauri-drag-region>
       <button
         type="button"
         role="switch"
