@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::time::Duration;
 
 use tauri::{AppHandle, Manager, Runtime};
 
@@ -48,6 +47,20 @@ pub fn run() {
             pending_questions: std::sync::Mutex::new(None),
             remembered_answers: std::sync::Mutex::new(HashMap::new()),
         })
+        // Single-instance: when the user double-clicks the desktop icon
+        // (or relaunches in any way) while PromptForge is already running,
+        // bring the existing main window to the foreground instead of
+        // spawning a second tray + hotkey owner. The closure receives the
+        // CLI args of the second instance, but we don't take args today —
+        // we just surface the window.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            println!("[single-instance] another launch attempted — focusing main window");
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
@@ -86,7 +99,8 @@ pub fn run() {
             tray::build(app.handle())?;
             hotkey::register(app.handle(), &user_settings.hotkey)?;
             install_keep_alive_close_handlers(app.handle());
-            maybe_show_settings_on_first_run(app.handle(), &user_settings);
+            // First-run onboarding is handled by the Home screen's banner
+            // — no need to spawn a separate Settings window on top of it.
             Ok(())
         })
         .run(tauri::generate_context!())
@@ -128,36 +142,3 @@ fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-/// First-run UX: if there is no API key in either the GROQ_API_KEY env var or
-/// the saved settings.json, auto-open the Settings window so the user can paste
-/// one without having to discover the tray menu.
-fn maybe_show_settings_on_first_run<R: Runtime>(
-    app: &AppHandle<R>,
-    user_settings: &settings::UserSettings,
-) {
-    let has_env_key = std::env::var("GROQ_API_KEY")
-        .map(|v| !v.trim().is_empty())
-        .unwrap_or(false);
-    let has_saved_key = user_settings
-        .api_key
-        .as_ref()
-        .map(|k| !k.trim().is_empty())
-        .unwrap_or(false);
-
-    if has_env_key || has_saved_key {
-        return;
-    }
-
-    let Some(window) = app.get_webview_window("settings") else {
-        return;
-    };
-
-    println!("[onboarding] no API key found — auto-showing Settings window");
-    let window = window.clone();
-    tauri::async_runtime::spawn(async move {
-        // Tiny delay so the rest of the app is ready (tray icon visible, etc.)
-        tokio::time::sleep(Duration::from_millis(400)).await;
-        let _ = window.show();
-        let _ = window.set_focus();
-    });
-}
