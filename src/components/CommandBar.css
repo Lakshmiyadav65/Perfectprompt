@@ -1,5 +1,5 @@
-/* CommandBar — minimal floating toggle. Lives in its own transparent
-   webview (label "command-bar"). */
+/* CommandBar — single floating row capsule with drag handle, toggle,
+   open shortcut, and dismiss. Lives in its own transparent webview. */
 
 body.cb-route,
 body.cb-route #root {
@@ -17,25 +17,63 @@ body.cb-route * {
   box-sizing: border-box;
 }
 
-.cb-root {
-  display: flex;
+/* ---------- Row capsule ---------- */
+
+.cb-row {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 100vw;
-  height: 100vh;
-  /* Background is the drag handle. The toggle button inside opts out
-     of drag via -webkit-app-region: no-drag below. */
+  gap: 4px;
+  padding: 5px 8px;
   background: var(--pf-bg);
   border: 1px solid var(--pf-border-strong);
   border-radius: 999px;
   box-shadow:
     0 8px 24px rgba(0, 0, 0, 0.5),
     0 2px 4px rgba(0, 0, 0, 0.3);
+  width: fit-content;
+  margin: 4px;
+}
+
+/* ---------- Icon buttons ---------- */
+
+.cb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--pf-text-muted);
+  cursor: pointer;
+  border-radius: 999px;
+  transition: background 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
+  -webkit-app-region: no-drag;
+}
+
+.cb-icon-btn:hover {
+  background: var(--pf-surface-2);
+  color: var(--pf-text);
+}
+
+.cb-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--pf-accent-ring);
+}
+
+.cb-drag {
   cursor: grab;
+  color: var(--pf-text-faint);
   -webkit-app-region: drag;
 }
 
-.cb-root:active {
+.cb-drag:hover {
+  background: transparent;
+  color: var(--pf-text-subtle);
+}
+
+.cb-drag:active {
   cursor: grabbing;
 }
 
@@ -43,8 +81,8 @@ body.cb-route * {
 
 .cb-toggle {
   position: relative;
-  width: 44px;
-  height: 22px;
+  width: 32px;
+  height: 18px;
   padding: 0;
   border-radius: 999px;
   background: var(--pf-surface-3);
@@ -58,16 +96,16 @@ body.cb-route * {
 
 .cb-toggle:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+  box-shadow: 0 0 0 2px var(--pf-accent-ring);
 }
 
 .cb-toggle-dot {
   position: absolute;
   top: 50%;
   left: 3px;
-  width: 14px;
-  height: 14px;
-  margin-top: -7px;
+  width: 10px;
+  height: 10px;
+  margin-top: -5px;
   background: var(--pf-text-muted);
   border-radius: 50%;
   transition:
@@ -81,7 +119,7 @@ body.cb-route * {
 }
 
 .cb-toggle.on .cb-toggle-dot {
-  left: calc(100% - 14px - 3px - 2px);
+  left: calc(100% - 10px - 3px - 2px);
   background: var(--pf-text);
 }
 

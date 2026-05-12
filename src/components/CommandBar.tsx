@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./CommandBar.css";
 
-/// Minimal floating widget — just the active/paused toggle. Always-on-top.
-/// The pill background is draggable; the toggle inside fires its own click.
+/// Floating widget — single capsule with drag handle, status toggle,
+/// open-app shortcut, and dismiss. Always-on-top, no taskbar entry.
 export function CommandBar() {
   const [enabled, setEnabled] = useState(true);
+  const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
     document.body.classList.add("cb-route");
@@ -16,8 +18,8 @@ export function CommandBar() {
 
   useEffect(() => {
     void refresh();
-    // Poll so the bar stays in sync if the user flips the sidebar toggle
-    // in the main window.
+    // Poll so the bar stays in sync if the user flips the sidebar
+    // toggle in the main window.
     const id = window.setInterval(() => void refresh(), 1500);
     return () => window.clearInterval(id);
   }, []);
@@ -42,18 +44,67 @@ export function CommandBar() {
     }
   }
 
+  async function handleOpen() {
+    try {
+      await invoke("open_main_window");
+    } catch (e) {
+      console.error("open main failed", e);
+    }
+  }
+
+  async function handleHide() {
+    await appWindow.hide();
+  }
+
   return (
-    <div className="cb-root" data-tauri-drag-region>
+    <div className="cb-row">
+      <button
+        type="button"
+        className="cb-icon-btn cb-drag"
+        data-tauri-drag-region
+        aria-label="Drag the command bar"
+        tabIndex={-1}
+      >
+        <svg viewBox="0 0 24 8" width="22" height="8" aria-hidden="true">
+          <circle cx="3" cy="4" r="1.2" fill="currentColor" />
+          <circle cx="8" cy="4" r="1.2" fill="currentColor" />
+          <circle cx="13" cy="4" r="1.2" fill="currentColor" />
+          <circle cx="18" cy="4" r="1.2" fill="currentColor" />
+        </svg>
+      </button>
       <button
         type="button"
         role="switch"
         aria-checked={enabled}
-        aria-label={enabled ? "Pause PromptForge" : "Activate PromptForge"}
-        title={enabled ? "Active — click to pause" : "Paused — click to activate"}
         className={`cb-toggle ${enabled ? "on" : "off"}`}
+        aria-label={enabled ? "Pause PromptForge" : "Activate PromptForge"}
         onClick={() => void handleToggle()}
+        title={enabled ? "Active — click to pause" : "Paused — click to activate"}
       >
         <span className="cb-toggle-dot" />
+      </button>
+      <button
+        type="button"
+        className="cb-icon-btn"
+        aria-label="Open PromptForge"
+        onClick={() => void handleOpen()}
+        title="Open PromptForge"
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="4" y="6" width="16" height="14" rx="2" />
+          <path d="M8 10h8M8 14h5" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="cb-icon-btn"
+        aria-label="Hide command bar"
+        onClick={() => void handleHide()}
+        title="Hide (re-open from tray)"
+      >
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
       </button>
     </div>
   );
