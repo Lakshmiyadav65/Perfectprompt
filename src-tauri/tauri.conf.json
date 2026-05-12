@@ -1,0 +1,107 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "PromptForge",
+  "version": "0.2.1",
+  "identifier": "com.promptforge.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "PromptForge",
+        "width": 400,
+        "height": 300,
+        "visible": false,
+        "skipTaskbar": true
+      },
+      {
+        "label": "status",
+        "url": "index.html#/status",
+        "title": "PromptForge Status",
+        "width": 220,
+        "height": 70,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "visible": false,
+        "focus": false,
+        "shadow": false
+      },
+      {
+        "label": "settings",
+        "url": "index.html#/settings",
+        "title": "PromptForge Settings",
+        "width": 540,
+        "height": 480,
+        "resizable": false,
+        "visible": false,
+        "center": true,
+        "decorations": true
+      },
+      {
+        "label": "clarify",
+        "url": "index.html#/clarify",
+        "title": "Clarify Prompt",
+        "width": 600,
+        "height": 550,
+        "resizable": false,
+        "visible": false,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true
+      },
+      {
+        "label": "projects",
+        "url": "index.html#/projects",
+        "title": "PromptForge — Projects",
+        "width": 700,
+        "height": 600,
+        "resizable": true,
+        "visible": false,
+        "center": true,
+        "decorations": true
+      },
+      {
+        "label": "question-card",
+        "url": "index.html#/question-card",
+        "title": "Quick context",
+        "width": 360,
+        "height": 320,
+        "minHeight": 180,
+        "resizable": false,
+        "visible": false,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": {
+      "../prompts/enhancer-system-prompt.md": "prompts/enhancer-system-prompt.md"
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  }
+}

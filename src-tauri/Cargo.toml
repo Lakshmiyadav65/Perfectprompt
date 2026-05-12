@@ -1,0 +1,35 @@
+[package]
+name = "promptforge"
+version = "0.2.1"
+description = "PromptForge — system-tray prompt enhancer"
+authors = ["PromptForge"]
+edition = "2021"
+
+[lib]
+name = "promptforge_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+enigo = "0.2"
+tokio = { version = "1", features = ["time"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+dotenvy = "0.15"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { version = "0.61", features = [
+    "Win32_UI_Input_KeyboardAndMouse",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Graphics_Gdi",
+    "Win32_Foundation",
+] }

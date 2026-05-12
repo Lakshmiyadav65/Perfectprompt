@@ -1,0 +1,47 @@
+html,
+body,
+#root {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  overflow: hidden;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+.pf-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  margin: 8px;
+  background: rgba(20, 20, 22, 0.94);
+  color: #f2f2f4;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35);
+  font-size: 14px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.pf-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: pf-spin 0.65s linear infinite;
+}
+
+.pf-status-text {
+  letter-spacing: 0.01em;
+}
+
+@keyframes pf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
