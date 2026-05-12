@@ -233,6 +233,41 @@ pub async fn test_connection<R: Runtime>(app: AppHandle<R>) -> ConnectionTest {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub struct QuestionEngineSettings {
+    pub question_threshold: f32,
+    pub question_mode: QuestionMode,
+}
+
+#[tauri::command]
+pub fn get_question_engine_settings<R: Runtime>(app: AppHandle<R>) -> QuestionEngineSettings {
+    let s = load(&app);
+    QuestionEngineSettings {
+        question_threshold: s.question_threshold,
+        question_mode: s.question_mode,
+    }
+}
+
+#[tauri::command]
+pub fn save_question_engine_settings<R: Runtime>(
+    app: AppHandle<R>,
+    payload: QuestionEngineSettings,
+) -> std::result::Result<(), String> {
+    if !payload.question_threshold.is_finite()
+        || payload.question_threshold < 0.0
+        || payload.question_threshold > 1.0
+    {
+        return Err(format!(
+            "question_threshold must be in [0.0, 1.0], got {}",
+            payload.question_threshold
+        ));
+    }
+    let mut settings = load(&app);
+    settings.question_threshold = payload.question_threshold;
+    settings.question_mode = payload.question_mode;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))
+}
+
 #[tauri::command]
 pub fn open_settings<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), String> {
     let window = app

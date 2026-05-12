@@ -175,3 +175,125 @@ body,
 .pf-err {
   color: #ff7070;
 }
+
+/* ----- Smart Question Engine section ----- */
+
+.pf-settings kbd {
+  background: #2a2a2c;
+  border: 1px solid #3a3a3c;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #f2f2f4;
+}
+
+.pf-segmented {
+  display: inline-flex;
+  background: #2a2a2c;
+  border: 1px solid #3a3a3c;
+  border-radius: 7px;
+  padding: 3px;
+  margin: 8px 0 6px;
+  gap: 2px;
+}
+
+.pf-segment {
+  background: transparent;
+  border: none;
+  color: #c8c8cc;
+  font-size: 12px;
+  font-family: inherit;
+  font-weight: 500;
+  padding: 6px 14px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.pf-segment:hover:not(:disabled):not(.selected) {
+  background: #34343a;
+  color: #f2f2f4;
+}
+
+.pf-segment.selected {
+  background: #4a8af2;
+  color: #fff;
+}
+
+.pf-segment:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pf-mode-desc {
+  margin-top: 2px;
+  margin-bottom: 12px;
+}
+
+.pf-threshold {
+  background: #232325;
+  border: 1px solid #2f2f31;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 6px 0 12px;
+}
+
+.pf-threshold-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #c8c8cc;
+  margin-bottom: 6px;
+}
+
+.pf-threshold-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #f4f4f6;
+  background: #2a2a2c;
+  border: 1px solid #3a3a3c;
+  border-radius: 4px;
+  padding: 1px 8px;
+}
+
+.pf-threshold input[type="range"] {
+  width: 100%;
+  accent-color: #4a8af2;
+  cursor: pointer;
+}
+
+.pf-threshold input[type="range"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pf-threshold-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: #777;
+  margin-top: 4px;
+  letter-spacing: 0.02em;
+}
+
+.pf-privacy {
+  color: #888;
+  font-size: 11px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  background: rgba(40, 40, 44, 0.5);
+  border-left: 2px solid #3a3a3c;
+  border-radius: 0 4px 4px 0;
+}
+
+.pf-privacy a {
+  color: #6aa9ff;
+  text-decoration: none;
+}
+
+.pf-privacy a:hover {
+  text-decoration: underline;
+}

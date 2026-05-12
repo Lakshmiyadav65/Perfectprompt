@@ -57,6 +57,8 @@ pub fn run() {
             settings::save_hotkey,
             settings::test_connection,
             settings::open_settings,
+            settings::get_question_engine_settings,
+            settings::save_question_engine_settings,
             updater::check_for_updates,
             enhance::get_pending_prompt,
             enhance::generate_clarifying_questions,
