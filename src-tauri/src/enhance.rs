@@ -334,4 +334,20 @@ mod meta_prompt_tests {
             "Context Integration must instruct the model not to leak block contents"
         );
     }
+
+    #[test]
+    fn meta_prompt_enforces_mcq_only_generation() {
+        // The LLM-generated path must always pick chips/single_select so users
+        // get clickable options instead of free-text inputs. free_text and
+        // multi_select are still valid types in the schema (used by the static
+        // bank for Analysis "context") but the LLM must not emit them.
+        assert!(
+            META_PROMPT.contains("**Always** use `chips`"),
+            "Question Generation Mode is missing the 'Always use chips' MCQ-only directive"
+        );
+        assert!(
+            META_PROMPT.contains("**Never** emit `free_text`"),
+            "Question Generation Mode is missing the 'Never emit free_text' MCQ-only directive"
+        );
+    }
 }
