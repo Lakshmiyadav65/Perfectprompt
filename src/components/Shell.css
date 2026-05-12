@@ -1,0 +1,201 @@
+/* ===== Wispr-Flow inspired shell: sidebar + main content ===== */
+
+html,
+body,
+#root {
+  background: #f6f5f1;
+  color: #1c1c1e;
+  margin: 0;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+.pf-shell {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background: #f6f5f1;
+}
+
+/* ---------- Sidebar ---------- */
+
+.pf-sidebar {
+  width: 248px;
+  background: #ecebe6;
+  border-right: 1px solid #e2e0d8;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 14px 18px;
+  flex-shrink: 0;
+}
+
+.pf-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px 18px;
+}
+
+.pf-brand-mark {
+  width: 30px;
+  height: 30px;
+  background: linear-gradient(135deg, #1c1c1e 0%, #3a3a3c 100%);
+  color: #f6f5f1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.pf-brand-text {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-brand-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1c1c1e;
+  letter-spacing: -0.01em;
+}
+
+.pf-brand-tag {
+  font-size: 11px;
+  font-weight: 500;
+  color: #6b6b6b;
+  background: #fff;
+  border: 1px solid #d8d6cc;
+  border-radius: 5px;
+  padding: 1px 7px;
+}
+
+.pf-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 6px;
+}
+
+.pf-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  border: none;
+  color: #4d4d4f;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pf-nav-item:hover:not(.active) {
+  background: rgba(0, 0, 0, 0.04);
+  color: #1c1c1e;
+}
+
+.pf-nav-item.active {
+  background: #fff;
+  color: #1c1c1e;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.pf-nav-icon {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+}
+
+.pf-sidebar-footer {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+.pf-hotkey-card {
+  background: #fff;
+  border: 1px solid #e2e0d8;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.pf-hotkey-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a8a8a;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.pf-hotkey-value {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.pf-hotkey-value kbd {
+  background: #f1efe8;
+  border: 1px solid #d8d6cc;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 2px 7px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+.pf-plus {
+  color: #9a9a9a;
+  font-size: 11px;
+}
+
+.pf-hotkey-hint {
+  font-size: 11px;
+  color: #8a8a8a;
+  line-height: 1.4;
+}
+
+/* ---------- Main pane ---------- */
+
+.pf-main {
+  flex: 1;
+  background: #fff;
+  border-radius: 16px 0 0 0;
+  margin: 12px 12px 12px 0;
+  border: 1px solid #e2e0d8;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Hide ugly scrollbar */
+.pf-main::-webkit-scrollbar {
+  width: 8px;
+}
+.pf-main::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pf-main::-webkit-scrollbar-thumb {
+  background: #d8d6cc;
+  border-radius: 4px;
+}
+.pf-main::-webkit-scrollbar-thumb:hover {
+  background: #c8c6bc;
+}

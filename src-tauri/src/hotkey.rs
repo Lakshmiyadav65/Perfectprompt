@@ -13,7 +13,7 @@ use crate::{
 };
 use crate::AppState;
 
-pub const DEFAULT_HOTKEY: &str = "CommandOrControl+Alt+E";
+pub const DEFAULT_HOTKEY: &str = "Alt+E";
 
 pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()> {
     let shortcut = Shortcut::from_str(combo)

@@ -1,23 +1,24 @@
 import { StatusIndicator } from "./components/StatusIndicator";
-import { Settings } from "./components/Settings";
 import { ClarifyPopup } from "./components/ClarifyPopup";
-import { ProjectManager } from "./components/ProjectManager";
 import { QuestionCard } from "./components/QuestionCard";
+import { Shell } from "./components/Shell";
 
 function App() {
   const hash = window.location.hash;
+  // Floating popups stay independent — they live in their own borderless,
+  // transparent windows with their own bespoke styling.
   if (hash === "#/status") return <StatusIndicator />;
-  if (hash === "#/settings") return <Settings />;
   if (hash === "#/clarify") return <ClarifyPopup />;
-  if (hash === "#/projects") return <ProjectManager />;
   if (hash === "#/question-card") return <QuestionCard />;
 
-  return (
-    <main style={{ padding: 16, fontFamily: "system-ui, sans-serif" }}>
-      <h1>PromptForge</h1>
-      <p>Use the tray icon to open Settings. Press your hotkey to enhance any selected text.</p>
-    </main>
-  );
+  // Anything else (main / home / settings / projects, plus the legacy
+  // "/settings" or "/projects" deep-links from the tray) renders the
+  // shell with the requested initial route. The sidebar lets the user
+  // navigate between Home, Projects, and Settings without spawning new
+  // windows.
+  if (hash === "#/projects") return <Shell initial="projects" />;
+  if (hash === "#/settings") return <Shell initial="settings" />;
+  return <Shell initial="home" />;
 }
 
 export default App;

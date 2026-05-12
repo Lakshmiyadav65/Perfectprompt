@@ -1,105 +1,95 @@
-html,
-body,
-#root {
-  background: #1a1a1c;
-  color: #e6e6e6;
-  margin: 0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-  height: 100%;
-}
-
-body {
-  /* Settings has outgrown the original 480px window; let the body scroll
-     vertically rather than clipping the new Smart Question Engine section. */
-  overflow-y: auto;
-}
+/* Light Wispr-Flow theme. The Shell owns body/root background;
+   Settings only paints its own pane content. */
 
 .pf-settings {
-  padding: 22px 28px 28px;
-  box-sizing: border-box;
-  min-height: 100vh;
+  padding: 36px 44px 48px;
+  max-width: 720px;
+  margin: 0 auto;
+  color: #1c1c1e;
 }
 
 .pf-settings h1 {
-  font-size: 18px;
-  margin: 0 0 18px;
+  font-size: 28px;
   font-weight: 600;
-  letter-spacing: 0.01em;
+  letter-spacing: -0.02em;
+  margin: 0 0 6px;
+  color: #1c1c1e;
 }
 
 .pf-welcome {
-  background: linear-gradient(135deg, rgba(74, 138, 242, 0.16), rgba(74, 138, 242, 0.06));
-  border: 1px solid rgba(74, 138, 242, 0.32);
-  border-radius: 10px;
-  padding: 16px 18px;
-  margin-bottom: 22px;
+  background: linear-gradient(135deg, #fff7e0 0%, #fff1c8 100%);
+  border: 1px solid #f0d99c;
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 24px;
 }
 
 .pf-welcome-title {
   font-size: 15px;
   font-weight: 600;
   margin: 0 0 6px;
-  color: #f4f4f6;
-  letter-spacing: 0.01em;
+  color: #6a4f0a;
 }
 
 .pf-welcome-body {
   margin: 0 0 12px;
-  color: #c8c8cc;
+  color: #876417;
   font-size: 13px;
-  line-height: 1.5;
+  line-height: 1.55;
 }
 
 .pf-cta {
   display: inline-block;
   padding: 9px 16px;
-  background: #4a8af2;
-  color: #fff;
+  background: #1c1c1e;
+  color: #f6f5f1;
   border: none;
-  border-radius: 7px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
-  font-weight: 500;
-  letter-spacing: 0.01em;
+  font-weight: 600;
 }
 
 .pf-cta:hover {
-  background: #5a9af8;
+  background: #2a2a2c;
 }
 
 .pf-settings section {
-  margin-bottom: 22px;
+  margin-bottom: 28px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #ece9df;
+}
+
+.pf-settings section:last-child {
+  border-bottom: none;
 }
 
 .pf-settings h2 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   margin: 0 0 4px;
-  color: #f2f2f4;
-  letter-spacing: 0.02em;
+  color: #8a8a8a;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .pf-hint {
-  color: #9c9ca0;
-  font-size: 12px;
-  margin: 0 0 4px;
-  line-height: 1.4;
+  color: #6b6b6b;
+  font-size: 13px;
+  margin: 4px 0 12px;
+  line-height: 1.5;
 }
 
 .pf-sub {
-  color: #777;
-  font-size: 11px;
+  color: #8a8a8a;
+  font-size: 12px;
   margin: 0 0 8px;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 
 .pf-sub a {
-  color: #6aa9ff;
-  text-decoration: none;
-}
-
-.pf-sub a:hover {
+  color: #1c1c1e;
   text-decoration: underline;
 }
 
@@ -111,139 +101,140 @@ body {
 
 .pf-row input {
   flex: 1;
-  padding: 8px 12px;
-  background: #2a2a2c;
-  color: #e6e6e6;
-  border: 1px solid #3a3a3c;
-  border-radius: 6px;
+  padding: 9px 12px;
+  background: #fff;
+  color: #1c1c1e;
+  border: 1px solid #d8d6cc;
+  border-radius: 8px;
   font-size: 13px;
   font-family: inherit;
   min-width: 0;
 }
 
 .pf-row input.pf-recording {
-  border-color: #6aa9ff;
-  background: #1f2a3a;
+  border-color: #1c1c1e;
+  background: #faf9f5;
 }
 
 .pf-row input:focus {
   outline: none;
-  border-color: #6aa9ff;
+  border-color: #1c1c1e;
 }
 
 .pf-row input:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 
 .pf-row button {
-  padding: 8px 16px;
-  background: #4a8af2;
-  color: #fff;
+  padding: 9px 16px;
+  background: #1c1c1e;
+  color: #f6f5f1;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 13px;
   font-family: inherit;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .pf-row button:hover:not(:disabled) {
-  background: #5a9af8;
+  background: #2a2a2c;
 }
 
 .pf-row button:disabled {
-  background: #3a3a3c;
-  color: #888;
+  background: #d8d6cc;
+  color: #8a8a8a;
   cursor: not-allowed;
 }
 
 .pf-row button.pf-secondary {
   background: transparent;
-  border: 1px solid #3a3a3c;
-  color: #ccc;
+  border: 1px solid #d8d6cc;
+  color: #1c1c1e;
 }
 
 .pf-row button.pf-secondary:hover:not(:disabled) {
-  background: #2a2a2c;
+  background: #faf9f5;
 }
 
 .pf-msg {
-  font-size: 12px;
-  margin: 6px 0 0;
+  font-size: 12.5px;
+  margin: 8px 0 0;
   line-height: 1.4;
   word-break: break-word;
 }
 
 .pf-ok {
-  color: #4ad08a;
+  color: #2f8a4f;
 }
 
 .pf-err {
-  color: #ff7070;
+  color: #c0392b;
 }
 
 /* ----- Smart Question Engine section ----- */
 
 .pf-settings kbd {
-  background: #2a2a2c;
-  border: 1px solid #3a3a3c;
-  border-radius: 4px;
-  padding: 1px 5px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: #f1efe8;
+  border: 1px solid #d8d6cc;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 2px 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
   font-size: 11px;
-  color: #f2f2f4;
+  color: #1c1c1e;
 }
 
 .pf-segmented {
   display: inline-flex;
-  background: #2a2a2c;
-  border: 1px solid #3a3a3c;
-  border-radius: 7px;
+  background: #f1efe8;
+  border: 1px solid #d8d6cc;
+  border-radius: 9px;
   padding: 3px;
-  margin: 8px 0 6px;
+  margin: 4px 0 8px;
   gap: 2px;
 }
 
 .pf-segment {
   background: transparent;
   border: none;
-  color: #c8c8cc;
-  font-size: 12px;
+  color: #6b6b6b;
+  font-size: 12.5px;
   font-family: inherit;
   font-weight: 500;
   padding: 6px 14px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
 .pf-segment:hover:not(:disabled):not(.selected) {
-  background: #34343a;
-  color: #f2f2f4;
+  background: rgba(0, 0, 0, 0.04);
+  color: #1c1c1e;
 }
 
 .pf-segment.selected {
-  background: #4a8af2;
-  color: #fff;
+  background: #1c1c1e;
+  color: #f6f5f1;
 }
 
 .pf-segment:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .pf-mode-desc {
-  margin-top: 2px;
-  margin-bottom: 12px;
+  margin-top: 0;
+  margin-bottom: 14px;
 }
 
 .pf-threshold {
-  background: #232325;
-  border: 1px solid #2f2f31;
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin: 6px 0 12px;
+  background: #faf9f5;
+  border: 1px solid #ece9df;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin: 6px 0 14px;
 }
 
 .pf-threshold-label {
@@ -251,23 +242,23 @@ body {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #c8c8cc;
+  color: #6b6b6b;
   margin-bottom: 6px;
 }
 
 .pf-threshold-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: ui-monospace, Menlo, monospace;
   font-size: 12px;
-  color: #f4f4f6;
-  background: #2a2a2c;
-  border: 1px solid #3a3a3c;
-  border-radius: 4px;
+  color: #1c1c1e;
+  background: #fff;
+  border: 1px solid #d8d6cc;
+  border-radius: 5px;
   padding: 1px 8px;
 }
 
 .pf-threshold input[type="range"] {
   width: 100%;
-  accent-color: #4a8af2;
+  accent-color: #1c1c1e;
   cursor: pointer;
 }
 
@@ -279,28 +270,24 @@ body {
 .pf-threshold-scale {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  color: #777;
+  font-size: 10.5px;
+  color: #8a8a8a;
   margin-top: 4px;
   letter-spacing: 0.02em;
 }
 
 .pf-privacy {
-  color: #888;
-  font-size: 11px;
-  line-height: 1.5;
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  background: rgba(40, 40, 44, 0.5);
-  border-left: 2px solid #3a3a3c;
-  border-radius: 0 4px 4px 0;
+  color: #6b6b6b;
+  font-size: 11.5px;
+  line-height: 1.55;
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  background: #faf9f5;
+  border-left: 2px solid #d8d6cc;
+  border-radius: 0 6px 6px 0;
 }
 
 .pf-privacy a {
-  color: #6aa9ff;
-  text-decoration: none;
-}
-
-.pf-privacy a:hover {
+  color: #1c1c1e;
   text-decoration: underline;
 }

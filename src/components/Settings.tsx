@@ -60,7 +60,7 @@ const QUESTION_MODE_OPTIONS: {
 
 export function Settings() {
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
-  const [hotkey, setHotkey] = useState("CommandOrControl+Alt+E");
+  const [hotkey, setHotkey] = useState("Alt+E");
   const [keyInput, setKeyInput] = useState("");
   const [keyMsg, setKeyMsg] = useState<Msg>(null);
   const [testMsg, setTestMsg] = useState<Msg>(null);

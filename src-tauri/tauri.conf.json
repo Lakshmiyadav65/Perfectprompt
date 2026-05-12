@@ -13,11 +13,16 @@
     "windows": [
       {
         "label": "main",
+        "url": "index.html#/home",
         "title": "PromptForge",
-        "width": 400,
-        "height": 300,
+        "width": 1100,
+        "height": 720,
+        "minWidth": 880,
+        "minHeight": 560,
         "visible": false,
-        "skipTaskbar": true
+        "center": true,
+        "decorations": true,
+        "skipTaskbar": false
       },
       {
         "label": "status",

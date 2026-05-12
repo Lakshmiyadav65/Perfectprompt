@@ -16,25 +16,18 @@ export function ClarifyPopup() {
   const [loading, setLoading] = useState<boolean>(true);
   const [enhancing, setEnhancing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [debug, setDebug] = useState<string>("Mounting...");
   const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
     // On mount, fetch the pending prompt from backend state
     async function fetchAndGenerate() {
       try {
-        setDebug("Fetching prompt from backend state...");
         const pendingPrompt: string = await invoke("get_pending_prompt");
-        console.log("Got pending prompt:", pendingPrompt);
-        
         if (!pendingPrompt || pendingPrompt.trim() === "") {
-          setDebug("No prompt found in state. Waiting...");
           setLoading(false);
           return;
         }
-
         setPrompt(pendingPrompt);
-        setDebug(`Prompt received (${pendingPrompt.length} chars). Calling API...`);
         setLoading(true);
         setError(null);
 
@@ -43,7 +36,6 @@ export function ClarifyPopup() {
           prompt: pendingPrompt,
         });
         setQuestions(generatedQuestions);
-        setDebug("Questions generated successfully!");
 
         // Initialize answers state
         const initialAnswers: Record<string, { option: string; otherText: string }> = {};
@@ -53,7 +45,6 @@ export function ClarifyPopup() {
         setAnswers(initialAnswers);
       } catch (err: any) {
         console.error("Failed to generate questions:", err);
-        setDebug(`Error: ${err.toString()}`);
         setError(err.toString());
       } finally {
         setLoading(false);
@@ -139,8 +130,7 @@ export function ClarifyPopup() {
         {loading ? (
           <div className="loading-state">
             <div className="spinner"></div>
-            <p>Analyzing prompt and generating clarifying questions...</p>
-            <p style={{color: '#888', fontSize: '12px', marginTop: '10px'}}>{debug}</p>
+            <p>Analyzing your prompt…</p>
           </div>
         ) : enhancing ? (
           <div className="loading-state">
@@ -149,7 +139,6 @@ export function ClarifyPopup() {
           </div>
         ) : (
           <>
-            <div style={{color: '#888', fontSize: '12px', marginBottom: '10px'}}>{debug}</div>
             {error && <div className="error-message">{error}</div>}
             {questions.map((q, index) => (
               <div key={q.id} className="question-block">

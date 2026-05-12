@@ -106,7 +106,7 @@ pub fn run() {
 /// default behavior.
 fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
     const KEEP_ALIVE_LABELS: &[&str] =
-        &["settings", "projects", "clarify", "question-card", "status"];
+        &["main", "settings", "projects", "clarify", "question-card", "status"];
 
     for label in KEEP_ALIVE_LABELS {
         let Some(window) = app.get_webview_window(label) else {
