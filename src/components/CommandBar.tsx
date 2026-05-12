@@ -10,8 +10,15 @@ export function CommandBar() {
   const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
+    // Shell.css sets `html { background: var(--pf-bg) }` for the main
+    // window's dark theme. That global rule also targets THIS webview
+    // since all windows share the bundle, painting the rectangular dark
+    // area we don't want behind the rounded capsule. Inline-overriding
+    // the html element keeps that rectangle from showing through.
+    document.documentElement.style.background = "transparent";
     document.body.classList.add("cb-route");
     return () => {
+      document.documentElement.style.background = "";
       document.body.classList.remove("cb-route");
     };
   }, []);

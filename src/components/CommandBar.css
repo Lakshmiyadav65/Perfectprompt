@@ -5,12 +5,23 @@ body.cb-route,
 body.cb-route #root {
   margin: 0;
   padding: 0;
-  background: transparent;
+  background: transparent !important;
   font-family: var(--pf-font-sans);
   user-select: none;
   -webkit-user-select: none;
   cursor: default;
   overflow: hidden;
+}
+
+/* Center the capsule inside the window so any extra window space
+   (needed for the drop shadow to render fully) is symmetric and
+   shows transparency, not a dark rectangle. */
+body.cb-route #root {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
 }
 
 body.cb-route * {
@@ -31,7 +42,6 @@ body.cb-route * {
     0 8px 24px rgba(0, 0, 0, 0.5),
     0 2px 4px rgba(0, 0, 0, 0.3);
   width: fit-content;
-  margin: 4px;
 }
 
 /* ---------- Icon buttons ---------- */
