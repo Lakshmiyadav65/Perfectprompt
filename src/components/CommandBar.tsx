@@ -61,13 +61,16 @@ export function CommandBar() {
 
   async function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const id = e.target.value;
-    if (!id) return;
     // Optimistic update so the select snaps immediately.
-    setStore((s) => ({ ...s, active_project_id: id }));
+    setStore((s) => ({ ...s, active_project_id: id || null }));
     try {
-      await invoke("set_active_project", { id });
+      if (id) {
+        await invoke("set_active_project", { id });
+      } else {
+        await invoke("clear_active_project");
+      }
     } catch (err) {
-      console.error("set active project failed", err);
+      console.error("project selection failed", err);
       void refreshProjects();
     }
   }
@@ -100,24 +103,53 @@ export function CommandBar() {
 
   return (
     <div className="cb-row">
-      <select
-        className="cb-project-select"
-        value={store.active_project_id ?? ""}
-        onChange={(e) => void handleProjectChange(e)}
-        disabled={!hasProjects}
-        aria-label="Active project"
-        title={hasProjects ? "Active project (scanned for context)" : "Add a project in the main app"}
+      <div
+        className={`cb-project-wrap ${store.active_project_id ? "active" : ""}`}
+        title={
+          hasProjects
+            ? store.active_project_id
+              ? `Active project: ${
+                  store.projects.find((p) => p.id === store.active_project_id)?.name ?? ""
+                }`
+              : "Pick a project (optional)"
+            : "No projects — add one in the main app"
+        }
       >
-        {!hasProjects && <option value="">No projects</option>}
-        {hasProjects && store.active_project_id === null && (
-          <option value="">— pick a project —</option>
-        )}
-        {store.projects.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.name}
-          </option>
-        ))}
-      </select>
+        {/* Folder glyph — the visual users see. The native <select> below
+            is invisible but overlays this exactly, so a click anywhere on
+            the icon opens the OS-native picker that floats outside the
+            capsule's tight 60px window. */}
+        <svg
+          className="cb-project-icon"
+          viewBox="0 0 24 24"
+          width="14"
+          height="14"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+        </svg>
+        {store.active_project_id && <span className="cb-project-dot" aria-hidden="true" />}
+        <select
+          className="cb-project-select"
+          value={store.active_project_id ?? ""}
+          onChange={(e) => void handleProjectChange(e)}
+          disabled={!hasProjects}
+          aria-label="Active project"
+        >
+          {!hasProjects && <option value="">No projects</option>}
+          <option value="">— no project —</option>
+          {store.projects.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <button
         type="button"
         className="cb-icon-btn cb-enhance-btn"

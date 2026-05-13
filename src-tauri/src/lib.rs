@@ -102,6 +102,7 @@ pub fn run() {
             projects::update_project,
             projects::delete_project,
             projects::set_active_project,
+            projects::clear_active_project,
             projects::read_file_content,
             clarify::fetch_question_card_session,
             clarify::submit_question_card_answers,

@@ -207,6 +207,23 @@ pub fn set_active_project<R: Runtime>(
     Ok(())
 }
 
+/// Clear the active project. Used by the capsule's project picker
+/// when the user selects "— no project —" to opt out of project
+/// context for the next enhancement.
+#[tauri::command]
+pub fn clear_active_project<R: Runtime>(
+    app: AppHandle<R>,
+) -> std::result::Result<(), String> {
+    let mut store = load_store(&app);
+    if store.active_project_id.is_none() {
+        return Ok(());
+    }
+    store.active_project_id = None;
+    save_store(&app, &store).map_err(|e| format!("{e:#}"))?;
+    println!("[projects] cleared active project");
+    Ok(())
+}
+
 #[tauri::command]
 pub fn read_file_content(path: String) -> std::result::Result<String, String> {
     let file_path = std::path::Path::new(&path);
