@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" aria-label="PromptForge">
+  <defs>
+    <!-- Approximates the conic-gradient(from 220deg, #2a2a30, #f4f1ea 40%, #2a2a30 70%, #f4f1ea)
+         used by .pf-brand-mark in the sidebar. SVG has no native conic gradient,
+         so a diagonal linear stop pattern gives the closest read at icon sizes. -->
+    <linearGradient id="sweep" x1="20%" y1="0%" x2="80%" y2="100%">
+      <stop offset="0%"   stop-color="#f4f1ea"/>
+      <stop offset="30%"  stop-color="#2a2a30"/>
+      <stop offset="60%"  stop-color="#f4f1ea"/>
+      <stop offset="100%" stop-color="#2a2a30"/>
+    </linearGradient>
+  </defs>
+  <!-- Outer ring with the sweep colours. -->
+  <circle cx="512" cy="512" r="500" fill="url(#sweep)"/>
+  <!-- Inner core matches the sidebar background so we get a ring, not a full disc. -->
+  <circle cx="512" cy="512" r="360" fill="#1a1a18"/>
+  <!-- Thin hairline at the outermost edge for definition at small sizes. -->
+  <circle cx="512" cy="512" r="510" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+</svg>
