@@ -77,10 +77,10 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
     return () => window.clearInterval(id);
   }, []);
 
-  // Auto-loop the demo every 7 seconds — matches the animation length
-  // in Home.css so the user sees a continuous cycle.
+  // Auto-loop the demo every 8 seconds — matches the keyframe schedule
+  // in Home.css (last pane-3 line lands at ~7s; ~1s hold before reset).
   useEffect(() => {
-    const id = window.setInterval(() => setDemoKey((k) => k + 1), 7000);
+    const id = window.setInterval(() => setDemoKey((k) => k + 1), 8000);
     return () => window.clearInterval(id);
   }, []);
 

@@ -384,30 +384,33 @@
   border: 1px solid var(--pf-line-strong);
   border-radius: 8px;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
-  animation: ph-hotkey-glow 7s ease 0s forwards;
+  /* 8s cycle: "press" lights up the hotkey at ~3.0s, right after the
+     selection in pane 1 finishes at 2.6s — so the eye reads "select → press
+     → questions appear → output streams in" as a single flow. */
+  animation: ph-hotkey-glow 8s ease 0s forwards;
 }
 @keyframes ph-hotkey-glow {
-  0%, 53% {
+  0%, 35% {
     border-color: var(--pf-line-strong);
     box-shadow: 0 0 0 0 transparent;
   }
-  60%, 100% {
+  40%, 100% {
     border-color: var(--pf-accent-strong);
     box-shadow: 0 0 18px var(--pf-accent-soft);
   }
 }
 .ph-mini-hotkey .ph-kbd {
-  animation: ph-key-press 7s ease 0s forwards;
+  animation: ph-key-press 8s ease 0s forwards;
 }
 @keyframes ph-key-press {
-  0%, 56% {
+  0%, 35% {
     background: rgba(255, 255, 255, 0.06);
     color: var(--pf-text);
     border-color: var(--pf-line-strong);
     box-shadow: none;
     transform: translateY(0);
   }
-  60%, 100% {
+  40%, 100% {
     background: var(--pf-accent);
     color: var(--pf-bg-2);
     border-color: var(--pf-accent);
@@ -431,6 +434,14 @@
   border: 1px solid var(--pf-line-strong);
   border-radius: 10px;
   padding: 14px;
+  /* Lands shortly after the hotkey press finishes at 3.0s. Slight rise
+     gives the impression the card was triggered by the press. */
+  opacity: 0;
+  transform: translateY(8px);
+  animation: ph-pane2-in 0.45s var(--pf-ease, ease) 3.3s forwards;
+}
+@keyframes ph-pane2-in {
+  to { opacity: 1; transform: translateY(0); }
 }
 .ph-mini-qtitle {
   font-family: var(--pf-font-display);
@@ -454,11 +465,27 @@
   color: var(--pf-text-muted);
   transition: all 0.15s var(--pf-ease, ease);
 }
+/* Chips marked .picked in JSX start un-picked visually, then animate
+   into the picked state — so the loop reads as "user is choosing"
+   rather than "questions arrive already answered". The two qchips
+   groups stagger so the eye follows one chip lighting up after the
+   other. */
 .ph-mini-qchip.picked {
-  background: rgba(232, 226, 212, 0.92);
-  color: var(--pf-bg-2);
-  border-color: rgba(232, 226, 212, 1);
-  font-weight: 500;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--pf-text-muted);
+  border-color: var(--pf-line-strong);
+  font-weight: 400;
+  animation: ph-chip-pick 0.4s var(--pf-ease, ease) forwards;
+}
+.ph-mini-qcard > :nth-child(2) .ph-mini-qchip.picked { animation-delay: 4.1s; }
+.ph-mini-qcard > :nth-child(4) .ph-mini-qchip.picked { animation-delay: 4.6s; }
+@keyframes ph-chip-pick {
+  to {
+    background: rgba(232, 226, 212, 0.92);
+    color: var(--pf-bg-2);
+    border-color: rgba(232, 226, 212, 1);
+    font-weight: 500;
+  }
 }
 
 /* ----- enhanced output in pane 3 ----- */
@@ -469,6 +496,27 @@
   line-height: 1.65;
   color: var(--pf-text-muted);
 }
+
+/* Each line of the output fades up in sequence — reads as the
+   enhanced prompt being streamed in by the LLM after the questions
+   were answered. Stagger starts at 5.3s (right after the second chip
+   pick at 4.6s + a beat) and ends at 6.5s. */
+.ph-mini-output > span {
+  opacity: 0;
+  transform: translateY(4px);
+  animation: ph-line-in 0.4s var(--pf-ease, ease) forwards;
+}
+.ph-mini-output > span:nth-child(1) { animation-delay: 5.3s; }
+.ph-mini-output > span:nth-child(2) { animation-delay: 5.5s; }
+.ph-mini-output > span:nth-child(3) { animation-delay: 5.7s; }
+.ph-mini-output > span:nth-child(4) { animation-delay: 5.9s; }
+.ph-mini-output > span:nth-child(5) { animation-delay: 6.1s; }
+.ph-mini-output > span:nth-child(6) { animation-delay: 6.3s; }
+.ph-mini-output > span:nth-child(7) { animation-delay: 6.5s; }
+@keyframes ph-line-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .ph-mini-output .h {
   color: var(--pf-text);
   font-weight: 500;
@@ -495,6 +543,22 @@
   position: absolute;
   left: 2px;
   color: var(--pf-text-subtle);
+}
+
+/* Honour the user's motion preference. Skip every demo entrance/stagger
+   animation so the panes render statically at their end states. */
+@media (prefers-reduced-motion: reduce) {
+  .ph-mini-qcard,
+  .ph-mini-qchip.picked,
+  .ph-mini-output > span,
+  .ph-rough-text .typed,
+  .ph-rough-text .selbox,
+  .ph-mini-hotkey,
+  .ph-mini-hotkey .ph-kbd {
+    animation: none;
+  }
+  .ph-mini-qcard { opacity: 1; transform: none; }
+  .ph-mini-output > span { opacity: 1; transform: none; }
 }
 
 /* ---------- recent enhancements ---------- */
