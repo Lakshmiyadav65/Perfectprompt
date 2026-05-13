@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import "./CommandBar.css";
 
 interface Project {
@@ -18,15 +19,24 @@ interface ProjectStore {
   projects: Project[];
 }
 
+/// Window sizes — the capsule alone fits in 160x60, but when the project
+/// picker is open we grow the window so the dark popover can render
+/// inside our own webview instead of falling back to the OS-native
+/// dropdown (which clashes with the dark theme).
+const CAPSULE_SIZE = new LogicalSize(160, 60);
+const PICKER_OPEN_SIZE = new LogicalSize(160, 240);
+
 /// Floating widget — single capsule with a project selector (sets the
-/// active project that the developer-mode enhancer pulls context from)
-/// and a dismiss button. Always-on-top, no taskbar entry.
+/// active project that the developer-mode enhancer pulls context from),
+/// an enhance button, and a dismiss button. Always-on-top, no taskbar
+/// entry.
 export function CommandBar() {
   const appWindow = getCurrentWebviewWindow();
   const [store, setStore] = useState<ProjectStore>({
     active_project_id: null,
     projects: [],
   });
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
     // Shell.css sets `html { background: var(--pf-bg) }` for the main
@@ -50,6 +60,37 @@ export function CommandBar() {
     return () => window.clearInterval(id);
   }, []);
 
+  // Close the picker on click outside, Escape, or window blur. Each
+  // condition reads the latest pickerOpen via the closure on this
+  // effect's run.
+  useEffect(() => {
+    if (!pickerOpen) return;
+    function onMouseDown(e: MouseEvent) {
+      const t = e.target as Node;
+      if (
+        document.querySelector(".cb-picker-pop")?.contains(t) ||
+        document.querySelector(".cb-project-wrap")?.contains(t)
+      ) {
+        return;
+      }
+      void closePicker();
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") void closePicker();
+    }
+    function onBlur() {
+      void closePicker();
+    }
+    document.addEventListener("mousedown", onMouseDown);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      document.removeEventListener("mousedown", onMouseDown);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [pickerOpen]);
+
   async function refreshProjects() {
     try {
       const data = await invoke<ProjectStore>("list_projects");
@@ -59,10 +100,29 @@ export function CommandBar() {
     }
   }
 
-  async function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const id = e.target.value;
-    // Optimistic update so the select snaps immediately.
-    setStore((s) => ({ ...s, active_project_id: id || null }));
+  async function openPicker() {
+    setPickerOpen(true);
+    document.body.classList.add("cb-picker-open");
+    try {
+      await appWindow.setSize(PICKER_OPEN_SIZE);
+    } catch (e) {
+      console.error("picker resize failed", e);
+    }
+  }
+
+  async function closePicker() {
+    setPickerOpen(false);
+    document.body.classList.remove("cb-picker-open");
+    try {
+      await appWindow.setSize(CAPSULE_SIZE);
+    } catch (e) {
+      console.error("picker resize-back failed", e);
+    }
+  }
+
+  async function pickProject(id: string | null) {
+    // Optimistic update so the popover snaps immediately.
+    setStore((s) => ({ ...s, active_project_id: id }));
     try {
       if (id) {
         await invoke("set_active_project", { id });
@@ -73,6 +133,7 @@ export function CommandBar() {
       console.error("project selection failed", err);
       void refreshProjects();
     }
+    await closePicker();
   }
 
   async function handleEnhance() {
@@ -99,82 +160,113 @@ export function CommandBar() {
     }
   }
 
-  const hasProjects = store.projects.length > 0;
+  const activeProject = store.projects.find((p) => p.id === store.active_project_id);
 
   return (
-    <div className="cb-row">
-      <div
-        className={`cb-project-wrap ${store.active_project_id ? "active" : ""}`}
-        title={
-          hasProjects
-            ? store.active_project_id
-              ? `Active project: ${
-                  store.projects.find((p) => p.id === store.active_project_id)?.name ?? ""
-                }`
-              : "Pick a project (optional)"
-            : "No projects — add one in the main app"
-        }
-      >
-        {/* Folder glyph — the visual users see. The native <select> below
-            is invisible but overlays this exactly, so a click anywhere on
-            the icon opens the OS-native picker that floats outside the
-            capsule's tight 60px window. */}
-        <svg
-          className="cb-project-icon"
-          viewBox="0 0 24 24"
-          width="14"
-          height="14"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
-        </svg>
-        {store.active_project_id && <span className="cb-project-dot" aria-hidden="true" />}
-        <select
-          className="cb-project-select"
-          value={store.active_project_id ?? ""}
-          onChange={(e) => void handleProjectChange(e)}
-          disabled={!hasProjects}
+    <div className="cb-shell">
+      <div className="cb-row">
+        <button
+          type="button"
+          className={`cb-icon-btn cb-project-wrap ${store.active_project_id ? "active" : ""}`}
+          onClick={() => void (pickerOpen ? closePicker() : openPicker())}
           aria-label="Active project"
+          aria-expanded={pickerOpen}
+          title={
+            activeProject
+              ? `Active project: ${activeProject.name}`
+              : "Pick a project (optional)"
+          }
         >
-          {!hasProjects && <option value="">No projects</option>}
-          <option value="">— no project —</option>
-          {store.projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name}
-            </option>
-          ))}
-        </select>
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
+          </svg>
+          {store.active_project_id && <span className="cb-project-dot" aria-hidden="true" />}
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn cb-enhance-btn"
+          aria-label="Enhance selected text"
+          onClick={() => void handleEnhance()}
+          title="Enhance the selected text (same as Ctrl+Alt+E)"
+        >
+          {/* Sparkles / wand glyph — signals "improve / transform". */}
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+            <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn"
+          aria-label="Hide command bar"
+          onClick={() => void handleHide()}
+          title="Hide (re-open from tray)"
+        >
+          <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
+        </button>
       </div>
-      <button
-        type="button"
-        className="cb-icon-btn cb-enhance-btn"
-        aria-label="Enhance selected text"
-        onClick={() => void handleEnhance()}
-        title="Enhance the selected text (same as Ctrl+Alt+E)"
-      >
-        {/* Sparkles / wand glyph — signals "improve / transform". */}
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
-          <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
-      <button
-        type="button"
-        className="cb-icon-btn"
-        aria-label="Hide command bar"
-        onClick={() => void handleHide()}
-        title="Hide (re-open from tray)"
-      >
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d="M6 6l12 12M18 6L6 18" />
-        </svg>
-      </button>
+
+      {pickerOpen && (
+        <div className="cb-picker-pop" role="listbox" aria-label="Choose active project">
+          <div className="cb-picker-header">Active project</div>
+          <button
+            type="button"
+            className={`cb-picker-item ${!store.active_project_id ? "active" : ""}`}
+            onClick={() => void pickProject(null)}
+            role="option"
+            aria-selected={!store.active_project_id}
+          >
+            <span className="cb-picker-item-name">No project</span>
+            <span className="cb-picker-item-hint">enhance without context</span>
+          </button>
+          {store.projects.length === 0 && (
+            <div className="cb-picker-empty">
+              No projects yet. Open the main app to add one.
+            </div>
+          )}
+          {store.projects.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`cb-picker-item ${p.id === store.active_project_id ? "active" : ""}`}
+              onClick={() => void pickProject(p.id)}
+              role="option"
+              aria-selected={p.id === store.active_project_id}
+            >
+              <span className="cb-picker-item-name">{p.name}</span>
+              {p.id === store.active_project_id && (
+                <svg
+                  className="cb-picker-item-check"
+                  viewBox="0 0 16 16"
+                  width="12"
+                  height="12"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M3 8l3 3 7-7" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
