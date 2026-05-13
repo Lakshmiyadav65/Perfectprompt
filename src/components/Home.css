@@ -1,9 +1,6 @@
 /* ===== Home — hero, status strip, demo card, recent list, right rail ===== */
 
 .ph-page {
-  display: grid;
-  grid-template-columns: 1fr 280px;
-  align-items: start;
   min-height: 100%;
   background:
     radial-gradient(80% 50% at 80% -10%, rgba(255,122,77,0.06), transparent 50%),
@@ -16,13 +13,7 @@
 .ph-main-inner {
   padding: 36px 40px 60px;
   min-width: 0;
-}
-
-.ph-main-rail {
-  padding: 36px 32px 60px 12px;
-  border-left: 1px solid var(--pf-line);
-  background: rgba(255,255,255,0.015);
-  min-height: 100%;
+  max-width: 1080px;
 }
 
 /* ---------- shared bits ---------- */
@@ -507,6 +498,23 @@
 /* ---------- recent enhancements ---------- */
 
 .ph-recent-section { margin-top: 40px; }
+
+/* Header row: title block on the left, 7-day activity strip on the
+   right. Wraps onto a second line on narrow widths so the activity
+   doesn't fight the section title for space. */
+.ph-recent-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.ph-recent-activity {
+  flex-shrink: 0;
+  width: 200px;
+  min-width: 180px;
+}
 .ph-recent-list {
   margin-top: 16px;
   border-top: 1px solid var(--pf-line);
@@ -563,46 +571,17 @@
   gap: 4px;
 }
 
-/* ---------- right rail ---------- */
-
-.ph-rail-section { margin-bottom: 28px; }
-.ph-rail-eyebrow {
-  font-family: var(--pf-font-mono);
-  font-size: 10px;
-  color: var(--pf-text-subtle);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  margin-bottom: 14px;
-}
-.ph-stat-block {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-}
-.ph-stat-num {
-  font-family: var(--pf-font-display);
-  font-size: 32px;
-  font-weight: 400;
-  color: var(--pf-text);
-  letter-spacing: -0.022em;
-  line-height: 1;
-}
-.ph-stat-label { font-size: 12px; color: var(--pf-text-muted); }
-.ph-stat-label .dim { color: var(--pf-text-subtle); }
-
-/* activity dots */
+/* ---------- 7-day activity dots (in the recent-enhancements head) ---------- */
 
 .ph-activity-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 5px;
 }
 .ph-a-day {
   flex: 1;
-  height: 32px;
-  border-radius: 4px;
+  height: 22px;
+  border-radius: 3px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--pf-line);
 }
@@ -623,85 +602,14 @@
 }
 .ph-activity-labels {
   display: flex;
-  gap: 6px;
-  margin-top: 6px;
+  gap: 5px;
+  margin-top: 5px;
   font-family: var(--pf-font-mono);
-  font-size: 9.5px;
+  font-size: 9px;
   color: var(--pf-text-subtle);
   letter-spacing: 0.04em;
 }
 .ph-activity-labels span { flex: 1; text-align: center; }
-
-/* tip card */
-
-.ph-tip-card {
-  background: linear-gradient(180deg, var(--pf-surface), var(--pf-bg-2));
-  border: 1px solid var(--pf-line);
-  border-radius: 12px;
-  padding: 16px 18px;
-  position: relative;
-  overflow: hidden;
-}
-.ph-tip-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(60% 80% at 100% 0%, rgba(255, 122, 77, 0.06), transparent 60%);
-  pointer-events: none;
-}
-.ph-tip-eyebrow {
-  font-family: var(--pf-font-mono);
-  font-size: 10px;
-  color: var(--pf-accent);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 10px;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  position: relative;
-}
-.ph-tip-text {
-  font-family: var(--pf-font-display);
-  font-size: 15px;
-  color: var(--pf-text);
-  line-height: 1.35;
-  margin-bottom: 10px;
-  position: relative;
-}
-.ph-tip-text .dim {
-  color: var(--pf-text-subtle);
-  font-style: italic;
-}
-.ph-tip-text .kbdfont {
-  font-family: var(--pf-font-mono);
-  font-size: 12px;
-}
-.ph-tip-sub {
-  font-size: 12px;
-  color: var(--pf-text-muted);
-  line-height: 1.5;
-  position: relative;
-  margin-bottom: 12px;
-}
-.ph-tip-action {
-  font-size: 12px;
-  color: var(--pf-accent);
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  position: relative;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  font-family: inherit;
-  padding: 0;
-}
-.ph-tip-action:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
 
 /* ---------- banner (when no API key) ---------- */
 
@@ -730,17 +638,8 @@
 
 /* ---------- responsive ---------- */
 
-@media (max-width: 1100px) {
-  .ph-page { grid-template-columns: 1fr; }
-  .ph-main-rail {
-    border-left: none;
-    border-top: 1px solid var(--pf-line);
-    padding: 24px 40px 40px;
-  }
-}
 @media (max-width: 880px) {
   .ph-main-inner { padding: 28px 24px; }
-  .ph-main-rail { padding: 20px 24px 32px; }
   .ph-demo-body { grid-template-columns: 1fr; }
   .ph-demo-pane {
     border-right: none;
@@ -748,4 +647,5 @@
   }
   .ph-strip { grid-template-columns: 1fr; }
   .ph-hero-row { flex-direction: column; align-items: flex-start; }
+  .ph-recent-activity { width: 100%; }
 }

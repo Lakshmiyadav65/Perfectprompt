@@ -48,15 +48,8 @@ const SAMPLE_RECENT = [
   },
 ];
 
-/// Same caveat as SAMPLE_RECENT. Stats and activity bars are mocked
-/// against believable placeholder numbers until we have telemetry.
-const SAMPLE_STATS = {
-  enhancementsThisWeek: 42,
-  deltaVsLast: "↑ 18 vs last",
-  activeProjects: 3,
-  avgRoundtripSec: 1.8,
-};
-
+/// Same caveat as SAMPLE_RECENT — 7-day activity bars are mocked
+/// against a believable pattern until we have telemetry.
 const SAMPLE_ACTIVITY: Array<"" | "lo" | "md" | "hi"> = ["lo", "md", "lo", "hi", "md", "", "md"];
 
 function dayTimeNow(): string {
@@ -292,10 +285,30 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
 
         {/* ===== RECENT ENHANCEMENTS ===== */}
         <div className="ph-recent-section">
-          <div className="ph-eyebrow flame">Recent enhancements</div>
-          <h2 className="ph-h-section">
-            Today's work, <span className="dim">at a glance.</span>
-          </h2>
+          <div className="ph-recent-head">
+            <div>
+              <div className="ph-eyebrow flame">Recent enhancements</div>
+              <h2 className="ph-h-section">
+                Today's work, <span className="dim">at a glance.</span>
+              </h2>
+            </div>
+            <div className="ph-recent-activity" aria-label="7-day activity">
+              <div className="ph-activity-row">
+                {SAMPLE_ACTIVITY.map((level, i) => (
+                  <div
+                    key={i}
+                    className={`ph-a-day ${level} ${
+                      i === SAMPLE_ACTIVITY.length - 1 ? "today" : ""
+                    }`}
+                  />
+                ))}
+              </div>
+              <div className="ph-activity-labels">
+                <span>T</span><span>W</span><span>T</span>
+                <span>F</span><span>S</span><span>S</span><span>M</span>
+              </div>
+            </div>
+          </div>
 
           <div className="ph-recent-list">
             {SAMPLE_RECENT.map((r, i) => (
@@ -327,70 +340,6 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
           </div>
         )}
       </div>
-
-      {/* ===== RIGHT RAIL ===== */}
-      <aside className="ph-main-rail">
-        <div className="ph-rail-section">
-          <div className="ph-rail-eyebrow">This week</div>
-          <div className="ph-stat-block">
-            <div className="ph-stat-num">{SAMPLE_STATS.enhancementsThisWeek}</div>
-            <div className="ph-stat-label">
-              enhancements <span className="dim">{SAMPLE_STATS.deltaVsLast}</span>
-            </div>
-          </div>
-          <div className="ph-stat-block">
-            <div className="ph-stat-num">{store.projects.length || SAMPLE_STATS.activeProjects}</div>
-            <div className="ph-stat-label">
-              projects <span className="dim">active</span>
-            </div>
-          </div>
-          <div className="ph-stat-block">
-            <div className="ph-stat-num">
-              {SAMPLE_STATS.avgRoundtripSec}
-              <span style={{ fontSize: 18 }}>s</span>
-            </div>
-            <div className="ph-stat-label">
-              avg <span className="dim">round-trip</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="ph-rail-section">
-          <div className="ph-rail-eyebrow">Activity</div>
-          <div className="ph-activity-row">
-            {SAMPLE_ACTIVITY.map((level, i) => (
-              <div
-                key={i}
-                className={`ph-a-day ${level} ${i === SAMPLE_ACTIVITY.length - 1 ? "today" : ""}`}
-              />
-            ))}
-          </div>
-          <div className="ph-activity-labels">
-            <span>T</span><span>W</span><span>T</span>
-            <span>F</span><span>S</span><span>S</span><span>M</span>
-          </div>
-        </div>
-
-        <div className="ph-rail-section">
-          <div className="ph-tip-card">
-            <div className="ph-tip-eyebrow">
-              <SparkIcon />
-              Tip of the day
-            </div>
-            <div className="ph-tip-text">
-              Hold <span className="kbdfont">Shift</span> while pressing your hotkey to skip{" "}
-              <span className="dim">the questions.</span>
-            </div>
-            <div className="ph-tip-sub">
-              Useful when your prompt is already specific. The silent path is ~40% faster.
-            </div>
-            <button className="ph-tip-action" onClick={() => onNavigate("settings")} type="button">
-              See all shortcuts
-              <ArrowRight size={11} />
-            </button>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }
@@ -418,14 +367,6 @@ function ReplayIcon() {
     <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
       <path d="M3 3v5h5" />
-    </svg>
-  );
-}
-
-function SparkIcon() {
-  return (
-    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
     </svg>
   );
 }
