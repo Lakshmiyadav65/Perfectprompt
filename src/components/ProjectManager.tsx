@@ -8,6 +8,7 @@ interface Project {
   name: string;
   description: string;
   links: string[];
+  path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,7 @@ export function ProjectManager() {
   const [formName, setFormName] = useState("");
   const [formDesc, setFormDesc] = useState("");
   const [formLinks, setFormLinks] = useState<string[]>([]);
+  const [formPath, setFormPath] = useState<string>("");
   const [newLink, setNewLink] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -47,6 +49,7 @@ export function ProjectManager() {
     setFormName("");
     setFormDesc("");
     setFormLinks([]);
+    setFormPath("");
     setNewLink("");
     setUploadedFiles([]);
     setMsg(null);
@@ -57,10 +60,22 @@ export function ProjectManager() {
     setFormName(project.name);
     setFormDesc(project.description);
     setFormLinks(project.links || []);
+    setFormPath(project.path || "");
     setNewLink("");
     setUploadedFiles([]);
     setMsg(null);
     setFormMode({ type: "edit", project });
+  }
+
+  async function handleBrowseDirectory() {
+    try {
+      const selected = await open({ directory: true, multiple: false });
+      if (typeof selected === "string") {
+        setFormPath(selected);
+      }
+    } catch (e) {
+      console.error("Directory picker failed:", e);
+    }
   }
 
   function closeForm() {
@@ -128,8 +143,9 @@ export function ProjectManager() {
     setBusy(true);
     setMsg(null);
     try {
+      const path = formPath.trim() || null;
       if (formMode.type === "add") {
-        await invoke("add_project", { name: formName, description: formDesc });
+        await invoke("add_project", { name: formName, description: formDesc, path });
         // If links were added, immediately update the project with links
         const data = await invoke<ProjectStore>("list_projects");
         const newProject = data.projects[data.projects.length - 1];
@@ -139,6 +155,7 @@ export function ProjectManager() {
             name: formName,
             description: formDesc,
             links: formLinks,
+            path,
           });
         }
         setMsg({ ok: true, text: "Project added!" });
@@ -148,6 +165,7 @@ export function ProjectManager() {
           name: formName,
           description: formDesc,
           links: formLinks,
+          path,
         });
         setMsg({ ok: true, text: "Project updated!" });
       }
@@ -282,6 +300,26 @@ export function ProjectManager() {
               disabled={busy}
               autoFocus
             />
+
+            <label>Project Directory <span className="pm-optional">(optional)</span></label>
+            <div className="pm-path-row">
+              <input
+                type="text"
+                placeholder="C:\path\to\project — enables file-aware enhancement"
+                value={formPath}
+                onChange={(e) => setFormPath(e.target.value)}
+                disabled={busy}
+                className="pm-path-input"
+              />
+              <button
+                className="pm-link-add-btn"
+                onClick={() => void handleBrowseDirectory()}
+                disabled={busy}
+                type="button"
+              >
+                Browse…
+              </button>
+            </div>
 
             <label>Project Description</label>
             <textarea

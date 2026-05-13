@@ -11,6 +11,7 @@ mod developer_enhance;
 mod enhance;
 mod generation;
 mod hotkey;
+mod project_scan;
 mod projects;
 mod question_bank;
 mod settings;

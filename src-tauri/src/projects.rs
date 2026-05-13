@@ -13,6 +13,12 @@ pub struct Project {
     pub description: String,
     #[serde(default)]
     pub links: Vec<String>,
+    /// Absolute path to the project directory. When set and the directory
+    /// exists, the developer-mode enhancer scans it for README + manifest
+    /// context. Optional so projects created before this field existed
+    /// still deserialize cleanly.
+    #[serde(default)]
+    pub path: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -90,6 +96,7 @@ pub fn add_project<R: Runtime>(
     app: AppHandle<R>,
     name: String,
     description: String,
+    path: Option<String>,
 ) -> std::result::Result<Project, String> {
     let trimmed_name = name.trim();
     if trimmed_name.is_empty() {
@@ -102,6 +109,10 @@ pub fn add_project<R: Runtime>(
         name: trimmed_name.to_string(),
         description: description.trim().to_string(),
         links: vec![],
+        path: path.and_then(|p| {
+            let trimmed = p.trim();
+            if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+        }),
         created_at: now.clone(),
         updated_at: now,
     };
@@ -126,6 +137,7 @@ pub fn update_project<R: Runtime>(
     name: String,
     description: String,
     links: Vec<String>,
+    path: Option<String>,
 ) -> std::result::Result<Project, String> {
     let trimmed_name = name.trim();
     if trimmed_name.is_empty() {
@@ -142,6 +154,10 @@ pub fn update_project<R: Runtime>(
     project.name = trimmed_name.to_string();
     project.description = description.trim().to_string();
     project.links = links;
+    project.path = path.and_then(|p| {
+        let trimmed = p.trim();
+        if trimmed.is_empty() { None } else { Some(trimmed.to_string()) }
+    });
     project.updated_at = now_iso();
     let updated = project.clone();
 

@@ -1,8 +1,10 @@
 use anyhow::Result;
 use tauri::{AppHandle, Runtime};
 
+use std::path::Path;
+
 use crate::active_app::ActiveAppContext;
-use crate::{enhance, projects, settings};
+use crate::{enhance, project_scan, projects, settings};
 
 /// Direct enhancement path used when the active app is classified as a
 /// developer environment. Skips the questionnaire and feeds the LLM the
@@ -69,6 +71,16 @@ fn build_developer_context(
                 out.push_str(&format!("- {link}\n"));
             }
         }
+        if let Some(path_str) = proj.path.as_deref() {
+            let trimmed = path_str.trim();
+            if !trimmed.is_empty() {
+                if let Some(scan) = project_scan::scan_project_dir(Path::new(trimmed)) {
+                    out.push_str("Project directory scan:\n");
+                    out.push_str(&scan);
+                    out.push('\n');
+                }
+            }
+        }
     }
 
     out.push_str("[/CONTEXT]\n\n");
@@ -101,6 +113,7 @@ mod tests {
             name: "PromptForge".into(),
             description: "Tauri 2 + React app for system-tray prompt enhancement.".into(),
             links: vec!["https://github.com/example/promptforge".into()],
+            path: None,
             created_at: "0".into(),
             updated_at: "0".into(),
         }

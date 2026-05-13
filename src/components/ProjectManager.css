@@ -562,3 +562,42 @@
   gap: 4px;
   letter-spacing: 0.04em;
 }
+
+
+/* ---------- Project directory picker ---------- */
+
+.pm-path-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.pm-path-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-border);
+  border-radius: var(--pf-radius-sm);
+  color: var(--pf-text);
+  font-family: inherit;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s var(--pf-ease);
+}
+
+.pm-path-input:focus {
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+.pm-path-input::placeholder {
+  color: var(--pf-text-faint);
+}
+
+.pm-optional {
+  color: var(--pf-text-faint);
+  font-weight: normal;
+  font-size: 11px;
+  margin-left: 4px;
+}

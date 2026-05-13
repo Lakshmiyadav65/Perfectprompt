@@ -1,12 +1,32 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./CommandBar.css";
 
-/// Floating widget — single capsule with drag handle, open-app shortcut,
-/// and dismiss. Always-on-top, no taskbar entry.
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  links: string[];
+  path: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProjectStore {
+  active_project_id: string | null;
+  projects: Project[];
+}
+
+/// Floating widget — single capsule with a project selector (sets the
+/// active project that the developer-mode enhancer pulls context from)
+/// and a dismiss button. Always-on-top, no taskbar entry.
 export function CommandBar() {
   const appWindow = getCurrentWebviewWindow();
+  const [store, setStore] = useState<ProjectStore>({
+    active_project_id: null,
+    projects: [],
+  });
 
   useEffect(() => {
     // Shell.css sets `html { background: var(--pf-bg) }` for the main
@@ -22,11 +42,33 @@ export function CommandBar() {
     };
   }, []);
 
-  async function handleOpen() {
+  useEffect(() => {
+    void refreshProjects();
+    // Poll so the dropdown picks up projects added/edited in the main
+    // window. Same cadence as the sidebar toggle poll.
+    const id = window.setInterval(() => void refreshProjects(), 1500);
+    return () => window.clearInterval(id);
+  }, []);
+
+  async function refreshProjects() {
     try {
-      await invoke("open_main_window");
+      const data = await invoke<ProjectStore>("list_projects");
+      setStore(data);
     } catch (e) {
-      console.error("open main failed", e);
+      console.error("project list refresh failed", e);
+    }
+  }
+
+  async function handleProjectChange(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    if (!id) return;
+    // Optimistic update so the select snaps immediately.
+    setStore((s) => ({ ...s, active_project_id: id }));
+    try {
+      await invoke("set_active_project", { id });
+    } catch (err) {
+      console.error("set active project failed", err);
+      void refreshProjects();
     }
   }
 
@@ -43,20 +85,28 @@ export function CommandBar() {
     }
   }
 
+  const hasProjects = store.projects.length > 0;
+
   return (
     <div className="cb-row">
-      <button
-        type="button"
-        className="cb-icon-btn"
-        aria-label="Open PromptForge"
-        onClick={() => void handleOpen()}
-        title="Open PromptForge"
+      <select
+        className="cb-project-select"
+        value={store.active_project_id ?? ""}
+        onChange={(e) => void handleProjectChange(e)}
+        disabled={!hasProjects}
+        aria-label="Active project"
+        title={hasProjects ? "Active project (scanned for context)" : "Add a project in the main app"}
       >
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <rect x="4" y="6" width="16" height="14" rx="2" />
-          <path d="M8 10h8M8 14h5" />
-        </svg>
-      </button>
+        {!hasProjects && <option value="">No projects</option>}
+        {hasProjects && store.active_project_id === null && (
+          <option value="">— pick a project —</option>
+        )}
+        {store.projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
       <button
         type="button"
         className="cb-icon-btn"

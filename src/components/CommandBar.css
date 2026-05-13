@@ -82,6 +82,45 @@ body.cb-route * {
   box-shadow: 0 0 0 2px var(--pf-accent-ring);
 }
 
+/* ---------- Project selector ---------- */
+
+.cb-project-select {
+  -webkit-app-region: no-drag;
+  max-width: 140px;
+  padding: 3px 18px 3px 8px;
+  background: transparent;
+  border: 1px solid var(--pf-border-strong);
+  border-radius: 999px;
+  color: var(--pf-text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  /* Hide the OS default caret and draw our own — keeps the dark theme
+     consistent across Windows webview2 / macOS. */
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 8 8' fill='none' stroke='%239a9a9a' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'><path d='M2 3l2 2 2-2'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cb-project-select:hover:not(:disabled) {
+  background-color: var(--pf-surface-2);
+}
+
+.cb-project-select:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--pf-accent-ring);
+}
+
+.cb-project-select:disabled {
+  color: var(--pf-text-muted);
+  cursor: not-allowed;
+}
+
 /* ---------- Toggle ---------- */
 
 .cb-toggle {
