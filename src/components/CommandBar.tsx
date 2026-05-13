@@ -44,7 +44,7 @@ export function CommandBar() {
   }
 
   return (
-    <div className="cb-row" data-tauri-drag-region>
+    <div className="cb-row">
       <button
         type="button"
         className="cb-icon-btn"

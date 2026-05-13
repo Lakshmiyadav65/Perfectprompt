@@ -77,6 +77,18 @@ export function Shell({ initial }: { initial: Route }) {
     invoke<boolean>("get_hotkey_enabled").then(setEnabled).catch(() => {});
   }, [route]);
 
+  // Poll the persisted enabled state so the sidebar toggle stays in sync
+  // when the floating capsule's X button (or any other surface) flips it
+  // externally. Skip while a user-initiated toggle is in flight so the
+  // poll doesn't clobber the optimistic update with stale state.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      if (toggling) return;
+      invoke<boolean>("get_hotkey_enabled").then(setEnabled).catch(() => {});
+    }, 1500);
+    return () => window.clearInterval(id);
+  }, [toggling]);
+
   async function handleToggle(next: boolean) {
     if (toggling) return;
     setToggling(true);
