@@ -31,7 +31,16 @@ export function CommandBar() {
   }
 
   async function handleHide() {
+    // X is equivalent to flipping the sidebar toggle to OFF: the capsule
+    // disappears AND the persisted "enabled" setting flips to false, so
+    // re-opening the main app shows the toggle as Paused. Hide the window
+    // first for instant feedback, then persist.
     await appWindow.hide();
+    try {
+      await invoke("set_hotkey_enabled", { enabled: false });
+    } catch (e) {
+      console.error("persist paused state failed", e);
+    }
   }
 
   return (

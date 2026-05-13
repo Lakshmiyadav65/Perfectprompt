@@ -86,6 +86,15 @@ export function Shell({ initial }: { initial: Route }) {
     setEnabled(next);
     try {
       await invoke("set_hotkey_enabled", { enabled: next });
+      // The toggle is the single source of truth for the floating capsule
+      // too: ON shows it, OFF hides it. Failure to flip visibility is
+      // logged but doesn't undo the hotkey change — the persisted setting
+      // still reflects the user's intent and the next launch will obey it.
+      try {
+        await invoke(next ? "show_command_bar" : "hide_command_bar");
+      } catch (e) {
+        console.error("command bar visibility toggle failed", e);
+      }
     } catch (e) {
       console.error("toggle failed", e);
       setEnabled(prev);

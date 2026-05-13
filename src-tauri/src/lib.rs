@@ -61,10 +61,13 @@ pub fn run() {
                 let _ = window.show();
                 let _ = window.set_focus();
             }
-            // Re-surface the floating command bar too — opening the app
-            // is a single action, not two.
-            if let Err(e) = command_bar::show(app) {
-                println!("[single-instance] command bar show failed: {e}");
+            // Re-surface the floating command bar only if the user's
+            // persisted toggle is ON. When paused, opening the app is the
+            // path the user takes to flip the toggle back on themselves.
+            if settings::load(app).enabled {
+                if let Err(e) = command_bar::show(app) {
+                    println!("[single-instance] command bar show failed: {e}");
+                }
             }
         }))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -120,10 +123,13 @@ pub fn run() {
             }
             install_keep_alive_close_handlers(app.handle());
             // Float the command bar at the top of the primary monitor on
-            // startup. The window is created hidden in tauri.conf.json so
-            // we get to position it before the first paint.
-            if let Err(e) = command_bar::show(app.handle()) {
-                println!("[command-bar] startup show failed: {e}");
+            // startup, but only if the user's persisted toggle is ON. When
+            // paused, the bar stays hidden until the user flips the toggle
+            // back on from the sidebar.
+            if user_settings.enabled {
+                if let Err(e) = command_bar::show(app.handle()) {
+                    println!("[command-bar] startup show failed: {e}");
+                }
             }
             // First-run onboarding is handled by the Home screen's banner
             // — no need to spawn a separate Settings window on top of it.

@@ -82,10 +82,12 @@ fn open_main_route<R: Runtime>(app: &AppHandle<R>, route: &str) {
     let _ = window.show();
     let _ = window.set_focus();
 
-    // Opening the app re-surfaces the floating command bar too.
-    // Single entry point — user never needs to think about the bar
-    // separately from the app itself.
-    if let Err(e) = crate::command_bar::show(app) {
-        println!("[tray] command bar show failed: {e}");
+    // Opening the app re-surfaces the floating command bar only when the
+    // persisted toggle is ON. When paused, the bar stays hidden — the
+    // user flips the sidebar toggle from the main window to bring it back.
+    if crate::settings::load(app).enabled {
+        if let Err(e) = crate::command_bar::show(app) {
+            println!("[tray] command bar show failed: {e}");
+        }
     }
 }
