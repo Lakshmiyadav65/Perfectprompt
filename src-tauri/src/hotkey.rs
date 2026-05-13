@@ -9,7 +9,8 @@ use crate::active_app::{self, ActiveAppContext};
 use crate::app_classifier::{self, AppClassification};
 use crate::settings::QuestionMode;
 use crate::{
-    clipboard, developer_enhance, enhance, generation, question_bank, settings, status_window,
+    clipboard, developer_enhance, enhance, foreground_tracker, generation, question_bank,
+    settings, status_window,
 };
 use crate::AppState;
 
@@ -126,6 +127,35 @@ pub fn reregister<R: Runtime>(app: &AppHandle<R>, combo: &str) -> Result<()> {
 pub fn unregister_all<R: Runtime>(app: &AppHandle<R>) {
     let _ = app.global_shortcut().unregister_all();
     println!("[hotkey] all global shortcuts unregistered");
+}
+
+/// Tauri command — programmatic trigger for the same pipeline the global
+/// hotkey fires. Used by the floating capsule's Enhance icon so the user
+/// can run an enhancement without leaving the keyboard-free flow.
+///
+/// The capsule click steals foreground focus from the user's target app,
+/// so before running the pipeline we restore the last tracked user
+/// window and let Windows settle. The hotkey path skips this because
+/// keypresses don't shift focus.
+#[tauri::command]
+pub async fn trigger_enhance<R: Runtime>(
+    app: AppHandle<R>,
+    bypass: Option<bool>,
+) -> std::result::Result<(), String> {
+    if !foreground_tracker::restore_user_foreground_if_needed() {
+        return Err(
+            "no recent foreground window to capture from — focus an app first, then try again"
+                .into(),
+        );
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(
+        foreground_tracker::FOCUS_RESTORE_SETTLE_MS,
+    ))
+    .await;
+
+    run_capture_pipeline(&app, bypass.unwrap_or(false))
+        .await
+        .map_err(|e| format!("{e:#}"))
 }
 
 async fn run_capture_pipeline<R: Runtime>(

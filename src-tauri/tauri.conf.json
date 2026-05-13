@@ -94,7 +94,7 @@
         "label": "command-bar",
         "url": "index.html#/command-bar",
         "title": "PromptForge",
-        "width": 160,
+        "width": 240,
         "height": 60,
         "resizable": false,
         "visible": false,

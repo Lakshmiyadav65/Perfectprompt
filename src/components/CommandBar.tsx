@@ -72,6 +72,17 @@ export function CommandBar() {
     }
   }
 
+  async function handleEnhance() {
+    try {
+      await invoke("trigger_enhance", { bypass: false });
+    } catch (e) {
+      // Failures (empty selection, API error, etc.) surface as backend
+      // log lines; we don't have a visible toast surface in the capsule
+      // so console-log is the right level.
+      console.error("enhance trigger failed", e);
+    }
+  }
+
   async function handleHide() {
     // X is equivalent to flipping the sidebar toggle to OFF: the capsule
     // disappears AND the persisted "enabled" setting flips to false, so
@@ -107,6 +118,20 @@ export function CommandBar() {
           </option>
         ))}
       </select>
+      <button
+        type="button"
+        className="cb-icon-btn cb-enhance-btn"
+        aria-label="Enhance selected text"
+        onClick={() => void handleEnhance()}
+        title="Enhance the selected text (same as Ctrl+Alt+E)"
+      >
+        {/* Sparkles / wand glyph — signals "improve / transform". */}
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+          <path d="M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
       <button
         type="button"
         className="cb-icon-btn"

@@ -9,6 +9,7 @@ mod clipboard;
 mod command_bar;
 mod developer_enhance;
 mod enhance;
+mod foreground_tracker;
 mod generation;
 mod github_analyze;
 mod hotkey;
@@ -110,6 +111,7 @@ pub fn run() {
             command_bar::hide_command_bar,
             command_bar::open_main_window,
             github_analyze::analyze_github_repo,
+            hotkey::trigger_enhance,
         ])
         .setup(|app| {
             let user_settings = settings::load(app.handle());
@@ -125,6 +127,9 @@ pub fn run() {
                 println!("[hotkey] start-up: master toggle is OFF — not registering");
             }
             install_keep_alive_close_handlers(app.handle());
+            // Start the foreground tracker so the capsule's Enhance icon
+            // can restore the user's prior window before capturing.
+            foreground_tracker::spawn();
             // Float the command bar at the top of the primary monitor on
             // startup, but only if the user's persisted toggle is ON. When
             // paused, the bar stays hidden until the user flips the toggle
