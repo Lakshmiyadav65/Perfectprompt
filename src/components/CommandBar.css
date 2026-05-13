@@ -39,6 +39,23 @@ body.cb-route.cb-picker-open #root {
   flex-direction: column;
   align-items: center;
   gap: 6px;
+  position: relative;
+}
+
+/* Forgiving hit-area around the collapsed bar — invisible, but
+   triggers the expansion so the cursor doesn't have to land exactly
+   on a 7px tall line. Stays smaller than the webview window so it
+   never reaches the desktop. The bar still stacks on top, so its own
+   :hover and the buttons' clicks fire first. */
+.cb-shell::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 96px;
+  height: 28px;
+  transform: translateX(-50%);
+  z-index: 0;
 }
 
 body.cb-route * {
@@ -47,28 +64,70 @@ body.cb-route * {
 
 /* ---------- Row capsule ---------- */
 
+/* DEFAULT (collapsed) — slim horizontal bar. Expands to the full pill
+   on hover, keyboard focus, or while the picker is open.
+
+   The drag region stays on the row in both states so the user can
+   still move the floating window by grabbing the visible bar. */
 .cb-row {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  background: var(--pf-bg);
-  border: 1px solid var(--pf-border-strong);
+  justify-content: center;
+  gap: 0;
+  width: 48px;
+  height: 8px;
+  padding: 0;
+  /* Dark fill + bright white outline reads on both dark and light
+     wallpapers: the fill carries on light, the outline carries on
+     dark. The expanded state simply softens the outline alpha rather
+     than changing the color family — keeps the morph as one shape. */
+  background: rgba(0, 0, 0, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.75);
   border-radius: 999px;
-  width: fit-content;
-  /* The whole capsule is the drag handle. Inner buttons opt out via
-     -webkit-app-region: no-drag below, so clicks on the toggle/open/X
-     still fire normally. Cursor switches to grab so the user reads
-     the capsule as movable on hover. */
+  overflow: hidden;
   cursor: grab;
   -webkit-app-region: drag;
-  /* No box-shadow on purpose — soft drop shadows render as a visible
-     rectangular halo inside the transparent webview on Windows. The
-     border alone is enough to make the capsule legible. */
+  /* Stack above .cb-shell::before so hover/clicks on the bar itself
+     are not intercepted by the larger hit-area. */
+  position: relative;
+  z-index: 1;
+  /* One easing + one duration across every morph property so the bar
+     transforms as a single shape (no early color flash or property
+     leading the others). 380ms with cubic-bezier(0.22, 1, 0.36, 1) is
+     the soft, premium ease-out the design calls for. */
+  transition:
+    width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    gap 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 380ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .cb-row:active {
   cursor: grabbing;
+}
+
+.cb-row:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--pf-accent-ring);
+}
+
+/* EXPANDED — pointer hover (on the bar OR the larger hit-area on the
+   shell), keyboard focus on the row or any child, or while the picker
+   popover is mounted (so the pill doesn't collapse out from under it).
+   Border alpha softens to the standard capsule outline; same color
+   family means the morph reads as one continuous shape. */
+.cb-row:hover,
+.cb-row:focus-within,
+.cb-shell:hover .cb-row,
+body.cb-route.cb-picker-open .cb-row {
+  width: 102px;
+  height: 38px;
+  padding: 5px 8px;
+  gap: 4px;
+  background: var(--pf-bg);
+  border-color: var(--pf-border-strong);
 }
 
 /* ---------- Icon buttons ---------- */
@@ -77,7 +136,7 @@ body.cb-route * {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
+  width: 0;
   height: 26px;
   padding: 0;
   background: transparent;
@@ -85,8 +144,40 @@ body.cb-route * {
   color: var(--pf-text-muted);
   cursor: pointer;
   border-radius: 999px;
-  transition: background 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
+  opacity: 0;
+  transform: scale(0.9) translateY(2px);
+  visibility: hidden;
   -webkit-app-region: no-drag;
+  /* Same easing family as the row. Width tracks the row's 380ms morph;
+     opacity/transform run shorter so the fade-out completes before the
+     pill finishes shrinking. Visibility flips off at the very end so
+     hidden buttons leave the tab order. */
+  transition:
+    width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 380ms;
+}
+
+.cb-row:hover .cb-icon-btn,
+.cb-row:focus-within .cb-icon-btn,
+.cb-shell:hover .cb-icon-btn,
+body.cb-route.cb-picker-open .cb-icon-btn {
+  width: 26px;
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  visibility: visible;
+  /* 120ms reveal-delay lets the container expansion read first; the
+     icons then slide-and-fade into the already-opening pill. */
+  transition:
+    width 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms cubic-bezier(0.22, 1, 0.36, 1) 120ms,
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1) 100ms,
+    background 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 0s;
 }
 
 .cb-icon-btn:hover {
@@ -99,15 +190,15 @@ body.cb-route * {
   box-shadow: 0 0 0 2px var(--pf-accent-ring);
 }
 
-/* The enhance button is the capsule's primary action — give it the
-   accent color so the user reads it as the "do the work" button. */
-.cb-enhance-btn {
-  color: var(--pf-accent);
-}
-
-.cb-enhance-btn:hover {
-  background: var(--pf-accent);
-  color: var(--pf-text);
+/* The enhance button now hosts the PromptForge logo (gradient art).
+   Hover stays the neutral .cb-icon-btn treatment so the orange accent
+   doesn't sit behind the gradient and clash. The logo is sized to
+   match the other two icons (14x14). */
+.cb-enhance-logo {
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 /* ---------- Project picker ---------- */
@@ -136,22 +227,20 @@ body.cb-route * {
   pointer-events: none;
 }
 
-/* Light-themed popover — sits in front of the dark capsule for a
-   clear surface hierarchy. Hardcoded light tokens since the rest of
-   the app is dark-only; if a light-mode design system arrives later
-   these can be promoted to CSS vars. */
+/* Dark popover — reads as an elevated surface inside the same warm
+   dark design system as the rest of the app. The subtle white-alpha
+   border defines the edge against any wallpaper behind the
+   transparent webview. */
 .cb-picker-pop {
   width: 200px;
   max-height: 220px;
   overflow-y: auto;
-  background: #ffffff;
-  color: #1a1a1a;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: var(--pf-surface);
+  color: var(--pf-text);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 12px;
   padding: 4px;
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.1),
-    0 8px 22px rgba(0, 0, 0, 0.16);
+  box-shadow: var(--pf-shadow-md), var(--pf-shadow-lg);
   -webkit-app-region: no-drag;
   font-size: 12px;
   /* Subtle entrance — slight rise + fade. */
@@ -166,7 +255,7 @@ body.cb-route * {
 .cb-picker-divider {
   height: 1px;
   margin: 3px 6px;
-  background: rgba(0, 0, 0, 0.08);
+  background: var(--pf-border-strong);
 }
 
 .cb-picker-section {
@@ -182,7 +271,7 @@ body.cb-route * {
   text-align: left;
   background: transparent;
   border: none;
-  color: #1a1a1a;
+  color: var(--pf-text);
   font: inherit;
   font-size: 12px;
   padding: 6px 10px;
@@ -193,11 +282,13 @@ body.cb-route * {
 }
 
 .cb-picker-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
+/* Selected row sits on a slightly lighter surface than the popover
+   itself so the active project reads at a glance. */
 .cb-picker-item.active {
-  background: rgba(0, 0, 0, 0.03);
+  background: var(--pf-surface-2);
 }
 
 .cb-picker-item-text {
@@ -219,19 +310,19 @@ body.cb-route * {
 .cb-picker-item-hint {
   font-size: 10px;
   line-height: 1.3;
-  color: #6b7280;
+  color: var(--pf-text-muted);
   margin-top: 1px;
 }
 
 .cb-picker-item-check {
   flex-shrink: 0;
-  color: #1a1a1a;
+  color: var(--pf-text);
 }
 
 .cb-picker-empty {
   padding: 10px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--pf-text-muted);
   text-align: center;
   line-height: 1.4;
 }
@@ -247,7 +338,7 @@ body.cb-route * {
   background: transparent;
   border: none;
   border-radius: 8px;
-  color: #1a1a1a;
+  color: var(--pf-text);
   font: inherit;
   font-size: 12px;
   cursor: pointer;
@@ -256,11 +347,11 @@ body.cb-route * {
 }
 
 .cb-picker-footer:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .cb-picker-footer svg {
-  color: #6b7280;
+  color: var(--pf-text-muted);
   flex-shrink: 0;
 }
 
@@ -313,4 +404,13 @@ body.cb-route * {
 .cb-toggle.on:hover {
   background: var(--pf-accent-hover);
   border-color: var(--pf-accent-hover);
+}
+
+/* The line-to-pill morph is the only nontrivial animation here; for
+   users who set prefers-reduced-motion, flip to an instant swap. */
+@media (prefers-reduced-motion: reduce) {
+  .cb-row,
+  .cb-icon-btn {
+    transition: none;
+  }
 }
