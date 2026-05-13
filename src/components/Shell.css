@@ -276,7 +276,9 @@ body { overflow: hidden; }
 .pf-listening-keys {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 4px;
+  row-gap: 6px;
   position: relative;
 }
 

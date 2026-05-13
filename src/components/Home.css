@@ -189,7 +189,9 @@
 }
 .ph-value-keys {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+  row-gap: 6px;
   align-items: center;
   margin-bottom: 8px;
 }

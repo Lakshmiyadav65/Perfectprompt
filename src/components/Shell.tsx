@@ -126,7 +126,10 @@ export function Shell({ initial }: { initial: Route }) {
   }, [route]);
 
   const ready = !!(keyStatus?.from_env || keyStatus?.from_settings);
-  const hotkeyParts = hotkey.split("+");
+  // Tauri returns the canonical "CommandOrControl" / "Option" / "Super"
+  // strings — too verbose for the 232px sidebar. Display the short,
+  // OS-friendly forms.
+  const hotkeyParts = hotkey.split("+").map(prettyKey);
   // Top 2 most-recently-updated projects for the sidebar "Recent" list.
   const recentProjects = [...store.projects]
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
@@ -223,4 +226,23 @@ function BrandMark() {
   return (
     <div className="pf-brand-mark" aria-hidden="true" />
   );
+}
+
+/// Translates Tauri's canonical modifier names to the short labels users
+/// expect on Windows. macOS users would see ⌘/⌥ — we'll branch when we
+/// ship that platform.
+function prettyKey(part: string): string {
+  switch (part.trim()) {
+    case "CommandOrControl":
+    case "Control":
+      return "Ctrl";
+    case "Option":
+    case "Alt":
+      return "Alt";
+    case "Super":
+    case "Command":
+      return "Win";
+    default:
+      return part;
+  }
 }

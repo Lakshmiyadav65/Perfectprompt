@@ -104,7 +104,9 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
   const active = store.projects.find((p) => p.id === store.active_project_id);
   const hasKey = !!(keyStatus?.from_env || keyStatus?.from_settings);
   const dayTime = useMemo(dayTimeNow, []);
-  const hotkeyParts = hotkey.split("+");
+  // Tauri's canonical "CommandOrControl" reads too long inside the
+  // small strip card and demo chip — use the friendly Windows form.
+  const hotkeyParts = hotkey.split("+").map(prettyKey);
 
   return (
     <div className="ph-page">
@@ -360,6 +362,22 @@ function FolderIcon() {
       <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     </svg>
   );
+}
+
+function prettyKey(part: string): string {
+  switch (part.trim()) {
+    case "CommandOrControl":
+    case "Control":
+      return "Ctrl";
+    case "Option":
+    case "Alt":
+      return "Alt";
+    case "Super":
+    case "Command":
+      return "Win";
+    default:
+      return part;
+  }
 }
 
 function ReplayIcon() {
