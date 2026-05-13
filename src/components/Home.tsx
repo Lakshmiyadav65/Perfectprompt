@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./Home.css";
 
@@ -7,6 +7,7 @@ interface Project {
   name: string;
   description: string;
   links: string[];
+  path: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,17 +22,72 @@ interface ApiKeyStatus {
   from_settings: boolean;
 }
 
+/// Hard-coded sample rows for the "Recent enhancements" list. PromptForge
+/// doesn't persist enhancement history yet — these are illustrative.
+/// TODO: wire to a real Rust-side log once we have on-disk storage.
+const SAMPLE_RECENT = [
+  {
+    time: "2:08 PM",
+    from: "fix the dashboard",
+    to: "Refactor the Analytics dashboard's initial-load path to reduce TTI…",
+  },
+  {
+    time: "1:42 PM",
+    from: "email my manager about PTO",
+    to: "Write a short, warm-but-professional email to my manager…",
+  },
+  {
+    time: "12:30 PM",
+    from: "linkedin post about shipping V1",
+    to: "Write a LinkedIn post announcing PromptForge V1 with a behind-the-scenes vibe…",
+  },
+  {
+    time: "11:18 AM",
+    from: "make this image cinematic",
+    to: "Transform the attached image into a cinematic, moody portrait…",
+  },
+];
+
+/// Same caveat as SAMPLE_RECENT. Stats and activity bars are mocked
+/// against believable placeholder numbers until we have telemetry.
+const SAMPLE_STATS = {
+  enhancementsThisWeek: 42,
+  deltaVsLast: "↑ 18 vs last",
+  activeProjects: 3,
+  avgRoundtripSec: 1.8,
+};
+
+const SAMPLE_ACTIVITY: Array<"" | "lo" | "md" | "hi"> = ["lo", "md", "lo", "hi", "md", "", "md"];
+
+function dayTimeNow(): string {
+  const d = new Date();
+  const weekday = d.toLocaleDateString(undefined, { weekday: "long" });
+  const time = d.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+  return `${weekday}, ${time}`;
+}
+
 export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") => void }) {
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
-  const [hotkey, setHotkey] = useState("Alt+E");
+  const [hotkey, setHotkey] = useState("Ctrl+Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [enabled, setEnabled] = useState(true);
+  // Key on the demo pane — bumping this forces a remount so the CSS
+  // animations restart from t=0.
+  const [demoKey, setDemoKey] = useState(0);
 
   useEffect(() => {
     void refresh();
-    // Poll for changes from the sidebar toggle so the hero status stays
-    // in sync without a full page navigation.
     const id = window.setInterval(() => void refresh(), 2000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  // Auto-loop the demo every 7 seconds — matches the animation length
+  // in Home.css so the user sees a continuous cycle.
+  useEffect(() => {
+    const id = window.setInterval(() => setDemoKey((k) => k + 1), 7000);
     return () => window.clearInterval(id);
   }, []);
 
@@ -53,204 +109,323 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
   }
 
   const active = store.projects.find((p) => p.id === store.active_project_id);
-  const totalProjects = store.projects.length;
   const hasKey = !!(keyStatus?.from_env || keyStatus?.from_settings);
+  const dayTime = useMemo(dayTimeNow, []);
+  const hotkeyParts = hotkey.split("+");
 
   return (
     <div className="ph-page">
-      {/* ---- Header ---- */}
-      <header className="ph-header">
-        <div className="ph-eyebrow">Welcome back</div>
-        <h1 className="ph-title">Refine prompts in place.</h1>
-        <p className="ph-subtitle">
-          Select rough text in any app, press your hotkey, and PromptForge
-          rewrites it into a precise prompt — using your project context
-          when you&apos;re coding, asking a few questions when you&apos;re not.
-        </p>
-      </header>
 
-      {/* ---- Hero: terminal-inspired card with the hotkey as the focal element ---- */}
-      <section className="ph-hero">
-        <div className="ph-hero-grid" aria-hidden />
-        <div className="ph-hero-content">
-          <div className="ph-hero-label">Global hotkey</div>
-          <div className="ph-hero-keys">
-            {hotkey.split("+").map((part, i, arr) => (
-              <span key={i} className="ph-hero-keypair">
-                <kbd className="ph-hero-kbd">{part}</kbd>
-                {i < arr.length - 1 && <span className="ph-hero-plus">+</span>}
+      <div className="ph-main-inner">
+
+        {/* ===== HERO ===== */}
+        <div className="ph-hero">
+          <div className="ph-eyebrow">
+            <span>Welcome back</span>
+            <span className="sep">·</span>
+            <span>{dayTime}</span>
+          </div>
+          <div className="ph-hero-row">
+            <div className="ph-hero-text">
+              <h1 className="ph-h-hero">
+                Refine prompts <span className="dim">in place.</span>
+              </h1>
+              <p className="ph-sub">
+                Select rough text anywhere on your computer, press your hotkey,
+                and get a precise rewrite back in your selection.
+              </p>
+              <div className="ph-hero-cta-row">
+                <button
+                  className="ph-btn ph-btn-primary"
+                  onClick={() => setDemoKey((k) => k + 1)}
+                  title="Replay the demo below"
+                >
+                  Try it now
+                  <ArrowRight />
+                </button>
+                <button
+                  className="ph-btn ph-btn-ghost"
+                  onClick={() => onNavigate("projects")}
+                >
+                  <FolderIcon />
+                  Add project context
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== STATUS STRIP ===== */}
+        <div className="ph-strip">
+          <button
+            className="ph-strip-card cta"
+            onClick={() => onNavigate("settings")}
+            type="button"
+          >
+            <div className="ph-stl">Hotkey</div>
+            <div className="ph-value-keys">
+              {hotkeyParts.map((part, i) => (
+                <span key={i} className="ph-keypair">
+                  <kbd className="ph-kbd">{part}</kbd>
+                  {i < hotkeyParts.length - 1 && <span className="ph-kbd-plus">+</span>}
+                </span>
+              ))}
+            </div>
+            <div className="ph-strip-footer">
+              <span>{enabled ? "System-wide" : "Paused"}</span>
+              <span className="action">Customize →</span>
+            </div>
+          </button>
+
+          <button
+            className={`ph-strip-card ${hasKey ? "connected" : "cta empty"}`}
+            onClick={() => onNavigate("settings")}
+            type="button"
+          >
+            <div className="ph-stl">API key</div>
+            <div className="ph-value">{hasKey ? "Connected" : "Missing"}</div>
+            <div className="ph-strip-footer">
+              <span>
+                {keyStatus?.from_env
+                  ? "from .env"
+                  : keyStatus?.from_settings
+                    ? "from settings"
+                    : "not configured"}
               </span>
+              <span className="action">Manage →</span>
+            </div>
+          </button>
+
+          <button
+            className={`ph-strip-card cta ${active ? "" : "empty"}`}
+            onClick={() => onNavigate("projects")}
+            type="button"
+          >
+            <div className="ph-stl">Active project</div>
+            <div className="ph-value">{active?.name ?? "none"}</div>
+            <div className="ph-strip-footer">
+              <span>{active ? "context attached" : "No context attached"}</span>
+              <span className="action">{active ? "Change →" : "Attach →"}</span>
+            </div>
+          </button>
+        </div>
+
+        {/* ===== DEMO CARD ===== */}
+        <div className="ph-demo-card">
+          <div className="ph-demo-bar">
+            <div className="ph-demo-lights">
+              <span /><span /><span />
+            </div>
+            <span className="ph-demo-lbl">live demo · how it works</span>
+            <button
+              className="ph-demo-replay"
+              onClick={() => setDemoKey((k) => k + 1)}
+              type="button"
+            >
+              <ReplayIcon />
+              Replay
+            </button>
+          </div>
+
+          {/* Key on the body forces the panes to remount → CSS animations
+              restart from t=0. */}
+          <div className="ph-demo-body" key={demoKey}>
+            <div className="ph-demo-pane">
+              <div className="ph-pane-num">
+                <span className="ncircle">1</span>
+                Rough prompt
+              </div>
+              <div className="ph-rough-text">
+                <span className="selbox">
+                  <span className="typed">write a launch email</span>
+                </span>
+              </div>
+              <div className="ph-mini-hotkey">
+                <span className="mhlbl">press</span>
+                {hotkeyParts.map((part, i) => (
+                  <span key={i} className="ph-keypair">
+                    <kbd className="ph-kbd">{part}</kbd>
+                    {i < hotkeyParts.length - 1 && <span className="ph-kbd-plus">+</span>}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="ph-demo-pane">
+              <div className="ph-pane-num">
+                <span className="ncircle">2</span>
+                Smart questions
+              </div>
+              <div className="ph-mini-qcard">
+                <div className="ph-mini-qtitle">Who's it for?</div>
+                <div className="ph-mini-qchips">
+                  <span className="ph-mini-qchip">Customers</span>
+                  <span className="ph-mini-qchip picked">Investors</span>
+                  <span className="ph-mini-qchip">Team</span>
+                </div>
+                <div className="ph-mini-qtitle" style={{ marginTop: 10 }}>Tone?</div>
+                <div className="ph-mini-qchips">
+                  <span className="ph-mini-qchip picked">Confident</span>
+                  <span className="ph-mini-qchip">Warm</span>
+                  <span className="ph-mini-qchip">Direct</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="ph-demo-pane">
+              <div className="ph-pane-num">
+                <span className="ncircle">3</span>
+                Enhanced prompt
+              </div>
+              <div className="ph-mini-output">
+                <span className="h">Write a short, confident launch email for investors.</span>
+                <span className="ctx">[CONTEXT]</span>
+                <span className="item">Audience: angel investors I follow</span>
+                <span className="item">Tone: confident, no over-promising</span>
+                <span className="item">Length: ≤ 120 words</span>
+                <span className="item">Open with what shipped, not "I'm excited"</span>
+                <span className="item">End with one specific ask</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ===== RECENT ENHANCEMENTS ===== */}
+        <div className="ph-recent-section">
+          <div className="ph-eyebrow flame">Recent enhancements</div>
+          <h2 className="ph-h-section">
+            Today's work, <span className="dim">at a glance.</span>
+          </h2>
+
+          <div className="ph-recent-list">
+            {SAMPLE_RECENT.map((r, i) => (
+              <div key={i} className="ph-recent-row">
+                <div className="ph-recent-time">{r.time}</div>
+                <div className="ph-recent-preview">
+                  <span className="from">{r.from}</span>
+                  <span className="arrow">→</span>
+                  <span className="to">{r.to}</span>
+                </div>
+                <div className="ph-recent-action">
+                  Open
+                  <ArrowRight size={11} />
+                </div>
+              </div>
             ))}
           </div>
-          <div className={`ph-hero-meta ${enabled ? "" : "paused"}`}>
-            <span className="ph-hero-meta-dot" />
-            <span>
-              {enabled ? "Listening system-wide" : "Paused — toggle on to resume"}
-            </span>
-          </div>
-        </div>
-        <div className="ph-hero-aside">
-          <pre className="ph-hero-code">
-{`> select text
-> press ${hotkey.toLowerCase()}
-> ▌`}
-          </pre>
-        </div>
-      </section>
-
-      {/* ---- Status grid: 3 dense info tiles ---- */}
-      <section className="ph-tiles">
-        <Tile
-          label="Projects"
-          value={String(totalProjects)}
-          caption={totalProjects === 0 ? "none added yet" : "stored locally"}
-          actionLabel={totalProjects === 0 ? "Add" : "Manage"}
-          onAction={() => onNavigate("projects")}
-        />
-        <Tile
-          label="API key"
-          value={hasKey ? "Connected" : "Missing"}
-          caption={
-            keyStatus?.from_env
-              ? "from .env"
-              : keyStatus?.from_settings
-                ? "from settings"
-                : "not configured"
-          }
-          accent={!hasKey}
-          actionLabel="Settings"
-          onAction={() => onNavigate("settings")}
-        />
-        <Tile
-          label="Active project"
-          value={active?.name ?? "—"}
-          caption={active ? "in use as context" : "no context attached"}
-          actionLabel={active ? "Change" : "Add"}
-          onAction={() => onNavigate("projects")}
-        />
-      </section>
-
-      {/* ---- Active project deep card ---- */}
-      <section className="ph-section">
-        <div className="ph-section-head">
-          <h3>Active project</h3>
-          {active && (
-            <button className="ph-link-btn" onClick={() => onNavigate("projects")}>
-              Open Projects ↗
-            </button>
-          )}
         </div>
 
-        {active ? (
-          <div className="ph-active-card">
-            <div className="ph-active-name">
-              {active.name}
-              <span className="ph-active-flag">active</span>
+        {!hasKey && (
+          <div className="ph-banner">
+            <div>
+              <strong>Add a Groq API key to start.</strong>
+              <p>Free at console.groq.com — takes about 30 seconds.</p>
             </div>
-            <div className="ph-active-desc">
-              {active.description
-                ? active.description.split("\n")[0].slice(0, 220) +
-                  (active.description.length > 220 ? "…" : "")
-                : "No description yet — add one so prompts have something to chew on."}
-            </div>
-            {active.links.length > 0 && (
-              <div className="ph-active-links">
-                {active.links.length} link
-                {active.links.length === 1 ? "" : "s"} attached
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="ph-empty-card">
-            <div className="ph-empty-text">
-              <strong>No active project.</strong>
-              <span>
-                Add one to give PromptForge codebase awareness when you&apos;re in
-                an IDE. The questionnaire still works without it.
-              </span>
-            </div>
-            <button
-              className="ph-cta"
-              onClick={() => onNavigate("projects")}
-            >
-              Add project
+            <button className="ph-btn ph-btn-primary" onClick={() => onNavigate("settings")}>
+              Open Settings
             </button>
           </div>
         )}
-      </section>
+      </div>
 
-      {/* ---- Keyboard reference ---- */}
-      <section className="ph-section">
-        <div className="ph-section-head">
-          <h3>Keyboard</h3>
-        </div>
-        <div className="ph-kbd-rows">
-          <KbdRow keys={hotkey.split("+")}>Capture and enhance the selected text.</KbdRow>
-          <KbdRow keys={["Shift", ...hotkey.split("+")]}>
-            Bypass the questionnaire even in non-developer apps.
-          </KbdRow>
-          <KbdRow keys={["Esc"]}>
-            Dismiss the question card without enhancing.
-          </KbdRow>
-        </div>
-      </section>
-
-      {!hasKey && (
-        <section className="ph-banner">
-          <div>
-            <strong>Add a Groq API key to start.</strong>
-            <p>Free at console.groq.com — takes about 30 seconds.</p>
+      {/* ===== RIGHT RAIL ===== */}
+      <aside className="ph-main-rail">
+        <div className="ph-rail-section">
+          <div className="ph-rail-eyebrow">This week</div>
+          <div className="ph-stat-block">
+            <div className="ph-stat-num">{SAMPLE_STATS.enhancementsThisWeek}</div>
+            <div className="ph-stat-label">
+              enhancements <span className="dim">{SAMPLE_STATS.deltaVsLast}</span>
+            </div>
           </div>
-          <button className="ph-cta" onClick={() => onNavigate("settings")}>
-            Open Settings
-          </button>
-        </section>
-      )}
+          <div className="ph-stat-block">
+            <div className="ph-stat-num">{store.projects.length || SAMPLE_STATS.activeProjects}</div>
+            <div className="ph-stat-label">
+              projects <span className="dim">active</span>
+            </div>
+          </div>
+          <div className="ph-stat-block">
+            <div className="ph-stat-num">
+              {SAMPLE_STATS.avgRoundtripSec}
+              <span style={{ fontSize: 18 }}>s</span>
+            </div>
+            <div className="ph-stat-label">
+              avg <span className="dim">round-trip</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="ph-rail-section">
+          <div className="ph-rail-eyebrow">Activity</div>
+          <div className="ph-activity-row">
+            {SAMPLE_ACTIVITY.map((level, i) => (
+              <div
+                key={i}
+                className={`ph-a-day ${level} ${i === SAMPLE_ACTIVITY.length - 1 ? "today" : ""}`}
+              />
+            ))}
+          </div>
+          <div className="ph-activity-labels">
+            <span>T</span><span>W</span><span>T</span>
+            <span>F</span><span>S</span><span>S</span><span>M</span>
+          </div>
+        </div>
+
+        <div className="ph-rail-section">
+          <div className="ph-tip-card">
+            <div className="ph-tip-eyebrow">
+              <SparkIcon />
+              Tip of the day
+            </div>
+            <div className="ph-tip-text">
+              Hold <span className="kbdfont">Shift</span> while pressing your hotkey to skip{" "}
+              <span className="dim">the questions.</span>
+            </div>
+            <div className="ph-tip-sub">
+              Useful when your prompt is already specific. The silent path is ~40% faster.
+            </div>
+            <button className="ph-tip-action" onClick={() => onNavigate("settings")} type="button">
+              See all shortcuts
+              <ArrowRight size={11} />
+            </button>
+          </div>
+        </div>
+      </aside>
     </div>
   );
 }
 
-function Tile({
-  label,
-  value,
-  caption,
-  actionLabel,
-  onAction,
-  accent,
-}: {
-  label: string;
-  value: string;
-  caption: string;
-  actionLabel: string;
-  onAction: () => void;
-  accent?: boolean;
-}) {
+/* ---------- inline SVG icons ---------- */
+
+function ArrowRight({ size = 13 }: { size?: number }) {
   return (
-    <div className={`ph-tile ${accent ? "accent" : ""}`}>
-      <div className="ph-tile-label">{label}</div>
-      <div className="ph-tile-value">{value}</div>
-      <div className="ph-tile-row">
-        <span className="ph-tile-caption">{caption}</span>
-        <button className="ph-tile-action" onClick={onAction}>
-          {actionLabel} →
-        </button>
-      </div>
-    </div>
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden="true">
+      <path d="M5 12h14M13 6l6 6-6 6" />
+    </svg>
   );
 }
 
-function KbdRow({ keys, children }: { keys: string[]; children: React.ReactNode }) {
+function FolderIcon() {
   return (
-    <div className="ph-kbd-row">
-      <div className="ph-kbd-row-keys">
-        {keys.map((k, i, arr) => (
-          <span key={i} className="ph-kbd-keypair">
-            <kbd className="ph-kbd-mini">{k}</kbd>
-            {i < arr.length - 1 && <span className="ph-kbd-plus">+</span>}
-          </span>
-        ))}
-      </div>
-      <div className="ph-kbd-row-text">{children}</div>
-    </div>
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+      <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    </svg>
+  );
+}
+
+function ReplayIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
+
+function SparkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+      <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+    </svg>
   );
 }

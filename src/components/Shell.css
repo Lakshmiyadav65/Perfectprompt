@@ -1,9 +1,9 @@
-/* ===== Shell: dark sidebar + main pane ===== */
+/* ===== Shell: warm dark sidebar + main pane ===== */
 
 html,
 body,
 #root {
-  background: var(--pf-bg);
+  background: var(--pf-bg-deep, var(--pf-bg));
   color: var(--pf-text);
   margin: 0;
   font-family: var(--pf-font-sans);
@@ -12,12 +12,11 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
-body {
-  overflow: hidden;
-}
+body { overflow: hidden; }
 
 .pf-shell {
-  display: flex;
+  display: grid;
+  grid-template-columns: 232px 1fr;
   height: 100vh;
   width: 100vw;
   background: var(--pf-bg);
@@ -26,12 +25,11 @@ body {
 /* ---------- Sidebar ---------- */
 
 .pf-sidebar {
-  width: 232px;
-  background: var(--pf-bg);
-  border-right: 1px solid var(--pf-border);
+  background: var(--pf-bg-2);
+  border-right: 1px solid var(--pf-line);
   display: flex;
   flex-direction: column;
-  padding: 22px 14px 18px;
+  padding: 22px 14px 16px;
   flex-shrink: 0;
 }
 
@@ -39,177 +37,247 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 8px 22px;
+  padding: 0 6px 28px;
 }
 
-.pf-brand-word {
-  font-family: var(--pf-font-mono);
-  font-size: 13.5px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
+.pf-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: conic-gradient(from 220deg, #2a2a30, var(--pf-text) 40%, #2a2a30 70%, var(--pf-text));
+  box-shadow:
+    inset 0 0 0 4px var(--pf-bg-2),
+    0 0 0 1px var(--pf-line-strong);
+}
+
+.pf-brand-name {
+  font-family: var(--pf-font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
   color: var(--pf-text);
 }
 
 .pf-nav {
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding-top: 4px;
+  gap: 2px;
 }
 
 .pf-nav-item {
-  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  background: transparent;
-  border: none;
+  gap: 12px;
+  padding: 10px 14px;
+  border-radius: 10px;
   color: var(--pf-text-muted);
   font-family: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
-  padding: 8px 12px;
-  border-radius: var(--pf-radius-sm);
+  transition: all 0.18s var(--pf-ease, ease);
   cursor: pointer;
+  position: relative;
+  background: transparent;
+  border: none;
   text-align: left;
-  transition: background 0.12s var(--pf-ease), color 0.12s var(--pf-ease);
+  width: 100%;
 }
 
 .pf-nav-item:hover:not(.active) {
-  background: var(--pf-surface);
+  background: rgba(255, 255, 255, 0.03);
   color: var(--pf-text);
 }
 
 .pf-nav-item.active {
-  background: var(--pf-surface-2);
+  background: var(--pf-accent-soft);
   color: var(--pf-text);
 }
-
-.pf-nav-marker {
+.pf-nav-item.active::before {
+  content: "";
   position: absolute;
   left: -14px;
-  top: 50%;
+  top: 8px;
+  bottom: 8px;
   width: 2px;
-  height: 18px;
-  margin-top: -9px;
   background: var(--pf-accent);
-  border-radius: 0 2px 2px 0;
-  box-shadow: 0 0 8px var(--pf-accent-glow);
+  border-radius: 999px;
+  box-shadow: 0 0 8px rgba(255, 122, 77, 0.5);
 }
 
 .pf-nav-icon {
   width: 16px;
   height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: currentColor;
-  opacity: 0.85;
-}
-
-.pf-sidebar-footer {
-  margin-top: auto;
-  padding-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-/* ---- Status pill ---- */
-
-.pf-sb-pill {
+  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  align-self: flex-start;
-  padding: 4px 10px 4px 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.01em;
-  background: var(--pf-surface);
-  border: 1px solid var(--pf-border);
-  color: var(--pf-text-muted);
+  justify-content: center;
 }
 
-.pf-sb-dot {
+.pf-nav-section {
+  font-family: var(--pf-font-mono);
+  font-size: 10px;
+  color: var(--pf-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  padding: 22px 14px 8px;
+}
+
+/* recent project rows */
+.pf-nav-recent {
+  font-family: var(--pf-font-display);
+  font-size: 13.5px;
+  font-weight: 400;
+}
+.pf-recent-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--pf-text-faint);
+  background: var(--pf-text-subtle);
+  flex-shrink: 0;
 }
-
-.pf-sb-pill.ready {
-  color: var(--pf-text);
-  border-color: var(--pf-border-strong);
-}
-
-.pf-sb-pill.ready .pf-sb-dot {
+.pf-recent-dot.active {
   background: var(--pf-accent);
-  box-shadow: 0 0 0 3px var(--pf-accent-soft);
-  animation: pf-pulse 2.4s var(--pf-ease) infinite;
+  box-shadow: 0 0 6px rgba(255, 122, 77, 0.5);
+}
+.pf-recent-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-@keyframes pf-pulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--pf-accent-soft); }
-  50% { box-shadow: 0 0 0 5px rgba(255, 107, 53, 0.04); }
+.pf-sidebar-bottom {
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--pf-line);
 }
 
-.pf-sb-pill.setup .pf-sb-dot {
-  background: var(--pf-accent);
-  opacity: 0.6;
+/* ---------- listening card ---------- */
+
+.pf-listening-card {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 122, 77, 0.08), transparent 70%),
+    var(--pf-surface);
+  border: 1px solid var(--pf-line);
+  border-radius: 12px;
+  padding: 14px;
+  position: relative;
+  overflow: hidden;
 }
-
-/* ---- Hotkey block ---- */
-
-.pf-hotkey-block {
-  background: var(--pf-surface);
-  border: 1px solid var(--pf-border);
-  border-radius: var(--pf-radius);
-  padding: 10px 12px 12px;
+.pf-listening-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 50% at 0% 0%, rgba(255, 122, 77, 0.05), transparent 60%);
+  pointer-events: none;
 }
-
-.pf-hotkey-caption {
-  font-size: 10.5px;
-  font-weight: 500;
-  color: var(--pf-text-subtle);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-
-.pf-hotkey-keys {
+.pf-listening-row {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 4px;
+  gap: 9px;
+  margin-bottom: 12px;
+  position: relative;
 }
 
-.pf-hotkey-keypair {
-  display: inline-flex;
+/* the pulsing dot animates only when actively listening */
+.pf-listening-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pf-text-subtle);
+  position: relative;
+  flex-shrink: 0;
+}
+.pf-listening-card.live .pf-listening-dot {
+  background: var(--pf-accent);
+  box-shadow: 0 0 12px rgba(255, 122, 77, 0.7);
+}
+.pf-listening-card.live .pf-listening-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--pf-accent);
+  opacity: 0;
+  animation: pf-pulse-ring 2.2s ease-out infinite;
+}
+@keyframes pf-pulse-ring {
+  0%   { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(2.4); opacity: 0; }
+}
+
+.pf-listening-label {
+  font-size: 12.5px;
+  color: var(--pf-text);
+  font-weight: 500;
+}
+
+.pf-toggle-mini {
+  width: 32px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  position: relative;
+  cursor: pointer;
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  transition: background 0.18s var(--pf-ease, ease);
+}
+.pf-toggle-mini.on {
+  background: var(--pf-accent);
+  box-shadow: 0 0 10px rgba(255, 122, 77, 0.35);
+}
+.pf-toggle-mini-dot {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--pf-bg-2);
+  transition: left 0.18s var(--pf-ease, ease);
+}
+.pf-toggle-mini.on .pf-toggle-mini-dot {
+  left: 16px;
+  background: var(--pf-bg-2);
+}
+.pf-toggle-mini:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.pf-listening-hint {
+  font-family: var(--pf-font-mono);
+  font-size: 10px;
+  color: var(--pf-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  position: relative;
+}
+.pf-listening-keys {
+  display: flex;
   align-items: center;
   gap: 4px;
+  position: relative;
 }
 
+.pf-keypair { display: inline-flex; align-items: center; gap: 4px; }
 .pf-kbd {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 22px;
-  height: 22px;
-  padding: 0 6px;
-  background: var(--pf-surface-2);
-  border: 1px solid var(--pf-border-strong);
-  border-bottom-width: 2px;
-  border-radius: var(--pf-radius-sm);
   font-family: var(--pf-font-mono);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--pf-line-strong);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  padding: 3px 7px;
   color: var(--pf-text);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
-
-.pf-hotkey-plus {
-  color: var(--pf-text-faint);
+.pf-kbd-plus {
+  color: var(--pf-text-subtle);
+  font-family: var(--pf-font-mono);
   font-size: 11px;
 }
 
@@ -223,22 +291,17 @@ body {
   position: relative;
 }
 
-.pf-main::-webkit-scrollbar {
-  width: 10px;
-}
-.pf-main::-webkit-scrollbar-track {
-  background: transparent;
-}
+.pf-main::-webkit-scrollbar { width: 10px; }
+.pf-main::-webkit-scrollbar-track { background: transparent; }
 .pf-main::-webkit-scrollbar-thumb {
-  background: var(--pf-border);
+  background: var(--pf-line);
   border-radius: 5px;
   border: 2px solid var(--pf-bg);
 }
 .pf-main::-webkit-scrollbar-thumb:hover {
-  background: var(--pf-border-strong);
+  background: var(--pf-line-strong);
 }
 
-/* Selection */
 ::selection {
   background: var(--pf-accent-soft);
   color: var(--pf-text);

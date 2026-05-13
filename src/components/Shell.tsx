@@ -3,7 +3,6 @@ import { invoke } from "@tauri-apps/api/core";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
-import { Toggle } from "./Toggle";
 import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
@@ -13,13 +12,28 @@ interface ApiKeyStatus {
   from_settings: boolean;
 }
 
+interface Project {
+  id: string;
+  name: string;
+  description: string;
+  links: string[];
+  path: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+interface ProjectStore {
+  active_project_id: string | null;
+  projects: Project[];
+}
+
 const NAV: { route: Route; label: string; icon: ReactNode }[] = [
   {
     route: "home",
     label: "Home",
     icon: (
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 11l9-8 9 8" />
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12 12 3l9 9" />
         <path d="M5 10v10h14V10" />
       </svg>
     ),
@@ -28,7 +42,7 @@ const NAV: { route: Route; label: string; icon: ReactNode }[] = [
     route: "projects",
     label: "Projects",
     icon: (
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" />
       </svg>
     ),
@@ -37,7 +51,7 @@ const NAV: { route: Route; label: string; icon: ReactNode }[] = [
     route: "settings",
     label: "Settings",
     icon: (
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="3" />
         <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
       </svg>
@@ -45,63 +59,39 @@ const NAV: { route: Route; label: string; icon: ReactNode }[] = [
   },
 ];
 
-/// Custom forge-flame brand mark. Anvil silhouette + flame tip, monoline,
-/// renders crisply at 28px. The orange is the only color in the entire UI.
-function ForgeMark() {
-  return (
-    <svg viewBox="0 0 32 32" width="28" height="28" aria-hidden="true">
-      {/* Flame */}
-      <path
-        d="M16 4c-1.2 3.5-3.6 5.5-3.6 8.4 0 2 1.6 3.6 3.6 3.6s3.6-1.6 3.6-3.6c0-1.6-.8-2.5-1.7-3.6.3 1.6-.5 2.6-1.3 2.6-1 0-1.4-1-1-2 .6-1.5 1.4-3 .4-5.4z"
-        fill="var(--pf-accent)"
-      />
-      {/* Anvil */}
-      <path
-        d="M7 21h18v3H7zM10 24h12v2l-2 2H12l-2-2z"
-        fill="var(--pf-text)"
-      />
-    </svg>
-  );
-}
-
 export function Shell({ initial }: { initial: Route }) {
   const [route, setRoute] = useState<Route>(initial);
-  const [hotkey, setHotkey] = useState<string>("Alt+E");
+  const [hotkey, setHotkey] = useState<string>("Ctrl+Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [enabled, setEnabled] = useState<boolean>(true);
   const [toggling, setToggling] = useState(false);
+  const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
 
   useEffect(() => {
     invoke<string>("get_hotkey").then(setHotkey).catch(() => {});
     invoke<ApiKeyStatus>("api_key_status").then(setKeyStatus).catch(() => {});
     invoke<boolean>("get_hotkey_enabled").then(setEnabled).catch(() => {});
+    invoke<ProjectStore>("list_projects").then(setStore).catch(() => {});
   }, [route]);
 
-  // Poll the persisted enabled state so the sidebar toggle stays in sync
-  // when the floating capsule's X button (or any other surface) flips it
-  // externally. Skip while a user-initiated toggle is in flight so the
-  // poll doesn't clobber the optimistic update with stale state.
+  // Poll for external state flips (e.g. capsule X persists Paused).
   useEffect(() => {
     const id = window.setInterval(() => {
       if (toggling) return;
       invoke<boolean>("get_hotkey_enabled").then(setEnabled).catch(() => {});
+      invoke<ProjectStore>("list_projects").then(setStore).catch(() => {});
     }, 1500);
     return () => window.clearInterval(id);
   }, [toggling]);
 
-  async function handleToggle(next: boolean) {
+  async function handleToggle() {
     if (toggling) return;
     setToggling(true);
-    // Optimistic update so the capsule snaps immediately; revert on
-    // failure since the persisted state would still be the old value.
     const prev = enabled;
+    const next = !enabled;
     setEnabled(next);
     try {
       await invoke("set_hotkey_enabled", { enabled: next });
-      // The toggle is the single source of truth for the floating capsule
-      // too: ON shows it, OFF hides it. Failure to flip visibility is
-      // logged but doesn't undo the hotkey change — the persisted setting
-      // still reflects the user's intent and the next launch will obey it.
       try {
         await invoke(next ? "show_command_bar" : "hide_command_bar");
       } catch (e) {
@@ -128,8 +118,6 @@ export function Shell({ initial }: { initial: Route }) {
     return () => window.removeEventListener("hashchange", handler);
   }, []);
 
-  // Keep the URL hash in sync when the user clicks sidebar nav so the next
-  // hashchange from the tray doesn't fight the React state.
   useEffect(() => {
     const desired = `#/${route}`;
     if (window.location.hash !== desired) {
@@ -138,14 +126,18 @@ export function Shell({ initial }: { initial: Route }) {
   }, [route]);
 
   const ready = !!(keyStatus?.from_env || keyStatus?.from_settings);
-  const statusLabel = !ready ? "Setup" : enabled ? "Active" : "Paused";
+  const hotkeyParts = hotkey.split("+");
+  // Top 2 most-recently-updated projects for the sidebar "Recent" list.
+  const recentProjects = [...store.projects]
+    .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
+    .slice(0, 3);
 
   return (
     <div className="pf-shell">
       <aside className="pf-sidebar">
         <div className="pf-brand">
-          <ForgeMark />
-          <div className="pf-brand-word">PromptForge</div>
+          <BrandMark />
+          <div className="pf-brand-name">PromptForge</div>
         </div>
 
         <nav className="pf-nav" aria-label="Primary">
@@ -158,30 +150,57 @@ export function Shell({ initial }: { initial: Route }) {
             >
               <span className="pf-nav-icon">{item.icon}</span>
               <span>{item.label}</span>
-              {route === item.route && <span className="pf-nav-marker" aria-hidden />}
             </button>
           ))}
+
+          {recentProjects.length > 0 && (
+            <>
+              <div className="pf-nav-section">Recent</div>
+              {recentProjects.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="pf-nav-item pf-nav-recent"
+                  onClick={() => setRoute("projects")}
+                >
+                  <span
+                    className={`pf-recent-dot ${
+                      p.id === store.active_project_id ? "active" : ""
+                    }`}
+                  />
+                  <span className="pf-recent-name">{p.name}</span>
+                </button>
+              ))}
+            </>
+          )}
         </nav>
 
-        <div className="pf-sidebar-footer">
-          <div className="pf-toggle-row">
-            <Toggle
-              checked={enabled && ready}
-              disabled={toggling || !ready}
-              onChange={handleToggle}
-              ariaLabel={enabled ? "Pause PromptForge" : "Activate PromptForge"}
-            />
-            <span className={`pf-toggle-row-label ${enabled && ready ? "on" : ""}`}>
-              {statusLabel}
-            </span>
-          </div>
-          <div className="pf-hotkey-block" aria-label="Global hotkey">
-            <div className="pf-hotkey-caption">Press from anywhere</div>
-            <div className="pf-hotkey-keys">
-              {hotkey.split("+").map((part, i, arr) => (
-                <span key={i} className="pf-hotkey-keypair">
+        <div className="pf-sidebar-bottom">
+          <div className={`pf-listening-card ${enabled && ready ? "live" : ""}`}>
+            <div className="pf-listening-row">
+              <span className="pf-listening-dot" />
+              <span className="pf-listening-label">
+                {ready ? (enabled ? "Listening" : "Paused") : "Setup"}
+              </span>
+              <button
+                type="button"
+                className={`pf-toggle-mini ${enabled ? "on" : ""}`}
+                onClick={() => void handleToggle()}
+                disabled={toggling || !ready}
+                aria-label={enabled ? "Pause" : "Activate"}
+                title={enabled ? "Pause PromptForge" : "Activate PromptForge"}
+              >
+                <span className="pf-toggle-mini-dot" />
+              </button>
+            </div>
+            <div className="pf-listening-hint">Trigger from anywhere</div>
+            <div className="pf-listening-keys">
+              {hotkeyParts.map((part, i) => (
+                <span key={i} className="pf-keypair">
                   <kbd className="pf-kbd">{part}</kbd>
-                  {i < arr.length - 1 && <span className="pf-hotkey-plus">+</span>}
+                  {i < hotkeyParts.length - 1 && (
+                    <span className="pf-kbd-plus">+</span>
+                  )}
                 </span>
               ))}
             </div>
@@ -195,5 +214,13 @@ export function Shell({ initial }: { initial: Route }) {
         {route === "settings" && <Settings />}
       </main>
     </div>
+  );
+}
+
+/// Conic-gradient brand mark — matches the mockup. No fill image needed,
+/// renders crisply at 28px.
+function BrandMark() {
+  return (
+    <div className="pf-brand-mark" aria-hidden="true" />
   );
 }
