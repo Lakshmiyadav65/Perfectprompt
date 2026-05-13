@@ -7,6 +7,11 @@ import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
 
+/// Display name shown in the sidebar profile chip. Hardcoded for now —
+/// once we add a `display_name` field to settings.json, swap this for a
+/// settings-loaded value with this string as the fallback.
+const PROFILE_NAME = "You";
+
 interface ApiKeyStatus {
   from_env: boolean;
   from_settings: boolean;
@@ -208,6 +213,41 @@ export function Shell({ initial }: { initial: Route }) {
               ))}
             </div>
           </div>
+
+          {/* Profile chip — Discord/Slack style anchor for user identity.
+              TODO: wire displayName to a settings field once we add one. */}
+          <button
+            type="button"
+            className="pf-profile-chip"
+            onClick={() => setRoute("settings")}
+            title="Open Settings"
+            aria-label="Your profile — open Settings"
+          >
+            <span className="pf-profile-avatar" aria-hidden="true">
+              {PROFILE_NAME.charAt(0).toUpperCase()}
+            </span>
+            <span className="pf-profile-text">
+              <span className="pf-profile-name">{PROFILE_NAME}</span>
+              <span className={`pf-profile-status ${ready ? "ready" : "setup"}`}>
+                <span className="pf-profile-status-dot" />
+                {ready ? "Connected" : "Setup needed"}
+              </span>
+            </span>
+            <svg
+              className="pf-profile-chev"
+              viewBox="0 0 24 24"
+              width="14"
+              height="14"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
         </div>
       </aside>
 
