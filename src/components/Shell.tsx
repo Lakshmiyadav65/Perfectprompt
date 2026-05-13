@@ -135,6 +135,13 @@ export function Shell({ initial }: { initial: Route }) {
   // strings — too verbose for the 232px sidebar. Display the short,
   // OS-friendly forms.
   const hotkeyParts = hotkey.split("+").map(prettyKey);
+
+  // Mocked "Top 2%" badge gate: shows only when the user is fully set
+  // up (API key configured AND at least one project attached). The
+  // copy ("Top 2%") is decorative until we ship real telemetry — the
+  // intent is to let power users feel the app recognise them. Wire
+  // to a real percentile once enhancement history lives on disk.
+  const isPowerUser = ready && store.projects.length > 0;
   // Top 2 most-recently-updated projects for the sidebar "Recent" list.
   const recentProjects = [...store.projects]
     .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1))
@@ -227,10 +234,26 @@ export function Shell({ initial }: { initial: Route }) {
               {PROFILE_NAME.charAt(0).toUpperCase()}
             </span>
             <span className="pf-profile-text">
-              <span className="pf-profile-name">{PROFILE_NAME}</span>
-              <span className={`pf-profile-status ${ready ? "ready" : "setup"}`}>
-                <span className="pf-profile-status-dot" />
-                {ready ? "Connected" : "Setup needed"}
+              <span className="pf-profile-name-row">
+                <span className="pf-profile-name">{PROFILE_NAME}</span>
+                {isPowerUser && (
+                  <span
+                    className="pf-profile-badge"
+                    title="Top 2% — based on your local activity"
+                    aria-label="Top two percent"
+                  >
+                    <svg
+                      viewBox="0 0 24 24"
+                      width="9"
+                      height="9"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 2l2.6 6.3 6.8.6-5.2 4.5 1.6 6.6L12 16.8 6.2 20l1.6-6.6L2.6 8.9l6.8-.6L12 2z" />
+                    </svg>
+                    Top 2%
+                  </span>
+                )}
               </span>
             </span>
             <svg
