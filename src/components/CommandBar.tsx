@@ -1,12 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import "./CommandBar.css";
 
-/// Floating widget — single capsule with drag handle, status toggle,
-/// open-app shortcut, and dismiss. Always-on-top, no taskbar entry.
+/// Floating widget — single capsule with drag handle, open-app shortcut,
+/// and dismiss. Always-on-top, no taskbar entry.
 export function CommandBar() {
-  const [enabled, setEnabled] = useState(true);
   const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
@@ -23,34 +22,6 @@ export function CommandBar() {
     };
   }, []);
 
-  useEffect(() => {
-    void refresh();
-    // Poll so the bar stays in sync if the user flips the sidebar
-    // toggle in the main window.
-    const id = window.setInterval(() => void refresh(), 1500);
-    return () => window.clearInterval(id);
-  }, []);
-
-  async function refresh() {
-    try {
-      const en = await invoke<boolean>("get_hotkey_enabled");
-      setEnabled(en);
-    } catch (e) {
-      console.error("CommandBar refresh failed", e);
-    }
-  }
-
-  async function handleToggle() {
-    const next = !enabled;
-    setEnabled(next);
-    try {
-      await invoke("set_hotkey_enabled", { enabled: next });
-    } catch (e) {
-      console.error("toggle failed", e);
-      setEnabled(!next);
-    }
-  }
-
   async function handleOpen() {
     try {
       await invoke("open_main_window");
@@ -65,17 +36,6 @@ export function CommandBar() {
 
   return (
     <div className="cb-row" data-tauri-drag-region>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={enabled}
-        className={`cb-toggle ${enabled ? "on" : "off"}`}
-        aria-label={enabled ? "Pause PromptForge" : "Activate PromptForge"}
-        onClick={() => void handleToggle()}
-        title={enabled ? "Active — click to pause" : "Paused — click to activate"}
-      >
-        <span className="cb-toggle-dot" />
-      </button>
       <button
         type="button"
         className="cb-icon-btn"
