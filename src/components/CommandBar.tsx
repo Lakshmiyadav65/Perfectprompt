@@ -20,11 +20,12 @@ interface ProjectStore {
 }
 
 /// Window sizes — the capsule alone fits in 160x60, but when the project
-/// picker is open we grow the window so the dark popover can render
-/// inside our own webview instead of falling back to the OS-native
-/// dropdown (which clashes with the dark theme).
+/// picker is open we grow the window so a roomy light-themed popover
+/// can render inside our own webview. The wider layout matches the
+/// macOS-style picker UX with a toggle at the top, a list of options,
+/// and a configure footer.
 const CAPSULE_SIZE = new LogicalSize(160, 60);
-const PICKER_OPEN_SIZE = new LogicalSize(160, 240);
+const PICKER_OPEN_SIZE = new LogicalSize(220, 200);
 
 /// Floating widget — single capsule with a project selector (sets the
 /// active project that the developer-mode enhancer pulls context from),
@@ -54,11 +55,20 @@ export function CommandBar() {
 
   useEffect(() => {
     void refreshProjects();
-    // Poll so the dropdown picks up projects added/edited in the main
-    // window. Same cadence as the sidebar toggle poll.
+    // Poll so the picker reflects projects added/edited in the main
+    // window.
     const id = window.setInterval(() => void refreshProjects(), 1500);
     return () => window.clearInterval(id);
   }, []);
+
+  async function openMainProjects() {
+    try {
+      await invoke("open_main_window");
+    } catch (e) {
+      console.error("open main window failed", e);
+    }
+    await closePicker();
+  }
 
   // Close the picker on click outside, Escape, or window blur. Each
   // condition reads the latest pickerOpen via the closure on this
@@ -220,53 +230,79 @@ export function CommandBar() {
       </div>
 
       {pickerOpen && (
-        <div className="cb-picker-pop" role="listbox" aria-label="Choose active project">
-          <div className="cb-picker-header">Active project</div>
+        <div className="cb-picker-pop" role="dialog" aria-label="PromptForge picker">
+          <div className="cb-picker-section" role="listbox" aria-label="Active project">
+            <button
+              type="button"
+              className={`cb-picker-item ${!store.active_project_id ? "active" : ""}`}
+              onClick={() => void pickProject(null)}
+              role="option"
+              aria-selected={!store.active_project_id}
+            >
+              <span className="cb-picker-item-text">
+                <span className="cb-picker-item-name">No project</span>
+                <span className="cb-picker-item-hint">enhance without context</span>
+              </span>
+              {!store.active_project_id && <PickerCheck />}
+            </button>
+            {store.projects.length === 0 && (
+              <div className="cb-picker-empty">
+                No projects yet. Open the main app to add one.
+              </div>
+            )}
+            {store.projects.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`cb-picker-item ${p.id === store.active_project_id ? "active" : ""}`}
+                onClick={() => void pickProject(p.id)}
+                role="option"
+                aria-selected={p.id === store.active_project_id}
+              >
+                <span className="cb-picker-item-text">
+                  <span className="cb-picker-item-name">{p.name}</span>
+                </span>
+                {p.id === store.active_project_id && <PickerCheck />}
+              </button>
+            ))}
+          </div>
+
+          <div className="cb-picker-divider" />
+
+          {/* Escape hatch — open the main app for the full Projects
+              management surface (add/edit/delete/links/path). */}
           <button
             type="button"
-            className={`cb-picker-item ${!store.active_project_id ? "active" : ""}`}
-            onClick={() => void pickProject(null)}
-            role="option"
-            aria-selected={!store.active_project_id}
+            className="cb-picker-footer"
+            onClick={() => void openMainProjects()}
           >
-            <span className="cb-picker-item-name">No project</span>
-            <span className="cb-picker-item-hint">enhance without context</span>
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+            </svg>
+            <span>Configure projects</span>
           </button>
-          {store.projects.length === 0 && (
-            <div className="cb-picker-empty">
-              No projects yet. Open the main app to add one.
-            </div>
-          )}
-          {store.projects.map((p) => (
-            <button
-              key={p.id}
-              type="button"
-              className={`cb-picker-item ${p.id === store.active_project_id ? "active" : ""}`}
-              onClick={() => void pickProject(p.id)}
-              role="option"
-              aria-selected={p.id === store.active_project_id}
-            >
-              <span className="cb-picker-item-name">{p.name}</span>
-              {p.id === store.active_project_id && (
-                <svg
-                  className="cb-picker-item-check"
-                  viewBox="0 0 16 16"
-                  width="12"
-                  height="12"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M3 8l3 3 7-7" />
-                </svg>
-              )}
-            </button>
-          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function PickerCheck() {
+  return (
+    <svg
+      className="cb-picker-item-check"
+      viewBox="0 0 16 16"
+      width="13"
+      height="13"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 8l3 3 7-7" />
+    </svg>
   );
 }

@@ -136,90 +136,132 @@ body.cb-route * {
   pointer-events: none;
 }
 
-/* Custom popover — replaces the OS-native dropdown so the styling
-   matches the dark capsule. Lives in a vertically expanded window
-   (see .cb-picker-open above). */
+/* Light-themed popover — sits in front of the dark capsule for a
+   clear surface hierarchy. Hardcoded light tokens since the rest of
+   the app is dark-only; if a light-mode design system arrives later
+   these can be promoted to CSS vars. */
 .cb-picker-pop {
-  width: 144px;
-  max-height: 200px;
+  width: 200px;
+  max-height: 220px;
   overflow-y: auto;
-  background: var(--pf-bg);
-  border: 1px solid var(--pf-border-strong);
+  background: #ffffff;
+  color: #1a1a1a;
+  border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 12px;
-  padding: 6px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  padding: 4px;
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.1),
+    0 8px 22px rgba(0, 0, 0, 0.16);
   -webkit-app-region: no-drag;
-  /* Subtle entrance animation so the popover doesn't pop in jarringly
-     after the window resize. */
-  animation: cb-picker-in 0.12s var(--pf-ease, ease-out);
+  font-size: 12px;
+  /* Subtle entrance — slight rise + fade. */
+  animation: cb-picker-in 0.14s var(--pf-ease, ease-out);
 }
 
 @keyframes cb-picker-in {
-  from { opacity: 0; transform: translateY(-4px); }
+  from { opacity: 0; transform: translateY(-6px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.cb-picker-header {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--pf-text-faint);
-  padding: 4px 8px 6px;
+.cb-picker-divider {
+  height: 1px;
+  margin: 3px 6px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.cb-picker-section {
+  display: flex;
+  flex-direction: column;
 }
 
 .cb-picker-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 6px;
   width: 100%;
   text-align: left;
   background: transparent;
   border: none;
-  color: var(--pf-text);
+  color: #1a1a1a;
   font: inherit;
   font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
   cursor: pointer;
   transition: background 0.1s var(--pf-ease, ease-out);
   -webkit-app-region: no-drag;
 }
 
 .cb-picker-item:hover {
-  background: var(--pf-surface-2);
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .cb-picker-item.active {
-  color: var(--pf-accent);
-  background: var(--pf-surface-2);
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.cb-picker-item-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
 }
 
 .cb-picker-item-name {
-  flex: 1;
+  width: 100%;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
 }
 
 .cb-picker-item-hint {
   font-size: 10px;
-  color: var(--pf-text-faint);
-  flex-shrink: 0;
+  line-height: 1.3;
+  color: #6b7280;
+  margin-top: 1px;
 }
 
 .cb-picker-item-check {
   flex-shrink: 0;
-  color: var(--pf-accent);
+  color: #1a1a1a;
 }
 
 .cb-picker-empty {
-  padding: 12px 8px;
+  padding: 10px;
   font-size: 11px;
-  color: var(--pf-text-faint);
+  color: #6b7280;
   text-align: center;
   line-height: 1.4;
+}
+
+/* Footer link — opens the main app's Projects tab for the full
+   add/edit/delete surface. */
+.cb-picker-footer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: #1a1a1a;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s var(--pf-ease, ease-out);
+  -webkit-app-region: no-drag;
+}
+
+.cb-picker-footer:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.cb-picker-footer svg {
+  color: #6b7280;
+  flex-shrink: 0;
 }
 
 /* ---------- Toggle ---------- */
