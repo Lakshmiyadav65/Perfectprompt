@@ -48,6 +48,26 @@ body { overflow: hidden; }
   box-shadow:
     inset 0 0 0 4px var(--pf-bg-2),
     0 0 0 1px var(--pf-line-strong);
+  /* Slow continuous rotation makes the conic-gradient "light" appear
+     to sweep around the mark. Linear easing keeps motion steady; the
+     12s cycle is deliberately slow so it reads as ambient, not busy. */
+  animation: pf-brand-spin 12s linear infinite;
+  will-change: transform;
+}
+
+.pf-brand:hover .pf-brand-mark {
+  /* Pick up the pace a touch on hover — feels alive without being
+     distracting at rest. */
+  animation-duration: 4s;
+}
+
+@keyframes pf-brand-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-brand-mark { animation: none; }
 }
 
 .pf-brand-name {
