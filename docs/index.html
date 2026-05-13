@@ -1,400 +1,1219 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PromptForge — Enhance your AI prompts with one keystroke</title>
-  <meta name="description" content="A tiny system-tray app that turns rough developer prompts into precise ones. Press a global hotkey anywhere on Windows — works in any app where you can select text." />
-  <meta property="og:title" content="PromptForge" />
-  <meta property="og:description" content="Press a global hotkey anywhere on your computer to turn rough prompts into precise ones — works in any app where you can select text." />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://lakshmiyadav65.github.io/PromptEnhancer/" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E⚡%3C/text%3E%3C/svg%3E" />
-  <style>
-    :root {
-      --bg: #0e0e10;
-      --panel: #18181c;
-      --panel-2: #1f1f24;
-      --text: #f1f1f4;
-      --text-dim: #a3a3a8;
-      --text-faint: #6e6e74;
-      --accent: #6aa9ff;
-      --accent-hover: #82b9ff;
-      --border: rgba(255, 255, 255, 0.08);
-      --green: #4ad08a;
-      --shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
-    }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-      line-height: 1.55;
-      -webkit-font-smoothing: antialiased;
-    }
-    a { color: var(--accent); text-decoration: none; }
-    a:hover { color: var(--accent-hover); text-decoration: underline; }
-    code, kbd {
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      font-size: 0.92em;
-      background: rgba(255, 255, 255, 0.06);
-      padding: 2px 6px;
-      border-radius: 4px;
-      border: 1px solid var(--border);
-    }
-    kbd {
-      background: var(--panel-2);
-      box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
-    }
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>PromptForge. Make rough prompts produce expert-level outputs.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=Geist+Mono:wght@400;500&family=Inter+Tight:wght@400;450;500;600&display=swap" rel="stylesheet" />
 
-    .container { max-width: 880px; margin: 0 auto; padding: 0 24px; }
+<style>
+  :root{
+    --bg:        #0a0a0b;
+    --bg-2:      #0e0e10;
+    --panel:     #121215;
+    --panel-2:   #18181c;
+    --line:      #23232a;
+    --line-soft: #1a1a20;
+    --ink:       #f4f1ea;
+    --ink-dim:   #b6b1a8;
+    --ink-mute:  #6b6960;
+    --accent:    #e8e2d4;
+    --accent-2:  #ff7a4d;
+    --accent-2-soft: rgba(255,122,77,0.14);
+    --flame:     #ff7a4d;
+    --flame-dim: rgba(255,122,77,0.14);
+    --green:     #4ade80;
+    --red:       #f87171;
 
-    /* Hero */
-    .hero {
-      padding: 80px 0 60px;
-      text-align: center;
-    }
-    .badge {
-      display: inline-block;
-      padding: 4px 12px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 100px;
-      font-size: 12px;
-      color: var(--text-dim);
-      margin-bottom: 20px;
-    }
-    .badge .dot {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      margin-right: 6px;
-      vertical-align: middle;
-    }
-    h1 {
-      font-size: 56px;
-      font-weight: 700;
-      margin: 0 0 16px;
-      letter-spacing: -0.02em;
-      background: linear-gradient(180deg, #ffffff, #b9b9bf);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-    .tagline {
-      font-size: 19px;
-      color: var(--text-dim);
-      margin: 0 0 32px;
-      max-width: 580px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .cta-row {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 22px;
-      border-radius: 8px;
-      font-size: 15px;
+    --display: 'Fraunces', 'Times New Roman', serif;
+    --sans: 'Inter Tight', system-ui, sans-serif;
+    --mono: 'Geist Mono', ui-monospace, monospace;
+  }
+
+  *{ box-sizing: border-box; }
+  html, body{ margin:0; padding:0; background: #050506; color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  body{
+    background:
+      radial-gradient(60% 40% at 0% 0%,   rgba(220,210,190,0.06), transparent 60%),
+      radial-gradient(50% 35% at 100% 0%, rgba(220,210,190,0.05), transparent 60%),
+      radial-gradient(60% 45% at 100% 100%, rgba(220,210,190,0.05), transparent 60%),
+      radial-gradient(55% 40% at 0% 100%, rgba(220,210,190,0.04), transparent 60%),
+      #050506;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  body::before{
+    content:"";
+    position: fixed; inset: 0;
+    pointer-events:none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 0.05 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    opacity:.5;
+    z-index: 0;
+    mix-blend-mode: overlay;
+  }
+
+  a{ color: inherit; text-decoration: none; }
+  button{ font: inherit; cursor: pointer; }
+
+  /* ---------- frame ---------- */
+  .frame{
+    position: relative;
+    z-index: 1;
+    margin: 28px;
+    border-radius: 20px;
+    background:
+      radial-gradient(120% 80% at 50% -10%, rgba(255,255,255,0.04), transparent 60%),
+      linear-gradient(180deg, #0c0c0e, #0a0a0c 40%, #08080a);
+    border: 1px solid rgba(255,255,255,0.06);
+    box-shadow:
+      0 0 0 1px rgba(0,0,0,0.4) inset,
+      0 40px 80px -20px rgba(0,0,0,0.6);
+    overflow: hidden;
+  }
+  .frame::before{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(80% 60% at 50% 30%, #000 30%, transparent 80%);
+  }
+
+  /* ---------- nav ---------- */
+  nav{
+    position: relative;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 22px 36px;
+  }
+  .logo{ display:flex; align-items:center; gap:10px; font-family: var(--display); font-weight:500; font-size: 19px; letter-spacing: -0.01em; }
+  .logo-mark{
+    width: 26px; height: 26px; border-radius: 50%;
+    background: conic-gradient(from 220deg, #2a2a30, #e8e2d4 40%, #2a2a30 70%, #e8e2d4);
+    box-shadow: inset 0 0 0 4px #0a0a0c, 0 0 0 1px rgba(255,255,255,0.1);
+  }
+  .nav-links{ display:flex; gap: 34px; font-size: 14px; color: var(--ink-dim); font-weight: 450; }
+  .nav-links a{ position: relative; transition: color .2s ease; }
+  .nav-links a:hover{ color: var(--ink); }
+  .nav-links a.active{ color: var(--ink); }
+  .nav-links a.active::after{
+    content:""; position:absolute; left:50%; bottom:-8px; transform: translateX(-50%);
+    width: 4px; height: 4px; border-radius: 50%; background: var(--flame);
+    box-shadow: 0 0 6px rgba(255,122,77,0.6);
+  }
+  .nav-cta{
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    color: var(--ink);
+    padding: 9px 16px; border-radius: 10px;
+    font-size: 13px; font-weight: 500;
+    transition: all .2s ease;
+  }
+  .nav-cta:hover{ background: rgba(255,255,255,0.08); }
+
+  /* ---------- hero ---------- */
+  .hero{ position: relative; padding: 60px 24px 30px; text-align:center; }
+  .pill{
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 7px 14px 7px 14px;
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 999px;
+    font-size: 12.5px; color: var(--ink-dim); font-weight: 450;
+  }
+  .pill .tag{
+    background: rgba(255,122,77,0.18);
+    border-radius: 999px;
+    padding: 3px 9px; color: var(--flame);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.02em;
+    font-weight: 500;
+  }
+  .pill .arrow{ width: 14px; height: 14px; color: var(--flame); }
+
+  h1{
+    font-family: var(--display);
+    font-weight: 400;
+    font-size: clamp(40px, 6.4vw, 88px);
+    line-height: 0.98;
+    letter-spacing: -0.025em;
+    margin: 24px auto 22px;
+    max-width: 18ch;
+    font-variation-settings: "opsz" 120;
+  }
+  h1 .dim{ color: var(--ink-mute); font-style: italic; font-weight: 300; }
+  h1 .accent{ color: var(--ink); }
+
+  .sub{
+    max-width: 56ch; margin: 0 auto;
+    color: var(--ink-dim); font-size: 16.5px; line-height: 1.55; font-weight: 400;
+  }
+
+  .cta-row{
+    display: inline-flex; gap: 10px; margin-top: 36px;
+    align-items: center;
+  }
+  .btn-primary{
+    background: #f4f1ea; color: #0a0a0c;
+    border: 1px solid #f4f1ea;
+    padding: 13px 22px; border-radius: 12px;
+    font-weight: 500; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: transform .15s ease, box-shadow .2s ease;
+    box-shadow: 0 8px 30px -8px rgba(244,241,234,0.3);
+  }
+  .btn-primary:hover{ transform: translateY(-1px); box-shadow: 0 12px 36px -8px rgba(244,241,234,0.45), 0 0 40px -10px rgba(255,122,77,0.4); }
+  .btn-primary .kbd{
+    font-family: var(--mono); font-size: 11px;
+    background: rgba(0,0,0,0.08); border: 1px solid rgba(0,0,0,0.1);
+    padding: 2px 6px; border-radius: 5px;
+    color: #2a2a30;
+  }
+  .btn-secondary{
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: var(--ink);
+    padding: 13px 20px; border-radius: 12px;
+    font-weight: 500; font-size: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: all .2s ease;
+  }
+  .btn-secondary:hover{ background: rgba(255,255,255,0.07); border-color: rgba(255,122,77,0.35); color: var(--flame); }
+  .btn-secondary:hover .arr{ color: var(--flame); }
+  .btn-secondary .arr{ width:14px; height:14px; }
+
+  .hero-meta{
+    margin-top: 24px;
+    display:flex; justify-content:center; gap: 22px;
+    color: var(--ink-mute); font-size: 12.5px;
+    font-family: var(--mono); letter-spacing: 0.02em;
+  }
+  .hero-meta span{ display:flex; align-items:center; gap:7px; }
+  .dot{ width:6px; height:6px; border-radius:50%; background: var(--green); box-shadow: 0 0 8px rgba(74,222,128,0.5); }
+
+  /* =========================================================
+     TOKAVY-INSPIRED FLOW ANIMATION
+     Sequenced reveal: rough input → hotkey → questionnaire → enhanced output
+     ========================================================= */
+  .flow-theatre{
+    position: relative;
+    margin: 70px auto 0;
+    max-width: 1180px;
+    padding: 0 36px;
+  }
+
+  .flow-stage{
+    position: relative;
+    border-radius: 16px;
+    background:
+      radial-gradient(80% 60% at 50% 0%, rgba(255,255,255,0.025), transparent 70%),
+      linear-gradient(180deg, #0e0e11, #0a0a0c);
+    border: 1px solid rgba(255,255,255,0.07);
+    box-shadow:
+      0 0 0 1px rgba(255,255,255,0.02) inset,
+      0 60px 120px -30px rgba(0,0,0,0.7);
+    overflow: hidden;
+    min-height: 520px;
+  }
+
+  /* stage status bar */
+  .stage-bar{
+    display:flex; align-items:center; gap: 10px;
+    padding: 14px 22px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.015);
+  }
+  .stage-tl{ display:flex; gap:6px; }
+  .stage-tl span{ width:10px; height:10px; border-radius:50%; background:#2a2a30; }
+  .stage-label{
+    font-family: var(--mono); font-size: 11px;
+    color: var(--ink-mute); letter-spacing: 0.04em;
+    margin-left: 14px;
+  }
+  .stage-progress{
+    margin-left: auto;
+    display: flex; gap: 6px;
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-mute);
+    align-items: center;
+  }
+  .stage-progress .pdot{
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.1);
+    transition: background .3s ease, box-shadow .3s ease;
+  }
+  .stage-progress .pdot.on{
+    background: var(--flame);
+    box-shadow: 0 0 8px rgba(255,122,77,0.6);
+  }
+
+  /* stage body: 3 panels side-by-side */
+  .stage-body{
+    position: relative;
+    display: grid;
+    grid-template-columns: 1.05fr 1.1fr 1.35fr;
+    min-height: 460px;
+  }
+  .stage-pane{
+    position: relative;
+    padding: 28px 24px;
+    border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .stage-pane:last-child{ border-right: none; }
+  .pane-label{
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--flame); letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    display:flex; align-items:center; gap: 8px;
+  }
+  .pane-label .num{
+    width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid rgba(255,122,77,0.35);
+    background: rgba(255,122,77,0.08);
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size: 9.5px; color: var(--flame);
+    font-weight: 500;
+  }
+
+  /* ---- pane 1: rough input ---- */
+  .rough-editor{
+    font-family: var(--mono);
+    font-size: 11.5px;
+    line-height: 1.75;
+    color: var(--ink-dim);
+  }
+  .rough-editor .line{ display:block; }
+  .rough-editor .typed{
+    display: inline-block;
+    border-right: 2px solid transparent;
+    white-space: nowrap;
+    overflow: hidden;
+    vertical-align: bottom;
+    animation: typing 2.4s steps(43, end) forwards, caret 0.8s steps(1, end) 0s 3, caret-off 0s 2.4s forwards;
+  }
+  @keyframes typing{
+    from{ width: 0; }
+    to  { width: 43ch; }
+  }
+  @keyframes caret{
+    50%{ border-right-color: var(--flame); }
+  }
+  @keyframes caret-off{ to{ border-right-color: transparent; } }
+
+  /* selection box that wraps the typed text after typing completes */
+  .selection-wrap{
+    position: relative;
+    display: inline-block;
+    padding: 2px 4px;
+    margin-left: -4px;
+    border-radius: 3px;
+    transition: background .35s ease, box-shadow .35s ease;
+  }
+  .selection-wrap.selected{
+    background: rgba(255,122,77,0.18);
+    box-shadow: 0 0 0 1px rgba(255,122,77,0.35);
+    color: var(--ink);
+  }
+
+  /* hotkey card */
+  .hotkey-card{
+    margin-top: 36px;
+    padding: 14px 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    opacity: 0;
+    transform: translateY(8px);
+    animation: pane-fade-in .5s ease 3.3s forwards;
+  }
+  .hotkey-card .hlabel{
+    font-family: var(--mono); font-size: 10.5px;
+    color: var(--ink-mute); letter-spacing: 0.05em;
+    margin-bottom: 10px;
+  }
+  .hotkey-keys{ display:flex; gap: 6px; align-items: center; }
+  .hkey{
+    font-family: var(--mono); font-size: 12px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-bottom: 2px solid rgba(255,255,255,0.06);
+    padding: 5px 10px; border-radius: 6px;
+    color: var(--ink);
+    transition: all .2s ease;
+  }
+  .hkey.pressed{
+    background: var(--flame);
+    color: #0a0a0c;
+    border-color: var(--flame);
+    border-bottom-color: rgba(0,0,0,0.3);
+    box-shadow: 0 0 16px rgba(255,122,77,0.5);
+    transform: translateY(2px);
+  }
+  .hotkey-plus{ color: var(--ink-mute); }
+  /* fire the "press" at t=4.0s */
+  .hotkey-card.firing .hkey:nth-child(5){ animation: key-press 0.6s ease 0s forwards; }
+  @keyframes key-press{
+    0%, 100%{ background: rgba(255,255,255,0.06); color: var(--ink); transform: translateY(0); box-shadow: none; }
+    30%, 70%{ background: var(--flame); color: #0a0a0c; box-shadow: 0 0 16px rgba(255,122,77,0.5); transform: translateY(2px); }
+  }
+
+  /* connector between panes */
+  .pane-connector{
+    position: absolute;
+    top: 50%; right: -1px;
+    width: 30px; height: 1px;
+    background: rgba(255,255,255,0.08);
+    z-index: 5;
+  }
+  .pane-connector::before{
+    content:""; position:absolute; right: -3px; top: -3px;
+    width: 7px; height: 7px; border-radius: 50%;
+    background: rgba(255,255,255,0.15);
+    transition: all .4s ease;
+  }
+  .pane-connector.active::before{
+    background: var(--flame);
+    box-shadow: 0 0 12px rgba(255,122,77,0.7);
+  }
+
+  /* ---- pane 2: questionnaire ---- */
+  .question-pane{
+    position: relative;
+  }
+  .qcard{
+    background: linear-gradient(180deg, #15151a, #101013);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 18px;
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+    animation: card-pop .55s cubic-bezier(.2,.7,.2,1) 4.6s forwards;
+  }
+  @keyframes card-pop{
+    to{ opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .qcard-title{
+    font-family: var(--display);
+    font-size: 14.5px;
+    color: var(--ink);
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+    font-weight: 400;
+    line-height: 1.35;
+  }
+  .qchips{ display:flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .qchip{
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 8px;
+    font-size: 12px; color: var(--ink-dim);
+    opacity: 0;
+    transform: translateY(4px);
+    animation: chip-in .35s ease forwards;
+  }
+  .qchip:nth-child(1){ animation-delay: 5.0s; }
+  .qchip:nth-child(2){ animation-delay: 5.1s; }
+  .qchip:nth-child(3){ animation-delay: 5.2s; }
+  .qchip:nth-child(4){ animation-delay: 5.3s; }
+  @keyframes chip-in{
+    to{ opacity: 1; transform: translateY(0); }
+  }
+  .qchip.picked{
+    animation: chip-in .35s ease forwards, chip-select .4s ease 6.6s forwards;
+  }
+  .q2 .qchip:nth-child(1){ animation-delay: 5.9s; }
+  .q2 .qchip:nth-child(2){ animation-delay: 6.0s; }
+  .q2 .qchip:nth-child(3){ animation-delay: 6.1s; }
+  .q2 .qchip.picked{
+    animation: chip-in .35s ease forwards, chip-select .4s ease 7.0s forwards;
+  }
+  @keyframes chip-select{
+    to{
+      background: rgba(232,226,212,0.92);
+      border-color: rgba(232,226,212,1);
+      color: #0a0a0c;
       font-weight: 500;
-      transition: transform 0.06s ease, background 0.15s ease;
-      text-decoration: none;
     }
-    .btn:active { transform: translateY(1px); }
-    .btn-primary {
-      background: var(--accent);
-      color: #0a0a0c;
-    }
-    .btn-primary:hover { background: var(--accent-hover); text-decoration: none; }
-    .btn-secondary {
-      background: var(--panel);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-    .btn-secondary:hover { background: var(--panel-2); text-decoration: none; }
+  }
 
-    /* Demo */
-    .demo {
-      margin: 60px 0;
-      padding: 32px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-    }
-    .demo-step {
-      display: flex;
-      align-items: flex-start;
-      gap: 16px;
-      margin-bottom: 18px;
-    }
-    .demo-step:last-child { margin-bottom: 0; }
-    .demo-num {
-      flex-shrink: 0;
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--accent);
-      color: #0a0a0c;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: 600;
-      font-size: 14px;
-    }
-    .demo-text { color: var(--text); font-size: 15px; }
-    .demo-text strong { color: #fff; }
-    .demo-arrow {
-      color: var(--text-faint);
-      text-align: center;
-      margin: 18px 0;
-      font-size: 14px;
-    }
-    .demo-result {
-      background: var(--panel-2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px 18px;
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-      font-size: 13px;
-      line-height: 1.6;
-    }
-    .demo-result .clarify {
-      color: var(--accent);
-    }
+  .qcard-foot{
+    display:flex; align-items:center; justify-content:space-between;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    opacity: 0;
+    animation: pane-fade-in .35s ease 6.4s forwards;
+  }
+  .qfoot-hint{ font-size: 10px; color: var(--ink-mute); font-family: var(--mono); }
+  .qfoot-hint kbd{
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    padding: 1px 5px; border-radius: 3px;
+    margin: 0 2px; color: var(--ink-dim);
+  }
+  .qsubmit{
+    background: var(--ink);
+    color: #0a0a0c;
+    border: none; padding: 5px 11px; border-radius: 6px;
+    font-size: 11px; font-weight: 500;
+    font-family: var(--mono);
+    transition: all .2s ease;
+  }
+  .qsubmit.firing{
+    animation: submit-flash .35s ease 7.5s forwards;
+  }
+  @keyframes submit-flash{
+    50%{ background: var(--flame); color: #0a0a0c; box-shadow: 0 0 14px rgba(255,122,77,0.5); }
+  }
 
-    /* Features */
-    .features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 20px;
-      margin: 40px 0;
-    }
-    .feature {
-      padding: 22px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-    }
-    .feature-icon {
-      font-size: 22px;
-      margin-bottom: 10px;
-    }
-    .feature h3 {
-      font-size: 15px;
-      font-weight: 600;
-      margin: 0 0 6px;
-      color: #fff;
-    }
-    .feature p {
-      margin: 0;
-      color: var(--text-dim);
-      font-size: 13.5px;
-      line-height: 1.55;
-    }
+  /* ---- pane 3: enhanced output ---- */
+  .output-pane{ position: relative; }
+  .output-body{
+    font-family: var(--mono);
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--ink-dim);
+    opacity: 0;
+    animation: pane-fade-in .6s ease 7.9s forwards;
+  }
+  @keyframes pane-fade-in{
+    to{ opacity: 1; transform: translateY(0); }
+  }
+  .output-tag{
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px;
+    color: var(--flame);
+    background: rgba(255,122,77,0.1);
+    border: 1px solid rgba(255,122,77,0.25);
+    padding: 1px 7px; border-radius: 4px;
+    margin-right: 6px;
+  }
+  .output-body p{ margin: 0 0 8px; }
+  .output-body .h-line{
+    color: var(--ink);
+    font-weight: 500;
+  }
+  .output-body .ctx{ color: var(--flame); font-weight: 500; }
+  .output-body .item{ display:block; padding-left: 12px; position: relative; }
+  .output-body .item::before{ content:"·"; position:absolute; left: 0; color: var(--ink-mute); }
 
-    /* Section */
-    section { margin: 60px 0; }
-    h2 {
-      font-size: 26px;
-      font-weight: 700;
-      margin: 0 0 16px;
-      letter-spacing: -0.01em;
-    }
-    p { color: var(--text-dim); }
-    p strong { color: var(--text); }
-    ul { color: var(--text-dim); padding-left: 24px; }
-    ul li { margin-bottom: 8px; }
+  /* shimmer line during "thinking" between submit and output */
+  .thinking-pill{
+    position: absolute;
+    top: 50%; left: 50%; transform: translate(-50%, -50%);
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 7px 14px;
+    background: rgba(20,20,24,0.92);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 999px;
+    font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+    opacity: 0;
+    animation: think-show 0s ease 7.5s forwards, think-hide 0s ease 7.9s forwards;
+    z-index: 2;
+  }
+  @keyframes think-show{ to{ opacity: 1; } }
+  @keyframes think-hide{ to{ opacity: 0; } }
+  .thinking-pill .spin{
+    width: 9px; height: 9px; border-radius: 50%;
+    border: 1.5px solid rgba(232,226,212,0.25);
+    border-top-color: var(--flame);
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin{ to{ transform: rotate(360deg); } }
 
-    .install-steps {
-      counter-reset: step;
-    }
-    .install-steps > div {
-      counter-increment: step;
-      padding: 14px 18px 14px 50px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      margin-bottom: 10px;
-      position: relative;
-    }
-    .install-steps > div::before {
-      content: counter(step);
-      position: absolute;
-      left: 16px;
-      top: 14px;
-      width: 24px;
-      height: 24px;
-      background: var(--panel-2);
-      border: 1px solid var(--border);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 12px;
-      color: var(--text-dim);
-      font-family: "SF Mono", Menlo, Consolas, monospace;
-    }
-    .install-steps strong { color: var(--text); }
+  /* the master loop. 13s flow + 4s pause, JS hard-restarts every cycle */
+  .stage-body{
+    animation: none;
+    opacity: 1;
+  }
 
-    /* Footer */
-    footer {
-      margin-top: 80px;
-      padding: 40px 0 60px;
-      border-top: 1px solid var(--border);
-      text-align: center;
-      color: var(--text-faint);
-      font-size: 13px;
+  /* the selection trigger fires from JS via the typed animation completing */
+  .rough-editor .typed{
+    animation:
+      typing 2.4s steps(43, end) 0.5s forwards,
+      caret 0.7s steps(1, end) 0.5s 4,
+      caret-off 0s 3.5s forwards;
+  }
+  .selection-wrap{
+    animation: select-on .35s ease 3.3s forwards;
+  }
+  @keyframes select-on{
+    to{
+      background: rgba(255,122,77,0.18);
+      box-shadow: 0 0 0 1px rgba(255,122,77,0.35);
+      color: var(--ink);
     }
-    footer a { color: var(--text-dim); }
+  }
 
-    @media (max-width: 600px) {
-      h1 { font-size: 40px; }
-      .tagline { font-size: 17px; }
-      .hero { padding: 50px 0 40px; }
-      .demo { padding: 20px; }
+  .hotkey-card.fires{
+    animation: pane-fade-in .5s ease 3.3s forwards;
+  }
+  .hotkey-card .hkey.k1{
+    animation: key-press 0.7s ease 4.0s forwards;
+  }
+  .hotkey-card .hkey.k2{
+    animation: key-press 0.7s ease 4.0s forwards;
+  }
+  .hotkey-card .hkey.k3{
+    animation: key-press 0.7s ease 4.0s forwards;
+  }
+  .pane-connector.c1{ animation: connector-fire .5s ease 4.0s forwards; }
+  .pane-connector.c2{ animation: connector-fire .5s ease 7.5s forwards; }
+  @keyframes connector-fire{
+    to{
+      background: rgba(255,122,77,0.4);
     }
-  </style>
+  }
+  .pane-connector.c1::before{ animation: connector-dot 0.5s ease 4.1s forwards; }
+  .pane-connector.c2::before{ animation: connector-dot 0.5s ease 7.6s forwards; }
+  @keyframes connector-dot{
+    to{
+      background: var(--flame);
+      box-shadow: 0 0 12px rgba(255,122,77,0.7);
+    }
+  }
+
+  /* progress dots driven by master clock */
+  .stage-progress .pdot.p1{ animation: dot-on .3s ease 0.5s forwards; }
+  .stage-progress .pdot.p2{ animation: dot-on .3s ease 3.3s forwards; }
+  .stage-progress .pdot.p3{ animation: dot-on .3s ease 4.6s forwards; }
+  .stage-progress .pdot.p4{ animation: dot-on .3s ease 7.9s forwards; }
+  @keyframes dot-on{
+    to{
+      background: var(--flame);
+      box-shadow: 0 0 8px rgba(255,122,77,0.6);
+    }
+  }
+
+  /* =========================================================
+     END FLOW ANIMATION
+     ========================================================= */
+
+  /* ---------- shared section heading ---------- */
+  section{ position: relative; z-index: 1; padding: 130px 36px; max-width: 1180px; margin: 0 auto; }
+  .eyebrow{
+    font-family: var(--mono); font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--flame); margin-bottom: 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .eyebrow::before{
+    content:""; display: inline-block;
+    width: 14px; height: 1px;
+    background: var(--flame);
+  }
+  h2{
+    font-family: var(--display); font-weight: 400;
+    font-size: clamp(36px, 4.4vw, 60px);
+    line-height: 1.02; letter-spacing: -0.022em;
+    margin: 0 0 18px;
+    max-width: 18ch;
+  }
+  h2 .dim{ color: var(--ink-mute); font-style: italic; font-weight: 300; }
+  .section-sub{
+    color: var(--ink-dim); font-size: 16px; line-height: 1.6;
+    max-width: 58ch;
+  }
+
+  /* ---------- how it works steps (4-step) ---------- */
+  .steps{
+    margin-top: 60px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .step{
+    background: #0c0c0e;
+    padding: 30px 26px 32px;
+    position: relative;
+    min-height: 230px;
+    transition: background .25s ease;
+  }
+  .step:hover{ background: #101013; }
+  .step-num{
+    font-family: var(--mono); font-size: 11px;
+    color: var(--flame); letter-spacing: 0.05em;
+    margin-bottom: 36px;
+  }
+  .step-icon{
+    position: absolute; top: 28px; right: 26px;
+    width: 22px; height: 22px; color: var(--ink-mute);
+  }
+  .step h3{
+    font-family: var(--display); font-weight: 400;
+    font-size: 22px; letter-spacing: -0.015em;
+    margin: 0 0 10px; color: var(--ink);
+    line-height: 1.2;
+  }
+  .step p{
+    margin: 0; font-size: 13.5px; color: var(--ink-dim);
+    line-height: 1.55;
+  }
+
+  /* ---------- examples section ---------- */
+  .examples{ margin-top: 60px; display: flex; flex-direction: column; gap: 20px; }
+  .example{
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(255,255,255,0.025), transparent 60%),
+      #0c0c0e;
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .example-head{
+    padding: 18px 26px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex; align-items: center; gap: 14px;
+  }
+  .example-num{
+    font-family: var(--mono); font-size: 11px;
+    color: var(--flame); letter-spacing: 0.08em;
+    font-weight: 500;
+  }
+  .example-type{
+    font-family: var(--mono); font-size: 10.5px;
+    padding: 3px 9px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 6px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+  }
+  .example-body{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.4fr;
+    min-height: 220px;
+  }
+  .example-col{
+    padding: 22px 26px;
+    border-right: 1px solid rgba(255,255,255,0.05);
+  }
+  .example-col:last-child{ border-right: none; }
+  .col-label{
+    font-family: var(--mono); font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.12em;
+    color: var(--ink-mute);
+    margin-bottom: 14px;
+    display:flex; align-items:center; gap: 8px;
+  }
+  .col-label .dotred{ width:6px;height:6px;border-radius:50%; background: var(--red); }
+  .col-label .dotorange{ width:6px;height:6px;border-radius:50%; background: var(--flame); box-shadow: 0 0 6px rgba(255,122,77,0.5); }
+  .col-label .dotgrn{ width:6px;height:6px;border-radius:50%; background: var(--green); }
+
+  .example-col .rough{
+    font-family: var(--mono); font-size: 14px;
+    color: var(--ink-dim);
+    line-height: 1.6;
+  }
+  .example-col .understands{
+    font-family: var(--mono); font-size: 12.5px;
+    color: var(--ink-dim); line-height: 1.7;
+  }
+  .example-col .understands .key{ color: var(--ink); }
+  .example-col .enhanced{
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink);
+    line-height: 1.75;
+  }
+  .example-col .enhanced .ctx{ color: var(--flame); font-weight: 500; }
+  .example-col .enhanced .dim{ color: var(--ink-dim); }
+
+  /* ---------- FAQs ---------- */
+  .faqs{ margin-top: 50px; }
+  .faq{
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding: 22px 0;
+    display:grid; grid-template-columns: 1fr 1.6fr;
+    gap: 40px;
+    transition: padding-left .25s ease;
+    position: relative;
+  }
+  .faq::before{
+    content:""; position: absolute;
+    left: -16px; top: 28px;
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--flame); opacity: 0;
+    box-shadow: 0 0 8px rgba(255,122,77,0.6);
+    transition: opacity .25s ease;
+  }
+  .faq:hover::before{ opacity: 0.7; }
+  .faq:last-child{ border-bottom: 1px solid rgba(255,255,255,0.07); }
+  .faq h4{
+    font-family: var(--display); font-weight: 400;
+    font-size: 19px; letter-spacing: -0.012em;
+    margin: 0; color: var(--ink); line-height: 1.3;
+  }
+  .faq p{
+    margin: 0; font-size: 14px; color: var(--ink-dim);
+    line-height: 1.6;
+  }
+
+  /* ---------- final CTA ---------- */
+  .final{
+    position: relative; z-index:1;
+    margin: 0 36px 36px;
+    border-radius: 20px;
+    padding: 100px 36px 110px;
+    text-align: center;
+    background:
+      radial-gradient(60% 100% at 50% 0%, rgba(232,226,212,0.08), transparent 60%),
+      linear-gradient(180deg, #0c0c0e, #08080a);
+    border: 1px solid rgba(255,255,255,0.07);
+    overflow: hidden;
+  }
+  .final::before{
+    content:""; position:absolute; inset:0; pointer-events:none;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(70% 60% at 50% 40%, #000 30%, transparent 80%);
+  }
+  .final h2{ margin: 14px auto 16px; max-width: 22ch; }
+  .final .section-sub{ margin: 0 auto; }
+  .final .cta-row{ margin-top: 32px; }
+
+  /* ---------- footer ---------- */
+  footer{
+    position: relative; z-index: 1;
+    padding: 40px 64px 60px;
+    display:flex; justify-content:space-between; align-items: flex-end;
+    flex-wrap: wrap; gap: 24px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+    margin: 0 28px;
+  }
+  footer .col{ display:flex; flex-direction:column; gap: 8px; font-size: 13px; color: var(--ink-dim); }
+  footer .col a{ transition: color .15s ease; }
+  footer .col a:hover{ color: var(--ink); }
+  footer .col h5{
+    font-family: var(--mono); font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--flame); margin: 0 0 8px;
+    font-weight: 500;
+    opacity: 0.85;
+  }
+  .footer-brand{
+    font-family: var(--display); font-size: 28px;
+    letter-spacing: -0.015em; color: var(--ink);
+  }
+  .footer-tag{ font-size: 12px; color: var(--ink-mute); margin-top: 6px; max-width: 26ch; line-height: 1.5; }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 980px){
+    .stage-body{ grid-template-columns: 1fr; }
+    .stage-pane{ border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .pane-connector{ display: none; }
+    .steps{ grid-template-columns: 1fr 1fr; }
+    .example-body{ grid-template-columns: 1fr; }
+    .example-col{ border-right: none; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .faq{ grid-template-columns: 1fr; gap: 10px; }
+    nav .nav-links{ display: none; }
+    .frame{ margin: 12px; }
+    footer{ margin: 0 12px; padding: 32px 24px; }
+  }
+
+  /* entry reveals */
+  .reveal{ opacity: 0; transform: translateY(14px); animation: reveal .9s cubic-bezier(.2,.7,.2,1) forwards; }
+  .r1{ animation-delay: .05s; } .r2{ animation-delay: .15s; } .r3{ animation-delay: .25s; }
+  .r4{ animation-delay: .35s; } .r5{ animation-delay: .5s; } .r6{ animation-delay: .7s; }
+  @keyframes reveal{ to{ opacity: 1; transform: none; } }
+</style>
 </head>
 <body>
-  <main class="container">
-    <div class="hero">
-      <div class="badge"><span class="dot"></span>v0.2.0 — Windows release</div>
-      <h1>PromptForge</h1>
-      <p class="tagline">
-        Press a global hotkey anywhere on your computer to turn rough prompts into precise ones. Works in any app where you can select text.
-      </p>
-      <div class="cta-row">
-        <a class="btn btn-primary" href="https://github.com/Lakshmiyadav65/PromptEnhancer/releases/latest">
-          ↓ Download for Windows
-        </a>
-        <a class="btn btn-secondary" href="https://github.com/Lakshmiyadav65/PromptEnhancer">
-          View on GitHub
-        </a>
-      </div>
+
+<div class="frame">
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">
+      <div class="logo-mark"></div>
+      PromptForge
+    </div>
+    <div class="nav-links">
+      <a href="#" class="active">Home</a>
+      <a href="#how">How it works</a>
+      <a href="#examples">Examples</a>
+      <a href="#faqs">FAQs</a>
+    </div>
+    <a class="nav-cta" href="#install">Download free</a>
+  </nav>
+
+  <!-- ===================== 1. HERO ===================== -->
+  <header class="hero">
+    <div class="pill reveal r1">
+      Get it now before it becomes paid.
+      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
     </div>
 
-    <section class="demo">
-      <div class="demo-step">
-        <div class="demo-num">1</div>
-        <div class="demo-text">
-          <strong>Type a rough prompt anywhere</strong> — Notepad, browser, VS Code chat, terminal, anywhere with selectable text.
-        </div>
-      </div>
-      <div class="demo-step">
-        <div class="demo-num">2</div>
-        <div class="demo-text">
-          <strong>Select the text</strong> and press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd>.
-        </div>
-      </div>
-      <div class="demo-step">
-        <div class="demo-num">3</div>
-        <div class="demo-text">
-          <strong>Selection is replaced</strong> with an enhanced version that asks for the missing context.
+    <h1 class="reveal r2">
+      <span class="accent">Make your rough prompts</span><br />
+      <span class="accent">produce</span> <span class="dim">expert-level</span> <span class="accent">outputs.</span>
+    </h1>
+
+    <p class="sub reveal r3">
+      Select a rough prompt anywhere, from Notepad to your browser, and turn it into a clear, ready-to-use prompt.
+    </p>
+
+    <div class="cta-row reveal r4">
+      <a class="btn-primary" href="#install">
+        Download for Windows
+        <span class="kbd">⌃⌥B</span>
+      </a>
+      <a class="btn-secondary" href="#how">
+        See it in action
+        <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+
+    <div class="hero-meta reveal r5">
+      <span><i class="dot"></i> Works in any text field</span>
+      <span>One hotkey · One paste</span>
+      <span>Built with Tauri 2 + Rust</span>
+    </div>
+  </header>
+
+  <!-- ===================== FLOW ANIMATION (Tokavy-inspired) ===================== -->
+  <div class="flow-theatre reveal r6">
+    <div class="flow-stage">
+
+      <div class="stage-bar">
+        <div class="stage-tl"><span></span><span></span><span></span></div>
+        <div class="stage-label">promptforge. live flow</div>
+        <div class="stage-progress">
+          <span class="pdot p1"></span>
+          <span class="pdot p2"></span>
+          <span class="pdot p3"></span>
+          <span class="pdot p4"></span>
         </div>
       </div>
 
-      <div class="demo-arrow">— example —</div>
+      <div class="stage-body">
 
-      <div style="margin-bottom: 12px;">
-        <div style="font-size: 12px; color: var(--text-faint); margin-bottom: 6px;">You typed:</div>
-        <div class="demo-result">fix the dashboard</div>
+        <!-- pane 1: rough input + hotkey -->
+        <div class="stage-pane">
+          <div class="pane-label"><span class="num">1</span> Rough prompt</div>
+          <div class="rough-editor">
+            <span class="line"><span class="selection-wrap"><span class="typed">email an angel investor i found on linkedin</span></span></span>
+          </div>
+
+          <div class="hotkey-card fires">
+            <div class="hlabel">Press the hotkey</div>
+            <div class="hotkey-keys">
+              <span class="hkey k1">Ctrl</span>
+              <span class="hotkey-plus">+</span>
+              <span class="hkey k2">Alt</span>
+              <span class="hotkey-plus">+</span>
+              <span class="hkey k3">B</span>
+            </div>
+          </div>
+
+          <div class="pane-connector c1"></div>
+        </div>
+
+        <!-- pane 2: question card -->
+        <div class="stage-pane question-pane">
+          <div class="pane-label"><span class="num">2</span> Smart Question Engine</div>
+
+          <div class="qcard">
+            <div class="qcard-title">What stage are you?</div>
+            <div class="qchips">
+              <span class="qchip">Idea</span>
+              <span class="qchip">Building, no users</span>
+              <span class="qchip picked">Live with early users</span>
+              <span class="qchip">Live with revenue</span>
+            </div>
+
+            <div class="qcard-title">Connection to them?</div>
+            <div class="qchips q2">
+              <span class="qchip">Mutual contact</span>
+              <span class="qchip picked">Their content</span>
+              <span class="qchip">Cold</span>
+            </div>
+
+            <div class="qcard-foot">
+              <div class="qfoot-hint"><kbd>↵</kbd> submit · <kbd>esc</kbd> skip</div>
+              <button class="qsubmit firing">Enhance &nbsp;&rarr;</button>
+            </div>
+          </div>
+
+          <div class="pane-connector c2"></div>
+        </div>
+
+        <!-- pane 3: enhanced output -->
+        <div class="stage-pane output-pane">
+          <div class="pane-label"><span class="num">3</span> Enhanced prompt</div>
+
+          <div class="thinking-pill">
+            <span class="spin"></span>
+            Enhancing &middot; 1.8s
+          </div>
+
+          <div class="output-body">
+            <p class="h-line">Write a short cold outreach email to an angel investor who invests in developer tools.</p>
+
+            <p>I have a live product with early users, not revenue yet. I've been following their writing, so reference one specific idea or post they've shared that resonated, in one sentence, naturally not flattering.</p>
+
+            <p>The goal of the meeting is their feedback on what I'm building, not a pitch for a check, frame it that way honestly. Keep it under 120 words.</p>
+
+            <p>Lead with one sentence on what I'm building and who uses it. End with a specific ask: 15 minutes, their preferred format (call, async, whatever).</p>
+
+            <p>Don't open with "I hope this finds you well." Don't promise to be brief and then not be brief. Don't use the word "synergy" or "ecosystem." Sign off with {your_name}.</p>
+          </div>
+        </div>
+
       </div>
-      <div>
-        <div style="font-size: 12px; color: var(--text-faint); margin-bottom: 6px;">PromptForge replaces it with:</div>
-        <div class="demo-result">
-          Fix the <span class="clarify">[CLARIFY: which dashboard file?]</span> dashboard component. The current issue is <span class="clarify">[CLARIFY: what's broken — visual bug, data issue, error?]</span>. Preserve existing styling and state management patterns.
+    </div>
+  </div>
+
+  <!-- ===================== 2. HOW IT WORKS ===================== -->
+  <section id="how">
+    <h2>How it <span class="dim">works.</span></h2>
+    <p class="section-sub">
+      Select a rough prompt anywhere on your computer, trigger PromptForge, and get a clearer prompt in seconds.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/></svg>
+        <div class="step-num">01 · Select</div>
+        <h3>Highlight your prompt</h3>
+        <p>Select any text in any app. IDE, browser, Notepad, chat.</p>
+      </div>
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h2M11 10h2M15 10h2M7 14h10"/></svg>
+        <div class="step-num">02 · Trigger</div>
+        <h3>Press Ctrl + Alt + B</h3>
+        <p>One global hotkey captures your selection instantly.</p>
+      </div>
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v6M12 16v6M2 12h6M16 12h6"/><circle cx="12" cy="12" r="3"/></svg>
+        <div class="step-num">03 · Clarify</div>
+        <h3>Answer if needed</h3>
+        <p>2–4 quick chip questions when the prompt is ambiguous.</p>
+      </div>
+      <div class="step">
+        <svg class="step-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 6 9 17l-5-5"/></svg>
+        <div class="step-num">04 · Paste</div>
+        <h3>Ready-to-use prompt</h3>
+        <p>A structured, scoped prompt lands back over your selection.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== 3. EXAMPLES ===================== -->
+  <section id="examples" style="padding-top: 60px;">
+    <h2>Examples of how your <span class="dim">prompt will look.</span></h2>
+    <p class="section-sub">
+      See how rough one-line prompts turn into clear, structured prompts with better context and direction.
+    </p>
+
+    <div class="examples">
+
+      <!-- Example 1: marketing / Reels -->
+      <div class="example">
+        <div class="example-head">
+          <span class="example-num">EX 01</span>
+          <span class="example-type">Marketing &middot; Reels script</span>
+        </div>
+        <div class="example-body">
+          <div class="example-col">
+            <div class="col-label"><span class="dotred"></span> Rough prompt</div>
+            <div class="rough">I need a reels script for my online yoga classes trying to get more sign-ups</div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotorange"></span> What PromptForge asks</div>
+            <div class="understands">
+              <span class="key">Who's the audience?</span><br/>&rarr; Busy professionals<br/><br/>
+              <span class="key">What's the wedge?</span><br/>&rarr; It's affordable, the teaching style<br/><br/>
+              <span class="key">Vibe of the video?</span><br/>&rarr; Personal and honest
+            </div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotgrn"></span> Enhanced prompt</div>
+<div class="enhanced">Write three variant scripts for a 20 to 30 second Instagram Reel promoting online yoga classes aimed at busy professionals. The hook of the offer is that each class is only 15 minutes, short enough to fit into a real workday. The vibe should be personal and honest, like a real teacher speaking to camera, not a polished marketing read. For each variant: write the hook (the first 3 seconds, spoken + what's on screen), the middle (one specific, real benefit, not "transform your life" filler), and the closing CTA (one specific action, like "link in bio" or "DM me 'yoga'"). Each variant should take a different angle: variant A leads with the time problem (no time for studios), variant B leads with how short the class is, variant C leads with how someone feels after one 15-minute session. Keep each script under 60 spoken words. Don't make medical or weight-loss claims. Don't use generic wellness phrases like "find your center" or "your journey."</div>
+          </div>
         </div>
       </div>
-    </section>
 
-    <section>
-      <h2>Why?</h2>
-      <p>
-        Tools like Promptly AI work great as Chrome extensions for ChatGPT and Claude.ai. But they don't work inside the AI chats developers actually use — Claude Code in VS Code, Cursor's chat panel, BLACKBOX AI, locked-down webviews. PromptForge sidesteps that by operating at the OS level on whatever text you've selected.
-      </p>
-    </section>
-
-    <section>
-      <h2>Features</h2>
-      <div class="features">
-        <div class="feature">
-          <div class="feature-icon">⚡</div>
-          <h3>Works everywhere</h3>
-          <p>Native OS-level keystroke + clipboard. Any app where you can select text.</p>
+      <!-- Example 2: teammate feedback -->
+      <div class="example">
+        <div class="example-head">
+          <span class="example-num">EX 02</span>
+          <span class="example-type">Writing &middot; honest feedback</span>
         </div>
-        <div class="feature">
-          <div class="feature-icon">🪶</div>
-          <h3>3 MB installer</h3>
-          <p>Tauri 2 + Rust. ~30× smaller than equivalent Electron apps.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔑</div>
-          <h3>Bring your own key</h3>
-          <p>Free Groq tier (no card needed). Your key never leaves your machine.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">⚙️</div>
-          <h3>Configurable</h3>
-          <p>Rebind the hotkey, swap your key, test the connection — all from a clean Settings window.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">🔒</div>
-          <h3>Open source</h3>
-          <p>MIT-licensed. Full source on GitHub. Review before running.</p>
-        </div>
-        <div class="feature">
-          <div class="feature-icon">📋</div>
-          <h3>Non-destructive</h3>
-          <p>Your original clipboard is restored after every enhancement.</p>
+        <div class="example-body">
+          <div class="example-col">
+            <div class="col-label"><span class="dotred"></span> Rough prompt</div>
+            <div class="rough">I need to give feedback to a teammate their work has been slipping lately don't want to make it awkward</div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotorange"></span> What PromptForge asks</div>
+            <div class="understands">
+              <span class="key">Your relationship?</span><br/>&rarr; Peer<br/><br/>
+              <span class="key">What's actually slipping?</span><br/>&rarr; Communication, responsiveness<br/><br/>
+              <span class="key">What outcome do you want?</span><br/>&rarr; An open conversation
+            </div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotgrn"></span> Enhanced prompt</div>
+<div class="enhanced">Write a short message to a peer teammate to start a conversation about their communication slipping lately: slow replies, missed check-ins, unclear on what they're working on. We're peers, not manager and report, so the tone should be a colleague reaching out, not a performance review. The goal is to open the conversation, not to deliver a verdict. Lead with care, say I noticed something feels off and I wanted to check in before assuming anything. Mention one or two specific recent moments without making a list of grievances. Make space for them to share what's actually going on, work, life, anything. Offer a low-stakes way to talk (coffee, walk, async, whatever they prefer). Under 140 words. Don't lecture. Don't moralize. Don't say "I just want to make sure you're okay" in a way that sounds like a setup. Sign off with {your_name}.</div>
+          </div>
         </div>
       </div>
-    </section>
 
-    <section>
-      <h2>Install</h2>
-      <div class="install-steps">
-        <div>
-          <strong>Download</strong> <a href="https://github.com/Lakshmiyadav65/PromptEnhancer/releases/latest"><code>PromptForge_x64-setup.exe</code></a> (~3 MB) from the latest release.
+      <!-- Example 3: data analysis -->
+      <div class="example">
+        <div class="example-head">
+          <span class="example-num">EX 03</span>
+          <span class="example-type">Data &middot; sales memo</span>
         </div>
-        <div>
-          <strong>Run the installer.</strong> Windows SmartScreen will warn (we're not code-signed yet) — click <strong>"More info" → "Run anyway"</strong>. This is normal for unsigned indie software.
-        </div>
-        <div>
-          <strong>Settings opens automatically</strong> on first launch. Click <strong>"Get a free Groq API key →"</strong>, paste it back into Settings, click <strong>Save</strong>, then <strong>Test Connection</strong>.
-        </div>
-        <div>
-          <strong>You're done.</strong> Type a rough prompt anywhere, select it, press <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>E</kbd>.
+        <div class="example-body">
+          <div class="example-col">
+            <div class="col-label"><span class="dotred"></span> Rough prompt</div>
+            <div class="rough">I got a spreadsheet of last quarters sales boss wants takeaways by tomorrow</div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotorange"></span> What PromptForge asks</div>
+            <div class="understands">
+              <span class="key">What's the audience?</span><br/>&rarr; Just your boss<br/><br/>
+              <span class="key">What kind of takeaways?</span><br/>&rarr; What's working, what's not<br/><br/>
+              <span class="key">Format?</span><br/>&rarr; Short memo
+            </div>
+          </div>
+          <div class="example-col">
+            <div class="col-label"><span class="dotgrn"></span> Enhanced prompt</div>
+<div class="enhanced">Analyze the attached last-quarter sales spreadsheet and write a short memo for my boss highlighting what's working and what isn't. Start by inspecting the data: column names, row count, time range, any obvious data-quality issues, and flag those before drawing conclusions. Then identify the two or three clearest signals of what's working (specific products, channels, segments, or time periods with above-trend performance) and the two or three clearest signals of what isn't (where revenue, conversion, or volume is declining or underperforming). For each finding, cite the specific number from the data, don't generalize. Keep the memo under 250 words, structured as a one-line headline, three "working" bullets, three "not working" bullets, and one closing line on what to look at next. Don't invent numbers, don't extrapolate beyond what the data supports, and flag any finding where the sample size is too small to trust. If anything crucial is missing from the spreadsheet to answer the question well, say so explicitly at the top rather than guessing around it.</div>
+          </div>
         </div>
       </div>
-    </section>
 
-    <section>
-      <h2>Honest limitations</h2>
-      <ul>
-        <li><strong>Windows only.</strong> macOS code paths exist but are untested.</li>
-        <li><strong>Not code-signed.</strong> SmartScreen warning on first launch — see step 2 above.</li>
-        <li><strong>No auto-install of updates.</strong> The app checks GitHub for newer releases but you'll re-run the installer manually.</li>
-        <li><strong>Some apps block synthetic input.</strong> A handful of Electron-wrapped chat panels reject our synthetic <code>Ctrl+C</code> — you'll see a clear error if so. Notepad, Brave, VS Code's chat panels, and most native apps work.</li>
-        <li><strong>The enhancement quality is set by the meta-prompt</strong> at <code>prompts/enhancer-system-prompt.md</code> — currently a placeholder. It works, but it'll get better as we calibrate it on real developer prompts. <a href="https://github.com/Lakshmiyadav65/PromptEnhancer/issues/new">Send us a rough prompt</a> you typed into Claude Code recently to help.</li>
-      </ul>
-    </section>
+    </div>
+  </section>
 
-    <footer>
-      <p>
-        Built by <a href="https://github.com/Lakshmiyadav65">@Lakshmiyadav65</a> · MIT License ·
-        <a href="https://github.com/Lakshmiyadav65/PromptEnhancer">Source on GitHub</a>
-      </p>
-    </footer>
-  </main>
+  <!-- ===================== 4. FAQ ===================== -->
+  <section id="faqs" style="padding-top: 60px;">
+    <div class="eyebrow">Questions</div>
+    <h2>Things people ask <span class="dim">before installing it.</span></h2>
+
+    <div class="faqs">
+
+      <div class="faq">
+        <h4>What does PromptForge do?</h4>
+        <p>It turns rough prompts into precise ones, without you leaving the app you're in. Select any text, hit a hotkey, and the enhanced version is pasted back in place. Works with coding agents (Cursor, Claude Code), chat AIs (ChatGPT, Claude, Gemini), and anywhere else you write prompts.</p>
+      </div>
+
+      <div class="faq">
+        <h4>Does it work for developers?</h4>
+        <p>Yes, and it's where PromptForge shines. Developers add project context once (stack, design system, constraints), and PromptForge uses that context to enhance prompts into agent-executable specs with acceptance criteria, file pointers, and "do not break" rules.</p>
+      </div>
+
+      <div class="faq">
+        <h4>Does it work for non-developers?</h4>
+        <p>Absolutely. For writers, marketers, designers, researchers, founders, PromptForge asks 2 to 4 friendly chip questions to fill in what the AI would otherwise guess. No jargon, no technical setup. Just clearer prompts.</p>
+      </div>
+
+      <div class="faq">
+        <h4>Why does it ask follow-up questions?</h4>
+        <p>Because vague prompts produce vague outputs. Instead of guessing audience, tone, or scope and getting it wrong 30% of the time, PromptForge asks the smallest number of questions that materially change the rewrite, usually 2 or 3, never more than 4. Hold Shift to skip entirely if you want a silent rewrite.</p>
+      </div>
+
+      <div class="faq">
+        <h4>Can I add project context?</h4>
+        <p>Yes. The Project Context panel stores your stack, current feature, design constraints, and business goals once. Every developer prompt after that gets enhanced with full awareness. No need to re-explain your codebase every time.</p>
+      </div>
+
+      <div class="faq">
+        <h4>Is the enhanced prompt ready to paste into AI tools?</h4>
+        <p>That's the whole point. The output is structured (task, context, constraints, acceptance criteria where they belong), placeholder-aware ({your_name}, {request_details}), and free of generic AI filler. Copy it, paste it, send it. Works in any AI tool.</p>
+      </div>
+
+    </div>
+  </section>
+
+</div><!-- /frame -->
+
+<!-- ===================== 5. FINAL CTA ===================== -->
+<div class="final" id="install">
+  <div class="eyebrow">Ready to install</div>
+  <h2>Stop rewriting the same rough prompt <span class="dim">three times in a row.</span></h2>
+  <p class="section-sub">
+    Free forever. Bring your own free Groq key. One binary, one hotkey, zero servers between you and the model.
+  </p>
+  <div class="cta-row">
+    <a class="btn-primary" href="#">
+      Download PromptForge for Windows
+      <span class="kbd">.msi · 18 MB</span>
+    </a>
+    <a class="btn-secondary" href="#">
+      View source on GitHub
+      <svg class="arr" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17 17 7M9 7h8v8"/></svg>
+    </a>
+  </div>
+  <div class="hero-meta" style="margin-top: 28px;">
+    <span><i class="dot"></i> v1.0 · released this week</span>
+    <span>Built with Tauri 2 + Rust</span>
+    <span>MIT licensed</span>
+  </div>
+</div>
+
+<!-- ===================== 6. FOOTER ===================== -->
+<footer>
+  <div>
+    <div class="footer-brand">PromptForge</div>
+    <div class="footer-tag">A system-tray prompt enhancer for people who prompt LLMs more than they email.</div>
+  </div>
+  <div class="col">
+    <h5>Product</h5>
+    <a href="#how">How it works</a>
+    <a href="#examples">Examples</a>
+    <a href="#faqs">FAQs</a>
+    <a href="#install">Download</a>
+  </div>
+  <div class="col">
+    <h5>Resources</h5>
+    <a href="#">Eval protocol</a>
+    <a href="#">Meta-prompt</a>
+    <a href="#">Changelog</a>
+    <a href="#">Report an app</a>
+  </div>
+  <div class="col">
+    <h5>The fine print</h5>
+    <a href="#">MIT license</a>
+    <a href="#">Privacy</a>
+    <a href="#">Built on Groq</a>
+  </div>
+</footer>
+
+<script>
+  // Restart the flow animation cleanly every 17 seconds (13s flow + 4s pause).
+  // CSS uses `forwards` fills so animations stop at end-state; we re-clone
+  // the stage body to force the browser to re-trigger every keyframe at t=0.
+  (function(){
+    const stage = document.querySelector('.flow-stage');
+    if (!stage) return;
+    const FLOW_MS = 13000;   // total flow duration (typing through output settled)
+    const PAUSE_MS = 4000;   // pause before restart
+    const CYCLE_MS = FLOW_MS + PAUSE_MS;
+
+    function restartFlow(){
+      const body = stage.querySelector('.stage-body');
+      if (!body) return;
+      // Hard reset: re-clone the inner so all child animations restart from t=0
+      const parent = body.parentNode;
+      const clone = body.cloneNode(true);
+      parent.replaceChild(clone, body);
+    }
+
+    setInterval(restartFlow, CYCLE_MS);
+  })();
+</script>
+
 </body>
 </html>
