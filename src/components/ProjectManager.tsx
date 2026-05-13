@@ -27,6 +27,8 @@ export function ProjectManager() {
   const [formDesc, setFormDesc] = useState("");
   const [formLinks, setFormLinks] = useState<string[]>([]);
   const [formPath, setFormPath] = useState<string>("");
+  const [formRepoUrl, setFormRepoUrl] = useState<string>("");
+  const [analyzing, setAnalyzing] = useState(false);
   const [newLink, setNewLink] = useState("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -50,6 +52,7 @@ export function ProjectManager() {
     setFormDesc("");
     setFormLinks([]);
     setFormPath("");
+    setFormRepoUrl("");
     setNewLink("");
     setUploadedFiles([]);
     setMsg(null);
@@ -61,10 +64,46 @@ export function ProjectManager() {
     setFormDesc(project.description);
     setFormLinks(project.links || []);
     setFormPath(project.path || "");
+    // Pre-fill the repo-url field if any saved link is a github URL —
+    // saves the user from re-typing it when editing.
+    const githubLink = (project.links || []).find((l) =>
+      /^(https?:\/\/(www\.)?)?github\.com\//i.test(l.trim()),
+    );
+    setFormRepoUrl(githubLink || "");
     setNewLink("");
     setUploadedFiles([]);
     setMsg(null);
     setFormMode({ type: "edit", project });
+  }
+
+  async function handleAnalyzeRepo() {
+    const url = formRepoUrl.trim();
+    if (!url) return;
+    setAnalyzing(true);
+    setMsg(null);
+    try {
+      const analyzed = await invoke<{
+        name: string;
+        description: string;
+        default_branch: string;
+        html_url: string;
+      }>("analyze_github_repo", { url });
+      // Always overwrite name; analyzed value wins. The user can still
+      // edit it before saving.
+      setFormName(analyzed.name);
+      // Description: replace only if empty, otherwise append. Avoids
+      // silently destroying notes the user already wrote.
+      setFormDesc((prev) => (prev.trim() ? `${prev}\n\n${analyzed.description}` : analyzed.description));
+      // Add the canonical html_url to links if not already present.
+      setFormLinks((prev) =>
+        prev.some((l) => l.trim() === analyzed.html_url) ? prev : [...prev, analyzed.html_url],
+      );
+      setMsg({ ok: true, text: `Analyzed ${analyzed.name}. Review and edit before saving.` });
+    } catch (e) {
+      setMsg({ ok: false, text: String(e) });
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   async function handleBrowseDirectory() {
@@ -291,6 +330,33 @@ export function ProjectManager() {
               </div>
             )}
 
+            <label>Repo URL <span className="pm-optional">(paste & analyze to auto-fill)</span></label>
+            <div className="pm-path-row">
+              <input
+                type="text"
+                placeholder="https://github.com/owner/repo"
+                value={formRepoUrl}
+                onChange={(e) => setFormRepoUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleAnalyzeRepo();
+                  }
+                }}
+                disabled={busy || analyzing}
+                className="pm-path-input"
+                autoFocus
+              />
+              <button
+                className="pm-link-add-btn"
+                onClick={() => void handleAnalyzeRepo()}
+                disabled={busy || analyzing || !formRepoUrl.trim()}
+                type="button"
+              >
+                {analyzing ? "Analyzing…" : "Analyze"}
+              </button>
+            </div>
+
             <label>Project Name</label>
             <input
               type="text"
@@ -298,7 +364,6 @@ export function ProjectManager() {
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               disabled={busy}
-              autoFocus
             />
 
             <label>Project Directory <span className="pm-optional">(optional)</span></label>

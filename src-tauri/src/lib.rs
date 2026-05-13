@@ -10,6 +10,7 @@ mod command_bar;
 mod developer_enhance;
 mod enhance;
 mod generation;
+mod github_analyze;
 mod hotkey;
 mod project_scan;
 mod projects;
@@ -108,6 +109,7 @@ pub fn run() {
             command_bar::show_command_bar,
             command_bar::hide_command_bar,
             command_bar::open_main_window,
+            github_analyze::analyze_github_repo,
         ])
         .setup(|app| {
             let user_settings = settings::load(app.handle());
