@@ -7,7 +7,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use crate::question_bank::{
     detect_domain, static_questions_for, GeneratedQuestion, ImpactDimension,
 };
-use crate::{clipboard, enhance, generation};
+use crate::{clipboard, generation, pipeline, tray};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QuestionAnswer {
@@ -134,9 +134,20 @@ pub async fn submit_question_card_answers(
         combined_input.len()
     );
 
-    let enhanced = enhance::enhance_prompt(&app, &combined_input)
+    // Step 9 rewire: the [CONTEXT] envelope is sent through the new
+    // pipeline as raw_input. Stages A, C, and E still apply — the
+    // envelope just looks like a longer input. `active_app` is set to
+    // the sentinel "clarify" because by submit time the user is on the
+    // card window, not their original target app.
+    let pi = pipeline::PipelineInput {
+        raw_input: combined_input,
+        active_app: "clarify".to_string(),
+        context: None,
+    };
+    let output = pipeline::run(&app, pi)
         .await
-        .map_err(|e| format!("enhancement failed: {e:#}"))?;
+        .map_err(|e| format!("pipeline failed: {e:#}"))?;
+    let enhanced = output.final_text.clone();
 
     // Record successful answers in session-scoped memory (PRD §5.1.6).
     // Empty answers are ignored — leaving a dimension blank should not
@@ -163,9 +174,17 @@ pub async fn submit_question_card_answers(
         .await
         .map_err(|e| format!("paste failed: {e}"))?;
 
+    if output.used_fallback {
+        if let Some(reason) = &output.fallback_reason {
+            tray::notify_fallback(&app, reason);
+        }
+    }
+
     println!(
-        "[latency] submit→pasted={}ms (PRD §12 latency budget for the enhance call is 1.5–3s)",
-        t_submit.elapsed().as_millis()
+        "[latency] submit→pasted={}ms route={} fallback={} (PRD §12 budget 1.5–3s)",
+        t_submit.elapsed().as_millis(),
+        output.trace.route,
+        output.used_fallback,
     );
     Ok(())
 }

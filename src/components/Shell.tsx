@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
+import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
@@ -71,6 +72,8 @@ export function Shell({ initial }: { initial: Route }) {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [toggling, setToggling] = useState(false);
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
+  const usage = useEnhancementUsage();
+  const usagePct = Math.min(100, Math.round((usage.used / usage.limit) * 100));
 
   useEffect(() => {
     invoke<string>("get_hotkey").then(setHotkey).catch(() => {});
@@ -191,6 +194,31 @@ export function Shell({ initial }: { initial: Route }) {
         </nav>
 
         <div className="pf-sidebar-bottom">
+          {/* Daily enhancement quota — frontend-only counter persisted
+              in localStorage, resets on the local date change. Sits
+              above the listening card per design. */}
+          <div className={`pf-usage-card ${usage.limitReached ? "limit-reached" : ""}`}>
+            <div className="pf-usage-head">
+              <span className="pf-usage-label">Enhancements</span>
+              <span className="pf-usage-count">
+                <strong>{usage.used}</strong>
+                <span className="pf-usage-sep">/</span>
+                {usage.limit}
+              </span>
+            </div>
+            <div className="pf-usage-bar" aria-hidden="true">
+              <div
+                className="pf-usage-bar-fill"
+                style={{ width: `${usagePct}%` }}
+              />
+            </div>
+            <div className="pf-usage-hint">
+              {usage.limitReached
+                ? "Daily enhancement limit reached."
+                : "Daily limit"}
+            </div>
+          </div>
+
           <div className={`pf-listening-card ${enabled && ready ? "live" : ""}`}>
             <div className="pf-listening-row">
               <span className="pf-listening-dot" />

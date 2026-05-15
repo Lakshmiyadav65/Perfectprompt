@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import "./ClarifyPopup.css";
 
 interface Question {
@@ -16,6 +17,7 @@ export function ClarifyPopup() {
   const [loading, setLoading] = useState<boolean>(true);
   const [enhancing, setEnhancing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const usage = useEnhancementUsage();
   const appWindow = getCurrentWebviewWindow();
 
   useEffect(() => {
@@ -80,7 +82,12 @@ export function ClarifyPopup() {
 
   const handleSubmit = async () => {
     if (enhancing) return;
-    
+    // Frontend-only daily quota gate. Increment fires on success.
+    if (usage.limitReached) {
+      setError("Daily enhancement limit reached.");
+      return;
+    }
+
     // Format answers
     const formattedAnswers = questions.map(q => {
       const answer = answers[q.id];
@@ -96,8 +103,9 @@ export function ClarifyPopup() {
         prompt,
         answers: formattedAnswers
       });
+      usage.increment();
       // The backend handles hiding the window after pasting
-      
+
       // Reset state for next time
       setTimeout(() => {
         setQuestions([]);
@@ -113,7 +121,8 @@ export function ClarifyPopup() {
   };
 
   // Ensure all questions have an option selected, or if 'Other' is selected, text is provided.
-  const isSubmitDisabled = questions.length === 0 || questions.some((q) => {
+  // Also disabled when the daily frontend quota is hit.
+  const isSubmitDisabled = usage.limitReached || questions.length === 0 || questions.some((q) => {
     const ans = answers[q.id];
     if (!ans || !ans.option) return true;
     if (ans.option === "Other" && !ans.otherText.trim()) return true;

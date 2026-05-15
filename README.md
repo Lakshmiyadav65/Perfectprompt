@@ -147,17 +147,24 @@ src-tauri/src/
 ├── tray.rs                          ← Phase 1: system tray icon + menu
 ├── hotkey.rs                        ← Phase 2: registers main combo AND Shift-bypass combo
 ├── clipboard.rs                     ← Phase 3: capture/replace via Win32 SendInput
-├── enhance.rs                       ← Phase 4: Groq enhancement call + meta-prompt loader
-├── status_window.rs                 ← Phase 5: position pill near cursor
-├── settings.rs                      ← Phase 6: persist & expose Tauri commands
-├── question_bank.rs                 ← Phase 7: domain classifier + complexity scorer + static bank
-├── generation.rs                    ← Phase 7: parallel LLM question generation (llama-3.1-8b)
-└── clarify.rs                       ← Phase 7: question-card IPC + [CONTEXT] block assembly
+├── enhance.rs                       ← single LLM call (call_llm), bundled prompt loader
+├── pipeline.rs                      ← orchestrator — Stages A→B→C→D→E→F
+├── intake.rs                        ← Stage A: normalize, length gate, adversarial regex
+├── cache.rs                         ← Stage B: LRU keyed on intake fingerprint
+├── router.rs                        ← Stage C: domain + complexity + ambiguity → route
+├── validate.rs                      ← Stage E: strip preambles/fences, reject bad output
+├── trace.rs                         ← Stage F: JSONL log to <app_data>/traces/YYYY-MM-DD.jsonl
+├── status_window.rs                 ← position pill near cursor
+├── settings.rs                      ← persist & expose Tauri commands
+├── question_bank.rs                 ← domain classifier + complexity scorer + static bank
+├── generation.rs                    ← parallel LLM question generation (llama-3.1-8b)
+└── clarify.rs                       ← question-card IPC + [CONTEXT] block assembly
 
 prompts/
-└── enhancer-system-prompt.md        ← THE PRODUCT — shared meta-prompt for both LLM calls
-                                      ("Question Generation Mode" + "Context Integration"
-                                      branches based on user-message tags — PRD §8)
+├── code-enhancer.md                 ← system prompt for the Code route (~340 words)
+├── writing-enhancer.md              ← system prompt for the Writing route (~390 words)
+├── generic-enhancer.md              ← system prompt for the Generic route (~290 words)
+└── questions-system-prompt.md       ← dedicated prompt for parallel question generation
 ```
 
 ### The capture/replace pipeline
@@ -175,7 +182,7 @@ When the user presses the hotkey:
 
 2. **Show indicator (`status_window.rs`)** — show the "Enhancing…" pill near the cursor. Window is hidden until needed.
 
-3. **Enhance (`enhance.rs`)** — POST to Groq's OpenAI-compatible endpoint with the meta-prompt as the system message and the captured text as the user message. 30s timeout.
+3. **Pipeline (`pipeline.rs`)** — runs the six-stage pipeline (intake → cache → router → LLM → validate → deliver). The LLM stage is a single call via `enhance.rs::call_llm` to Groq's OpenAI-compatible endpoint with a route-specific system prompt and the captured text wrapped in `<input>` tags. 30s timeout.
 
 4. **Replace (`clipboard.rs::replace_selection`)** — write the enhanced text to the clipboard and synthesize Ctrl+V.
 
@@ -229,15 +236,21 @@ The `.env` file overrides the saved API key when both are set — useful for dev
 
 ---
 
-## The meta-prompt
+## The system prompts
 
-The actual *product* is `prompts/enhancer-system-prompt.md`. Everything else is plumbing. The same file drives both LLM calls in the Smart Question Engine:
+The actual *product* lives in `prompts/`. Everything else is plumbing.
 
-- **Default mode** (no tags): enhancement — rewrite the user's rough prompt per the Rules section and the Examples.
-- **`[GENERATE_QUESTIONS]` tag** in the user message: emit a single JSON object `{"questions": [...]}` with 2–4 distinct-impact_dimension clarifying questions. The small `llama-3.1-8b-instant` model runs this branch in parallel with the card mount.
-- **`[CONTEXT]` block** in the user message: treat the lines under `User-provided context:` as hard requirements, never echo the block back, focus the rewrite on the `Original input:` line. The `llama-3.3-70b-versatile` model runs this branch when the card submits.
+Three route-specific prompts (one is loaded per LLM call by the orchestrator, based on the router's decision):
 
-The current version is a **placeholder** — derived from imagined examples, not from real developer prompts. It works, but the quality ceiling is set by this file. Once we have 5–10 real prompts that real users typed into Claude Code / Cursor, the meta-prompt should be rewritten using those as ground truth. [docs/eval-protocol.md](docs/eval-protocol.md) is the script to validate any rewrite empirically.
+- **`prompts/code-enhancer.md`** — Code route. Rewrites rough coding requests into precise prompts for a coding agent. Tightens explicit asks; redirects vague verbs to "investigate first". Never invents filenames, libraries, or APIs.
+- **`prompts/writing-enhancer.md`** — Writing route (emails, blog posts, tweets). Dominant rule: placeholder discipline. Missing facts (`{recipient_name}`, `{reasons_team_chose_postgres}`, `{company_one_liner}`) stay as placeholders rather than getting invented.
+- **`prompts/generic-enhancer.md`** — catch-all route (summarise, translate, explain). Critical rule: never *perform* the task; only rewrite the request as a spec.
+
+Plus one prompt for the parallel question-generation call:
+
+- **`prompts/questions-system-prompt.md`** — emits 2–4 clarifying-question JSON for the question-card. Loaded by `generation.rs`; out of scope for the enhancement pipeline.
+
+The Step 7 conflict resolution between the brief's "delete the old meta-prompt" rule and the "don't touch the parallel question-gen call" rule produced this dedicated questions prompt. See `docs/migration-report.md` for the full decision trail. [docs/eval-protocol.md](docs/eval-protocol.md) is the script to validate any rewrite empirically.
 
 ---
 

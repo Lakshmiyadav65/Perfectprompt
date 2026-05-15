@@ -4,6 +4,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 mod active_app;
 mod app_classifier;
+mod cache;
 mod clarify;
 mod clipboard;
 mod command_bar;
@@ -13,13 +14,18 @@ mod foreground_tracker;
 mod generation;
 mod github_analyze;
 mod hotkey;
+pub mod intake;
+mod pipeline;
 mod project_scan;
 mod projects;
 mod question_bank;
+pub mod router;
 mod settings;
 mod status_window;
+mod trace;
 mod tray;
 mod updater;
+pub mod validate;
 
 /// Receiver for the in-flight question-generation LLM call. The hotkey
 /// pipeline fires the call immediately after capture and stores the
@@ -37,6 +43,10 @@ pub struct AppState {
     /// `ImpactDimension::as_str()` (e.g. "tone", "audience"). Lives only as
     /// long as the tray process; persistent memory is a V2 feature.
     pub remembered_answers: std::sync::Mutex<HashMap<String, String>>,
+    /// Stage B of the enhancement pipeline — keyed on the Stage A
+    /// fingerprint, so identical input + active-app skips the LLM.
+    /// Wired in at Step 8 (pipeline::run()).
+    pub cache: cache::EnhancementCache,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -50,6 +60,7 @@ pub fn run() {
             pending_prompt: std::sync::Mutex::new(String::new()),
             pending_questions: std::sync::Mutex::new(None),
             remembered_answers: std::sync::Mutex::new(HashMap::new()),
+            cache: cache::EnhancementCache::default(),
         })
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PromptForge is already running,

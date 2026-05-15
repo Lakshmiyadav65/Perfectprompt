@@ -5,7 +5,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Runtime};
 
-use crate::enhance::{load_api_key, load_meta_prompt};
+use crate::enhance::{load_api_key, load_prompt};
 use crate::question_bank::{Domain, GeneratedQuestion, ImpactDimension, QuestionType};
 
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
@@ -100,11 +100,14 @@ pub async fn generate_questions_via_llm<R: Runtime>(
     domain: Domain,
 ) -> Result<Vec<GeneratedQuestion>> {
     let api_key = load_api_key(app)?;
-    // Same meta-prompt as enhancement (PRD §8). The model branches on the
-    // `[GENERATE_QUESTIONS]` tag in the user message — see the "Question
-    // Generation Mode" section in prompts/enhancer-system-prompt.md.
-    let system_prompt = load_meta_prompt(app)
-        .context("failed to load meta-prompt for question generation")?;
+    // Migration Step 7 (option 3 of the conflict resolution): a dedicated
+    // question-generation prompt replaces the shared meta-prompt. The
+    // `[GENERATE_QUESTIONS]` tag in the user message is now redundant
+    // (the system prompt is solely about question generation) but is
+    // kept inline for compatibility with the existing user-message
+    // shape — the parallel call's design is out of scope here.
+    let system_prompt = load_prompt(app, "questions-system-prompt.md")
+        .context("failed to load questions-system-prompt for question generation")?;
 
     let user_message = format!(
         "[GENERATE_QUESTIONS]\nDetected domain: {:?}\n\nInput:\n{}",

@@ -1,7 +1,7 @@
 use tauri::{
     menu::{Menu, MenuItem},
     tray::{TrayIconBuilder, TrayIconEvent},
-    AppHandle, Manager, Runtime,
+    AppHandle, Emitter, Manager, Runtime,
 };
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
@@ -67,6 +67,32 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .build(app)?;
 
     Ok(())
+}
+
+/// Step 10: announce a pipeline fallback to the user.
+///
+/// V1 surfaces it via two channels because the brief disallows
+/// changes to the React frontend and doesn't authorise a new
+/// notification dependency:
+///   1. a `pipeline:fallback` Tauri event (a future frontend toast
+///      can listen without us shipping one today);
+///   2. a transient tray-icon tooltip update (~1.5 s) so the hover
+///      surface reflects the most recent fallback reason.
+///
+/// Also logs to stderr. Never blocks the calling pipeline.
+pub fn notify_fallback<R: Runtime>(app: &AppHandle<R>, message: &str) {
+    let _ = app.emit("pipeline:fallback", message.to_string());
+    println!("[fallback] {message}");
+    if let Some(tray) = app.tray_by_id("main-tray") {
+        let _ = tray.set_tooltip(Some(message));
+        let app2 = app.clone();
+        let _ = tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            if let Some(t) = app2.tray_by_id("main-tray") {
+                let _ = t.set_tooltip(Some("PromptForge"));
+            }
+        });
+    }
 }
 
 /// Show the main window and navigate it to the requested hash route. The

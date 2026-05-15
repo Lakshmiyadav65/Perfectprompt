@@ -11,13 +11,17 @@ use crate::{clipboard, projects, settings};
 const ENV_VAR: &str = "GROQ_API_KEY";
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL: &str = "llama-3.3-70b-versatile";
-const MAX_TOKENS: u32 = 1024;
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
+/// Single-temperature chat-completion request. The orchestrator at
+/// Stage D sets a route-specific value (Code 0.3 / Writing 0.6 /
+/// Generic 0.4); `generate_clarifying_questions` uses `ChatRequestJson`
+/// instead and remains out of scope for this migration.
 #[derive(Serialize)]
 struct ChatRequest<'a> {
     model: &'a str,
     max_tokens: u32,
+    temperature: f32,
     messages: Vec<Message<'a>>,
 }
 
@@ -74,21 +78,32 @@ struct ResponseMessage {
     content: Option<String>,
 }
 
-pub async fn enhance_prompt<R: Runtime>(app: &AppHandle<R>, input: &str) -> Result<String> {
+/// Make a single Groq chat-completion call with explicit knobs. Returns
+/// the raw choice content with no trimming, no fence stripping, no
+/// validation — Stage E of the pipeline owns all of that. The brief
+/// names this the single LLM call of the new architecture; everything
+/// else around it is deterministic Rust.
+pub async fn call_llm<R: Runtime>(
+    app: &AppHandle<R>,
+    system_prompt: &str,
+    user_message: &str,
+    max_tokens: u32,
+    temperature: f32,
+) -> Result<String> {
     let api_key = load_api_key(app)?;
-    let system_prompt = load_meta_prompt(app)?;
 
     let body = ChatRequest {
         model: MODEL,
-        max_tokens: MAX_TOKENS,
+        max_tokens,
+        temperature,
         messages: vec![
             Message {
                 role: "system",
-                content: &system_prompt,
+                content: system_prompt,
             },
             Message {
                 role: "user",
-                content: input,
+                content: user_message,
             },
         ],
     };
@@ -123,10 +138,9 @@ pub async fn enhance_prompt<R: Runtime>(app: &AppHandle<R>, input: &str) -> Resu
         .into_iter()
         .next()
         .and_then(|c| c.message.content)
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
         .ok_or_else(|| anyhow!("API response had no text content"))
 }
+
 
 #[tauri::command]
 pub fn get_pending_prompt(app: tauri::AppHandle) -> String {
@@ -239,20 +253,36 @@ pub async fn submit_answers_and_enhance(app: tauri::AppHandle, prompt: String, a
         };
         
         let combined_input = format!("Original Prompt: {}\n\nUser Clarifications:\n{}{}", prompt, answers_text, project_context);
-        
-        let enhanced = enhance_prompt(app, &combined_input).await?;
-        
+
+        // Step 9 rewire: route through the new pipeline. The envelope
+        // is passed as raw_input; Stages A, C, and E still apply. The
+        // older ClarifyPopup invokes this command; the newer
+        // QuestionCard uses clarify::submit_question_card_answers.
+        // Both paths now share the same orchestrator.
+        let pi = crate::pipeline::PipelineInput {
+            raw_input: combined_input,
+            active_app: "clarify".to_string(),
+            context: None,
+        };
+        let output = crate::pipeline::run(app, pi).await?;
+
         // Hide window BEFORE pasting so the OS restores focus to the user's target app
         if let Some(window) = app.get_webview_window("clarify") {
             let _ = window.hide();
             // Small delay to let the OS switch focus back to the previous window
             tokio::time::sleep(Duration::from_millis(150)).await;
         }
-        
-        clipboard::replace_selection(app, &enhanced)
+
+        clipboard::replace_selection(app, &output.final_text)
             .await
             .map_err(|e| anyhow!("replace failed: {e}"))?;
-            
+
+        if output.used_fallback {
+            if let Some(reason) = &output.fallback_reason {
+                crate::tray::notify_fallback(app, reason);
+            }
+        }
+
         Ok(())
     }
 
@@ -281,73 +311,19 @@ pub(crate) fn load_api_key<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
     ))
 }
 
-pub(crate) fn load_meta_prompt<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
-    let path = resolve_prompt_path(app)?;
+/// Load a bundled prompt file by its bare filename
+/// (e.g. `"code-enhancer.md"`). Used by the orchestrator's Stage D to
+/// pick the route-specific system prompt, and by `generation.rs` to
+/// load the dedicated questions prompt.
+pub(crate) fn load_prompt<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<String> {
+    let path = resolve_prompt_path(app, name)?;
     std::fs::read_to_string(&path)
-        .with_context(|| format!("failed to read meta-prompt from {}", path.display()))
+        .with_context(|| format!("failed to read prompt {name} from {}", path.display()))
 }
 
-fn resolve_prompt_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf> {
+fn resolve_prompt_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<PathBuf> {
     app.path()
-        .resolve(
-            "prompts/enhancer-system-prompt.md",
-            BaseDirectory::Resource,
-        )
-        .context("failed to resolve meta-prompt resource path")
+        .resolve(format!("prompts/{name}"), BaseDirectory::Resource)
+        .with_context(|| format!("failed to resolve prompt resource {name}"))
 }
 
-#[cfg(test)]
-mod meta_prompt_tests {
-    /// Compile-time snapshot of the shipped meta-prompt. Picks up changes
-    /// on rebuild so these tests fail loudly if PRD §8's mode sections are
-    /// accidentally deleted or renamed.
-    const META_PROMPT: &str = include_str!("../../prompts/enhancer-system-prompt.md");
-
-    #[test]
-    fn meta_prompt_contains_question_generation_mode_section() {
-        assert!(
-            META_PROMPT.contains("## Question Generation Mode"),
-            "missing PRD §8 Addition 1 — Question Generation Mode section"
-        );
-        assert!(
-            META_PROMPT.contains("[GENERATE_QUESTIONS]"),
-            "Question Generation Mode section must reference the [GENERATE_QUESTIONS] tag"
-        );
-        assert!(
-            META_PROMPT.contains("\"questions\""),
-            "schema must mention the questions array key"
-        );
-    }
-
-    #[test]
-    fn meta_prompt_contains_context_integration_section() {
-        assert!(
-            META_PROMPT.contains("## Context Integration"),
-            "missing PRD §8 Addition 2 — Context Integration section"
-        );
-        assert!(
-            META_PROMPT.contains("[CONTEXT]") && META_PROMPT.contains("[/CONTEXT]"),
-            "Context Integration section must reference the [CONTEXT] / [/CONTEXT] tags"
-        );
-        assert!(
-            META_PROMPT.contains("Never echo"),
-            "Context Integration must instruct the model not to leak block contents"
-        );
-    }
-
-    #[test]
-    fn meta_prompt_enforces_mcq_only_generation() {
-        // The LLM-generated path must always pick chips/single_select so users
-        // get clickable options instead of free-text inputs. free_text and
-        // multi_select are still valid types in the schema (used by the static
-        // bank for Analysis "context") but the LLM must not emit them.
-        assert!(
-            META_PROMPT.contains("**Always** use `chips`"),
-            "Question Generation Mode is missing the 'Always use chips' MCQ-only directive"
-        );
-        assert!(
-            META_PROMPT.contains("**Never** emit `free_text`"),
-            "Question Generation Mode is missing the 'Never emit free_text' MCQ-only directive"
-        );
-    }
-}

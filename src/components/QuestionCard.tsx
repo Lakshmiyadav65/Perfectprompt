@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
+import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import "./QuestionCard.css";
 
 type QuestionType = "single_select" | "multi_select" | "free_text" | "chips";
@@ -50,6 +51,7 @@ export function QuestionCard() {
   const [state, setState] = useState<CardState>("loading");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<"idle" | "copied">("idle");
+  const usage = useEnhancementUsage();
   const appWindow = getCurrentWebviewWindow();
   // Guards against StrictMode running the effect twice in dev. The Rust-side
   // pending_questions receiver is one-shot — if the second effect fire also
@@ -127,6 +129,13 @@ export function QuestionCard() {
 
   const handleSubmit = async () => {
     if (state === "submitting" || state === "loading") return;
+    // Frontend-only daily quota — refuse to submit when the local
+    // counter has hit the limit. Increment happens on success below.
+    if (usage.limitReached) {
+      setErrorMsg("Daily enhancement limit reached.");
+      setState("error");
+      return;
+    }
     setState("submitting");
     setErrorMsg(null);
 
@@ -147,6 +156,7 @@ export function QuestionCard() {
 
     try {
       await invoke("submit_question_card_answers", { answers: payload });
+      usage.increment();
       await appWindow.hide();
     } catch (err) {
       setErrorMsg(String(err));
@@ -230,13 +240,16 @@ export function QuestionCard() {
         <button
           className="qc-primary"
           onClick={() => void handleSubmit()}
-          disabled={state === "loading" || state === "submitting"}
+          disabled={state === "loading" || state === "submitting" || usage.limitReached}
+          title={usage.limitReached ? "Daily enhancement limit reached." : undefined}
         >
-          {state === "submitting"
-            ? "Enhancing…"
-            : state === "error"
-              ? "Retry"
-              : "Enhance Now →"}
+          {usage.limitReached
+            ? "Daily limit reached"
+            : state === "submitting"
+              ? "Enhancing…"
+              : state === "error"
+                ? "Retry"
+                : "Enhance Now →"}
         </button>
       </footer>
     </div>

@@ -11,9 +11,15 @@
 }
 
 .ph-main-inner {
-  padding: 36px 40px 60px;
+  padding: 36px 48px 60px;
   min-width: 0;
-  max-width: 1080px;
+  /* 1360px is the sweet spot: on a 1920px viewport (sidebar = 232px,
+     main pane = 1688px) the inner block uses ~80% of available width
+     and the auto-margins leave a balanced gutter on both sides.
+     Bumped from 1080px — the old value left a ~600px void on the
+     right at common monitor sizes. */
+  max-width: 1360px;
+  margin: 0 auto;
 }
 
 /* ---------- shared bits ---------- */
@@ -131,6 +137,58 @@
   margin-top: 22px;
 }
 
+/* ---------- hero-area setup card (top-right) ---------- */
+
+.ph-setup-card {
+  /* Stretch to match hero-text height so the card visually occupies
+     the whole right column of the hero row. Without stretch, the row's
+     `align-items: flex-end` would shrink the card to its content
+     height and pin it to the bottom edge of the hero. */
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  width: 320px;
+  max-width: 100%;
+  padding: 22px;
+  background:
+    radial-gradient(120% 90% at 100% 0%, rgba(255, 122, 77, 0.06), transparent 55%),
+    var(--pf-surface);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 14px;
+  position: relative;
+}
+.ph-setup-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--pf-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pf-accent);
+  margin-bottom: 12px;
+}
+.ph-setup-title {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  line-height: 1.15;
+  color: var(--pf-text);
+  letter-spacing: -0.01em;
+  margin-bottom: 8px;
+}
+.ph-setup-sub {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pf-text-muted);
+  margin: 0 0 16px;
+}
+.ph-setup-cta {
+  /* Pin the CTA to the bottom-left of the card regardless of body
+     height — keeps the action anchored as the hero grows/shrinks. */
+  margin-top: auto;
+  align-self: flex-start;
+}
+
 /* ---------- keyboard pills ---------- */
 
 .ph-keypair { display: inline-flex; align-items: center; gap: 4px; }
@@ -161,6 +219,10 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
+  /* 40px top gives the demo card breathing room before the status
+     cards begin — matches the rhythm `.ph-recent-section` already uses
+     for the section break below. */
+  margin-top: 40px;
   margin-bottom: 32px;
 }
 .ph-strip-card {
@@ -282,283 +344,414 @@
   border-color: var(--pf-accent-strong);
 }
 
-.ph-demo-body {
+/* =========================================================
+   FLOW-STAGE animation — ported from docs/index.html
+   ("promptforge · live flow"). Timings/easing match the
+   website exactly; sizes/paddings scaled to fit this card.
+   Master cycle: 13s flow + 4s pause = 17s (Home.tsx re-keys
+   .ph-stage-body to restart the keyframes).
+   ========================================================= */
+
+.ph-stage-progress {
+  margin-left: auto;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.ph-pdot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+.ph-pdot.p1 { animation: ph-dot-on 0.3s ease 0.5s forwards; }
+.ph-pdot.p2 { animation: ph-dot-on 0.3s ease 3.3s forwards; }
+.ph-pdot.p3 { animation: ph-dot-on 0.3s ease 4.6s forwards; }
+.ph-pdot.p4 { animation: ph-dot-on 0.3s ease 7.9s forwards; }
+@keyframes ph-dot-on {
+  to {
+    background: var(--pf-accent);
+    box-shadow: 0 0 7px var(--pf-accent-glow);
+  }
+}
+
+.ph-stage-body {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.3fr;
-  min-height: 220px;
+  grid-template-columns: 1.05fr 1.1fr 1.35fr;
+  min-height: 260px;
   position: relative;
 }
-.ph-demo-pane {
-  padding: 18px 20px;
+.ph-stage-pane {
+  position: relative;
+  padding: 16px 18px;
   border-right: 1px solid var(--pf-line);
-  position: relative;
 }
-.ph-demo-pane:last-child { border-right: none; }
-.ph-pane-num {
+.ph-stage-pane:last-child { border-right: none; }
+
+.ph-pane-label {
   font-family: var(--pf-font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
   color: var(--pf-accent);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
   display: flex;
   align-items: center;
   gap: 7px;
 }
-.ph-pane-num .ncircle {
-  width: 16px;
-  height: 16px;
+.ph-pane-label .num {
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   border: 1px solid var(--pf-accent-strong);
   background: var(--pf-accent-soft);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  font-size: 8.5px;
   color: var(--pf-accent);
   font-weight: 500;
 }
 
-/* ----- typing animation in pane 1 ----- */
+/* ----- pane 1: rough input ----- */
 
-.ph-rough-text {
+.ph-rough-editor {
   font-family: var(--pf-font-mono);
-  font-size: 13px;
-  color: var(--pf-text-muted);
+  font-size: 10.5px;
   line-height: 1.6;
-  margin-bottom: 16px;
-  min-height: 24px;
-  position: relative;
+  color: var(--pf-text-muted);
 }
-.ph-rough-text .typed {
+.ph-rough-editor .line { display: block; }
+.ph-typed {
   display: inline-block;
-  overflow: hidden;
-  white-space: nowrap;
-  vertical-align: bottom;
   border-right: 2px solid transparent;
-  width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  vertical-align: bottom;
   animation:
-    ph-type-out 1.8s steps(20, end) 0.4s forwards,
-    ph-caret-blink 0.6s steps(1) 0.4s 4,
-    ph-caret-hide 0.01s 2.2s forwards;
+    ph-typing 2.4s steps(43, end) 0.5s forwards,
+    ph-caret 0.7s steps(1, end) 0.5s 4,
+    ph-caret-off 0s 3.5s forwards;
 }
-@keyframes ph-type-out {
-  from { width: 0; }
-  to   { width: 20ch; }
-}
-@keyframes ph-caret-blink {
-  50% { border-right-color: var(--pf-accent); }
-}
-@keyframes ph-caret-hide {
-  to { border-right-color: transparent; }
-}
-.ph-rough-text .selbox {
+@keyframes ph-typing { from { width: 0; } to { width: 43ch; } }
+@keyframes ph-caret  { 50% { border-right-color: var(--pf-accent); } }
+@keyframes ph-caret-off { to { border-right-color: transparent; } }
+
+.ph-selection-wrap {
+  position: relative;
   display: inline-block;
-  padding: 1px 4px;
+  padding: 2px 4px;
   margin-left: -4px;
   border-radius: 3px;
-  background: transparent;
-  box-shadow: 0 0 0 0 transparent;
-  color: var(--pf-text-muted);
-  animation: ph-select-on 0.45s ease 2.6s forwards;
+  animation: ph-select-on 0.35s ease 3.3s forwards;
 }
 @keyframes ph-select-on {
-  0% {
-    background: transparent;
-    box-shadow: 0 0 0 0 transparent;
-    color: var(--pf-text-muted);
-  }
-  100% {
+  to {
     background: var(--pf-accent-soft);
     box-shadow: 0 0 0 1px var(--pf-accent-strong);
     color: var(--pf-text);
   }
 }
 
-.ph-mini-hotkey {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 9px 11px;
+.ph-hotkey-card {
+  margin-top: 22px;
+  padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--pf-line-strong);
-  border-radius: 8px;
-  transition: border-color 0.25s ease, box-shadow 0.25s ease;
-  /* 8s cycle: "press" lights up the hotkey at ~3.0s, right after the
-     selection in pane 1 finishes at 2.6s — so the eye reads "select → press
-     → questions appear → output streams in" as a single flow. */
-  animation: ph-hotkey-glow 8s ease 0s forwards;
+  border-radius: 9px;
+  opacity: 0;
+  transform: translateY(8px);
 }
-@keyframes ph-hotkey-glow {
-  0%, 35% {
-    border-color: var(--pf-line-strong);
-    box-shadow: 0 0 0 0 transparent;
-  }
-  40%, 100% {
-    border-color: var(--pf-accent-strong);
-    box-shadow: 0 0 18px var(--pf-accent-soft);
-  }
+.ph-hotkey-card.fires {
+  animation: ph-pane-fade-in 0.5s ease 3.3s forwards;
 }
-.ph-mini-hotkey .ph-kbd {
-  animation: ph-key-press 8s ease 0s forwards;
-}
-@keyframes ph-key-press {
-  0%, 35% {
-    background: rgba(255, 255, 255, 0.06);
-    color: var(--pf-text);
-    border-color: var(--pf-line-strong);
-    box-shadow: none;
-    transform: translateY(0);
-  }
-  40%, 100% {
-    background: var(--pf-accent);
-    color: var(--pf-bg-2);
-    border-color: var(--pf-accent);
-    box-shadow: 0 0 10px var(--pf-accent-glow);
-    transform: translateY(1px);
-  }
-}
-.ph-mini-hotkey .mhlbl {
+.ph-hlabel {
   font-family: var(--pf-font-mono);
   font-size: 9.5px;
   color: var(--pf-text-subtle);
-  margin-right: 4px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.05em;
+  margin-bottom: 7px;
+}
+.ph-hotkey-keys {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ph-hotkey-keypair {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.ph-hkey {
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.06);
+  padding: 3px 7px;
+  border-radius: 5px;
+  color: var(--pf-text);
+  transition: all 0.2s ease;
+  /* Every hkey lights up at the same instant (t=4.0s) — the website
+     applies the keyframe selectively to k1/k2/k3, but at scale a unified
+     press reads as "the user just hit the chord". */
+  animation: ph-key-press 0.7s ease 4.0s forwards;
+}
+@keyframes ph-key-press {
+  0%, 100% {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--pf-text);
+    transform: translateY(0);
+    box-shadow: none;
+  }
+  30%, 70% {
+    background: var(--pf-accent);
+    color: var(--pf-bg-2);
+    box-shadow: 0 0 14px var(--pf-accent-glow);
+    transform: translateY(1px);
+  }
+}
+.ph-hkey-plus { color: var(--pf-text-subtle); font-size: 10px; }
+
+/* ----- pane connectors (orange dots between panes) ----- */
+
+.ph-pane-connector {
+  position: absolute;
+  top: 50%; right: -1px;
+  width: 22px; height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  z-index: 5;
+}
+.ph-pane-connector::before {
+  content: "";
+  position: absolute; right: -3px; top: -3px;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  transition: all 0.4s ease;
+}
+.ph-pane-connector.c1 { animation: ph-connector-fire 0.5s ease 4.0s forwards; }
+.ph-pane-connector.c2 { animation: ph-connector-fire 0.5s ease 7.5s forwards; }
+@keyframes ph-connector-fire {
+  to { background: var(--pf-accent-strong); }
+}
+.ph-pane-connector.c1::before { animation: ph-connector-dot 0.5s ease 4.1s forwards; }
+.ph-pane-connector.c2::before { animation: ph-connector-dot 0.5s ease 7.6s forwards; }
+@keyframes ph-connector-dot {
+  to {
+    background: var(--pf-accent);
+    box-shadow: 0 0 10px var(--pf-accent-glow);
+  }
 }
 
-/* ----- mini question card in pane 2 ----- */
+/* ----- pane 2: question engine ----- */
 
-.ph-mini-qcard {
+.ph-question-pane { position: relative; }
+.ph-qcard {
   background: linear-gradient(180deg, var(--pf-surface-2), var(--pf-surface));
   border: 1px solid var(--pf-line-strong);
   border-radius: 10px;
-  padding: 14px;
-  /* Lands shortly after the hotkey press finishes at 3.0s. Slight rise
-     gives the impression the card was triggered by the press. */
+  padding: 12px 13px;
   opacity: 0;
-  transform: translateY(8px);
-  animation: ph-pane2-in 0.45s var(--pf-ease, ease) 3.3s forwards;
+  transform: translateY(12px) scale(0.97);
+  animation: ph-card-pop 0.55s cubic-bezier(.2,.7,.2,1) 4.6s forwards;
 }
-@keyframes ph-pane2-in {
-  to { opacity: 1; transform: translateY(0); }
+@keyframes ph-card-pop {
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
-.ph-mini-qtitle {
+.ph-qcard-title {
   font-family: var(--pf-font-display);
-  font-size: 13px;
+  font-size: 12px;
   color: var(--pf-text);
-  margin-bottom: 9px;
-  line-height: 1.3;
+  margin-bottom: 8px;
+  letter-spacing: -0.01em;
+  font-weight: 400;
+  line-height: 1.35;
 }
-.ph-mini-qchips {
+.ph-qcard-title + .ph-qcard-title { margin-top: 8px; }
+
+.ph-qchips {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-bottom: 6px;
+  gap: 4px;
+  margin-bottom: 8px;
 }
-.ph-mini-qchip {
-  padding: 5px 8px;
+.ph-qchip {
+  padding: 3px 7px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--pf-line-strong);
   border-radius: 6px;
-  font-size: 10.5px;
+  font-size: 10px;
   color: var(--pf-text-muted);
-  transition: all 0.15s var(--pf-ease, ease);
+  opacity: 0;
+  transform: translateY(4px);
+  animation: ph-chip-in 0.35s ease forwards;
 }
-/* Chips marked .picked in JSX start un-picked visually, then animate
-   into the picked state — so the loop reads as "user is choosing"
-   rather than "questions arrive already answered". The two qchips
-   groups stagger so the eye follows one chip lighting up after the
-   other. */
-.ph-mini-qchip.picked {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--pf-text-muted);
-  border-color: var(--pf-line-strong);
-  font-weight: 400;
-  animation: ph-chip-pick 0.4s var(--pf-ease, ease) forwards;
+.ph-qchips:not(.q2) .ph-qchip:nth-child(1) { animation-delay: 5.0s; }
+.ph-qchips:not(.q2) .ph-qchip:nth-child(2) { animation-delay: 5.1s; }
+.ph-qchips:not(.q2) .ph-qchip:nth-child(3) { animation-delay: 5.2s; }
+.ph-qchips:not(.q2) .ph-qchip:nth-child(4) { animation-delay: 5.3s; }
+@keyframes ph-chip-in { to { opacity: 1; transform: translateY(0); } }
+
+.ph-qchips:not(.q2) .ph-qchip.picked {
+  animation: ph-chip-in 0.35s ease forwards, ph-chip-select 0.4s ease 6.6s forwards;
 }
-.ph-mini-qcard > :nth-child(2) .ph-mini-qchip.picked { animation-delay: 4.1s; }
-.ph-mini-qcard > :nth-child(4) .ph-mini-qchip.picked { animation-delay: 4.6s; }
-@keyframes ph-chip-pick {
+.ph-qchips.q2 .ph-qchip:nth-child(1) { animation-delay: 5.9s; }
+.ph-qchips.q2 .ph-qchip:nth-child(2) { animation-delay: 6.0s; }
+.ph-qchips.q2 .ph-qchip:nth-child(3) { animation-delay: 6.1s; }
+.ph-qchips.q2 .ph-qchip.picked {
+  animation: ph-chip-in 0.35s ease forwards, ph-chip-select 0.4s ease 7.0s forwards;
+}
+@keyframes ph-chip-select {
   to {
     background: rgba(232, 226, 212, 0.92);
-    color: var(--pf-bg-2);
     border-color: rgba(232, 226, 212, 1);
+    color: var(--pf-bg-2);
     font-weight: 500;
   }
 }
 
-/* ----- enhanced output in pane 3 ----- */
+.ph-qcard-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  margin-top: 4px;
+  border-top: 1px solid var(--pf-line);
+  opacity: 0;
+  animation: ph-pane-fade-in 0.35s ease 6.4s forwards;
+}
+.ph-qfoot-hint {
+  font-size: 9px;
+  color: var(--pf-text-subtle);
+  font-family: var(--pf-font-mono);
+}
+.ph-qfoot-hint kbd {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1px 4px;
+  border-radius: 3px;
+  margin: 0 2px;
+  color: var(--pf-text-muted);
+  font-family: inherit;
+}
+.ph-qsubmit {
+  background: var(--pf-text);
+  color: var(--pf-bg-2);
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--pf-font-mono);
+  transition: all 0.2s ease;
+  cursor: default;
+}
+.ph-qsubmit.firing {
+  animation: ph-submit-flash 0.35s ease 7.5s forwards;
+}
+@keyframes ph-submit-flash {
+  50% {
+    background: var(--pf-accent);
+    color: var(--pf-bg-2);
+    box-shadow: 0 0 12px var(--pf-accent-glow);
+  }
+}
 
-.ph-mini-output {
+/* ----- pane 3: enhanced output ----- */
+
+.ph-output-pane { position: relative; }
+.ph-output-body {
   font-family: var(--pf-font-mono);
   font-size: 10.5px;
-  line-height: 1.65;
+  line-height: 1.55;
   color: var(--pf-text-muted);
 }
-
-/* Each line of the output fades up in sequence — reads as the
-   enhanced prompt being streamed in by the LLM after the questions
-   were answered. Stagger starts at 5.3s (right after the second chip
-   pick at 4.6s + a beat) and ends at 6.5s. */
-.ph-mini-output > span {
-  opacity: 0;
-  transform: translateY(4px);
-  animation: ph-line-in 0.4s var(--pf-ease, ease) forwards;
-}
-.ph-mini-output > span:nth-child(1) { animation-delay: 5.3s; }
-.ph-mini-output > span:nth-child(2) { animation-delay: 5.5s; }
-.ph-mini-output > span:nth-child(3) { animation-delay: 5.7s; }
-.ph-mini-output > span:nth-child(4) { animation-delay: 5.9s; }
-.ph-mini-output > span:nth-child(5) { animation-delay: 6.1s; }
-.ph-mini-output > span:nth-child(6) { animation-delay: 6.3s; }
-.ph-mini-output > span:nth-child(7) { animation-delay: 6.5s; }
-@keyframes ph-line-in {
+@keyframes ph-pane-fade-in {
   to { opacity: 1; transform: translateY(0); }
 }
-
-.ph-mini-output .h {
+/* Each paragraph fades up in sequence — reads like the LLM streaming
+   the enhanced prompt back at 2× the original pace. 0.65s between
+   paragraphs + a 0.3s fade keeps the stream feel without dragging.
+   Last paragraph lands at ~10.15s; the master cycle (Home.tsx) leaves
+   a ~8s reading hold before the loop restarts. */
+.ph-output-body p {
+  margin: 0 0 6px;
+  opacity: 0;
+  transform: translateY(4px);
+  animation: ph-pane-fade-in 0.3s ease forwards;
+}
+.ph-output-body p:last-child { margin-bottom: 0; }
+.ph-output-body p:nth-child(1) { animation-delay: 7.9s; }
+.ph-output-body p:nth-child(2) { animation-delay: 8.55s; }
+.ph-output-body p:nth-child(3) { animation-delay: 9.2s; }
+.ph-output-body p:nth-child(4) { animation-delay: 9.85s; }
+.ph-output-body .h-line {
   color: var(--pf-text);
   font-weight: 500;
-  display: block;
-  margin-bottom: 6px;
-}
-.ph-mini-output .ctx {
-  color: var(--pf-accent);
-  background: var(--pf-accent-soft);
-  border: 1px solid var(--pf-accent-strong);
-  padding: 0 5px;
-  border-radius: 3px;
-  font-size: 9.5px;
-  display: inline-block;
-  margin-bottom: 4px;
-}
-.ph-mini-output .item {
-  display: block;
-  padding-left: 10px;
-  position: relative;
-}
-.ph-mini-output .item::before {
-  content: "·";
-  position: absolute;
-  left: 2px;
-  color: var(--pf-text-subtle);
 }
 
-/* Honour the user's motion preference. Skip every demo entrance/stagger
-   animation so the panes render statically at their end states. */
+/* Thinking pill shown briefly between submit (7.5s) and output (7.9s).
+   Same instant-show / instant-hide pattern as the website. */
+.ph-thinking-pill {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  background: rgba(20, 20, 24, 0.92);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 999px;
+  font-family: var(--pf-font-mono);
+  font-size: 10px;
+  color: var(--pf-text-muted);
+  opacity: 0;
+  animation:
+    ph-think-show 0s ease 7.5s forwards,
+    ph-think-hide 0s ease 7.9s forwards;
+  z-index: 2;
+}
+@keyframes ph-think-show { to { opacity: 1; } }
+@keyframes ph-think-hide { to { opacity: 0; } }
+.ph-spin {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(232, 226, 212, 0.25);
+  border-top-color: var(--pf-accent);
+  animation: ph-spin 0.9s linear infinite;
+}
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+
+/* Honour the user's motion preference. Skip every entrance/stagger so
+   the panes render statically at their end states. */
 @media (prefers-reduced-motion: reduce) {
-  .ph-mini-qcard,
-  .ph-mini-qchip.picked,
-  .ph-mini-output > span,
-  .ph-rough-text .typed,
-  .ph-rough-text .selbox,
-  .ph-mini-hotkey,
-  .ph-mini-hotkey .ph-kbd {
-    animation: none;
+  .ph-typed,
+  .ph-selection-wrap,
+  .ph-hotkey-card,
+  .ph-hkey,
+  .ph-qcard,
+  .ph-qchip,
+  .ph-qchip.picked,
+  .ph-qcard-foot,
+  .ph-qsubmit.firing,
+  .ph-output-body p,
+  .ph-thinking-pill,
+  .ph-pane-connector.c1,
+  .ph-pane-connector.c2,
+  .ph-pane-connector.c1::before,
+  .ph-pane-connector.c2::before,
+  .ph-pdot.p1, .ph-pdot.p2, .ph-pdot.p3, .ph-pdot.p4 {
+    animation: none !important;
   }
-  .ph-mini-qcard { opacity: 1; transform: none; }
-  .ph-mini-output > span { opacity: 1; transform: none; }
+  .ph-hotkey-card,
+  .ph-qcard,
+  .ph-qchip,
+  .ph-output-body p { opacity: 1; transform: none; }
+  .ph-thinking-pill { display: none; }
 }
 
 /* ---------- recent enhancements ---------- */
@@ -706,11 +899,12 @@
 
 @media (max-width: 880px) {
   .ph-main-inner { padding: 28px 24px; }
-  .ph-demo-body { grid-template-columns: 1fr; }
-  .ph-demo-pane {
+  .ph-stage-body { grid-template-columns: 1fr; }
+  .ph-stage-pane {
     border-right: none;
     border-bottom: 1px solid var(--pf-line);
   }
+  .ph-pane-connector { display: none; }
   .ph-strip { grid-template-columns: 1fr; }
   .ph-hero-row { flex-direction: column; align-items: flex-start; }
   .ph-recent-activity { width: 100%; }

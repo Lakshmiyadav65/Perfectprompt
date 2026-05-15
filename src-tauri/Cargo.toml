@@ -26,6 +26,9 @@ enigo = "0.2"
 tokio = { version = "1", features = ["time", "sync"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 dotenvy = "0.15"
+regex = "1"
+sha2 = "0.10"
+lru = "0.12"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = [
@@ -35,3 +38,9 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_System_Threading",
 ] }
+
+[dev-dependencies]
+# Used only by the eval_pass2 example harness (cargo run --example
+# eval_pass2). Adds the runtime + macros features the production binary
+# doesn't need.
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
