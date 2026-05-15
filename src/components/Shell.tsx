@@ -168,6 +168,9 @@ export function Shell({ initial }: { initial: Route }) {
             >
               <span className="pf-nav-icon">{item.icon}</span>
               <span>{item.label}</span>
+              {item.route === "projects" && (
+                <span className="pf-beta-badge" aria-label="Beta feature">Beta</span>
+              )}
             </button>
           ))}
 

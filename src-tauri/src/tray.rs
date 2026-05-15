@@ -4,6 +4,8 @@ use tauri::{
     AppHandle, Emitter, Manager, Runtime,
 };
 
+use crate::toast_window;
+
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     let home_item = MenuItem::with_id(app, "home", "Open PromptForge", true, None::<&str>)?;
     let projects_item = MenuItem::with_id(app, "projects", "Projects", true, None::<&str>)?;
@@ -81,8 +83,25 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 ///
 /// Also logs to stderr. Never blocks the calling pipeline.
 pub fn notify_fallback<R: Runtime>(app: &AppHandle<R>, message: &str) {
+    // 1) Frontend `pipeline:fallback` event — the in-app Toast
+    //    component listens for this and renders the actual visible
+    //    notification. The Rust side just owns showing the borderless
+    //    toast window; the React side owns the message text +
+    //    animations + auto-dismiss.
     let _ = app.emit("pipeline:fallback", message.to_string());
+    // 2) Stderr trace (dev-time observability).
     println!("[fallback] {message}");
+    // 3) Show the app-styled toast window. The OS-native
+    //    `tauri-plugin-notification` path is intentionally NOT used
+    //    here — it produced a generic Windows Action Center toast
+    //    that didn't match the PromptForge dark UI. The in-app toast
+    //    matches the rest of the app's visual language.
+    if let Err(e) = toast_window::show(app) {
+        eprintln!("[fallback] toast window show failed: {e:#}");
+    }
+    // 4) Tray-tooltip surrogate — kept for hover-discoverability and
+    //    because some users may have the toast window blocked by
+    //    full-screen apps / desktop policies.
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(message));
         let app2 = app.clone();
@@ -93,6 +112,35 @@ pub fn notify_fallback<R: Runtime>(app: &AppHandle<R>, message: &str) {
             }
         });
     }
+}
+
+/// Canonical text for the Groq rate-limit notification. Exposed so
+/// callers outside the pipeline (and unit tests) can pin the exact
+/// wording.
+///
+/// In the current production flow the pipeline's `friendly_reason`
+/// maps `"groq_rate_limit"` to this same string, so the live toast
+/// is fired indirectly through `notify_fallback`. This constant is
+/// the canonical source for that text — don't drift it out of sync
+/// with `pipeline::friendly_reason`.
+#[allow(dead_code)] // public convenience surface; see doc note above.
+pub const RATE_LIMIT_MESSAGE: &str = "Your API limit has been reached.";
+
+/// Sibling to [`notify_fallback`] specifically for Groq rate-limit
+/// hits. Uses the same tray-tooltip + `pipeline:fallback` event
+/// mechanism — only the body text differs, so the user can tell
+/// "Groq is throttling us" apart from "your input was bad" without
+/// us shipping a new notification dependency.
+///
+/// The pipeline's [`crate::pipeline::run`] already surfaces this
+/// text via `friendly_reason("groq_rate_limit")` → the
+/// hotkey/clarify callers' existing `notify_fallback` invocation,
+/// so the live flow does NOT need this function. Provided for code
+/// paths outside the pipeline that want to fire the rate-limit
+/// toast directly (manual recovery, future retry logic, etc.).
+#[allow(dead_code)] // public convenience surface; see doc note above.
+pub fn notify_rate_limit<R: Runtime>(app: &AppHandle<R>) {
+    notify_fallback(app, RATE_LIMIT_MESSAGE);
 }
 
 /// Show the main window and navigate it to the requested hash route. The

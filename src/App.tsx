@@ -3,6 +3,7 @@ import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
 import { CommandBar } from "./components/CommandBar";
 import { Shell } from "./components/Shell";
+import { Toast } from "./components/Toast";
 
 function App() {
   const hash = window.location.hash;
@@ -12,6 +13,7 @@ function App() {
   if (hash === "#/clarify") return <ClarifyPopup />;
   if (hash === "#/question-card") return <QuestionCard />;
   if (hash === "#/command-bar") return <CommandBar />;
+  if (hash === "#/toast") return <Toast />;
 
   // Anything else (main / home / settings / projects, plus the legacy
   // "/settings" or "/projects" deep-links from the tray) renders the

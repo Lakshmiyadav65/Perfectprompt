@@ -44,6 +44,20 @@ pub struct TraceRecord {
     pub validation_outcome: String,
     pub reject_reason: Option<String>,
     pub total_latency_ms: u64,
+    /// Phase 2 Step 6: true when `build_context_block` returned a
+    /// non-empty `<context>` bundle for this run. Stays `false` for
+    /// records that short-circuited before the orchestrator computed
+    /// context (intake reject, cache hit). `#[serde(default)]` keeps
+    /// older JSONL files from rejecting on missing fields.
+    #[serde(default)]
+    pub context_present: bool,
+    /// Phase 2 Step 6: the ambiguity threshold the router used for this
+    /// record's Decline check. `DECLINE_THRESHOLD` (70) by default; Step
+    /// 8 sets it to `DECLINE_THRESHOLD + 15` (85) when context_present
+    /// flips the router's Mode D path. Stays `0` for records that never
+    /// reached the router (intake reject, cache hit).
+    #[serde(default)]
+    pub effective_threshold: u32,
 }
 
 /// Append a trace record to today's log file. Best-effort — failures
@@ -166,6 +180,8 @@ mod tests {
             validation_outcome: "repaired".into(),
             reject_reason: None,
             total_latency_ms: 860,
+            context_present: true,
+            effective_threshold: 85,
         };
         let s = serde_json::to_string(&r).expect("serialise");
         // A JSONL line is one record, no embedded newlines.
@@ -174,6 +190,36 @@ mod tests {
         let back: TraceRecord = serde_json::from_str(&s).expect("round-trip");
         assert_eq!(back.route, "code");
         assert_eq!(back.input_len, 10);
-        assert!(back.cache_hit == false);
+        assert!(!back.cache_hit);
+        assert!(back.context_present);
+        assert_eq!(back.effective_threshold, 85);
+    }
+
+    #[test]
+    fn record_deserializes_legacy_jsonl_without_phase2_fields() {
+        // Phase 1 trace files lack `context_present` and
+        // `effective_threshold`. `#[serde(default)]` keeps the schema
+        // forward-compatible — old logs must still load.
+        let legacy = r#"{
+            "ts_ms": 1700000000000,
+            "raw_input": "x",
+            "input_len": 1,
+            "route": "code",
+            "domain": null,
+            "complexity": null,
+            "ambiguity": null,
+            "cache_hit": false,
+            "llm_called": false,
+            "llm_latency_ms": null,
+            "raw_llm_output": null,
+            "final_pasted_output": "x",
+            "validators_fired": [],
+            "validation_outcome": "n/a",
+            "reject_reason": null,
+            "total_latency_ms": 0
+        }"#;
+        let r: TraceRecord = serde_json::from_str(legacy).expect("legacy parse");
+        assert!(!r.context_present, "default for context_present must be false");
+        assert_eq!(r.effective_threshold, 0, "default for effective_threshold must be 0");
     }
 }

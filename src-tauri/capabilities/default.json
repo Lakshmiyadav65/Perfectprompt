@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for PromptForge windows",
-  "windows": ["main", "status", "settings", "command-bar"],
+  "windows": ["main", "status", "settings", "command-bar", "toast"],
   "permissions": [
     "core:default",
     "core:window:default",
@@ -13,6 +13,7 @@
     "core:window:allow-start-dragging",
     "core:window:allow-set-size",
     "opener:default",
-    "opener:allow-open-url"
+    "opener:allow-open-url",
+    "notification:default"
   ]
 }

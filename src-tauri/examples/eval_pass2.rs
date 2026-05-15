@@ -88,6 +88,7 @@ fn knobs_for(route: &RoutingDecision) -> Option<RouteKnobs> {
                 max_length_ratio: 15.0,
                 min_output_chars: 10,
                 min_input_chars_for_ratio: 5,
+                ..Default::default()
             },
         },
         RoutingDecision::Writing => RouteKnobs {
@@ -98,16 +99,19 @@ fn knobs_for(route: &RoutingDecision) -> Option<RouteKnobs> {
                 max_length_ratio: 20.0,
                 min_output_chars: 20,
                 min_input_chars_for_ratio: 5,
+                ..Default::default()
             },
         },
         RoutingDecision::Generic => RouteKnobs {
             prompt_file: "generic-enhancer.md",
             max_tokens: 300,
-            temperature: 0.4,
+            // Phase 2: lowered from 0.4 to 0.3 in lockstep with pipeline.rs.
+            temperature: 0.3,
             validator: ValidatorConfig {
                 max_length_ratio: 15.0,
                 min_output_chars: 15,
                 min_input_chars_for_ratio: 5,
+                ..Default::default()
             },
         },
         _ => return None,
@@ -296,7 +300,10 @@ async fn run_one(
             }
         }
         IntakeResult::Pass { normalized, .. } => {
-            let r = router::run(&normalized);
+            // Phase 1 eval harness runs without active-project context.
+            // Phase 2 added the `context_present` parameter; the Phase 1
+            // baseline inputs always pass `false` here.
+            let r = router::run(&normalized, false);
             domain = Some(format!("{:?}", r.domain));
             complexity = Some(r.complexity);
             ambiguity = Some(r.ambiguity);

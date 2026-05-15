@@ -9,8 +9,8 @@ use crate::active_app::{self, ActiveAppContext};
 use crate::app_classifier::{self, AppClassification};
 use crate::settings::QuestionMode;
 use crate::{
-    clipboard, developer_enhance, foreground_tracker, generation, pipeline, question_bank,
-    settings, status_window, tray,
+    clipboard, foreground_tracker, generation, pipeline, question_bank, settings,
+    status_window, tray,
 };
 use crate::AppState;
 
@@ -210,8 +210,13 @@ async fn run_capture_pipeline<R: Runtime>(
     );
 
     if matches!(classification, AppClassification::Developer) {
+        // Developer apps skip the question card and run the silent
+        // path. Project context now flows in uniformly via
+        // `pipeline::run`'s `build_context_block` (Phase 2 Step 6),
+        // so there's no separate developer-specific orchestration —
+        // the routing branch only chooses whether to gate on the card.
         println!("[pipeline] developer environment — skipping questionnaire");
-        return run_developer_path(app, &input, &active_app, t0).await;
+        return run_silent_path(app, &input, &active_app, t0).await;
     }
 
     // General environment: keep the existing question-engine routing.
@@ -254,7 +259,6 @@ async fn run_silent_path<R: Runtime>(
     let pi = pipeline::PipelineInput {
         raw_input: input.to_string(),
         active_app: active_app.process_name.clone(),
-        context: None,
     };
     let output = pipeline::run(app, pi)
         .await
@@ -276,55 +280,6 @@ async fn run_silent_path<R: Runtime>(
 
     println!(
         "[latency] silent path hotkey→pasted={}ms (enhance={}ms paste={}ms) route={} fallback={}",
-        t0.elapsed().as_millis(),
-        t_enhance.as_millis(),
-        t_paste.as_millis(),
-        output.trace.route,
-        output.used_fallback,
-    );
-    Ok(())
-}
-
-/// Developer-direct path: skip the questionnaire, inject project
-/// awareness context (when enabled), enhance, paste. Triggered when the
-/// active foreground app is classified as a developer environment
-/// (FR-003). The status pill still appears so the user gets feedback
-/// (UI-001 / AC-009).
-async fn run_developer_path<R: Runtime>(
-    app: &AppHandle<R>,
-    input: &str,
-    active_app: &ActiveAppContext,
-    t0: Instant,
-) -> Result<()> {
-    let _ = status_window::show_near_cursor(app);
-
-    let t_enhance_start = Instant::now();
-    let context = developer_enhance::developer_context_for(app, active_app);
-    let pi = pipeline::PipelineInput {
-        raw_input: input.to_string(),
-        active_app: active_app.process_name.clone(),
-        context,
-    };
-    let output = pipeline::run(app, pi)
-        .await
-        .map_err(|e| anyhow!("pipeline failed: {e:#}"))?;
-    let t_enhance = t_enhance_start.elapsed();
-    let _ = status_window::hide(app);
-
-    let t_paste_start = Instant::now();
-    clipboard::replace_selection(app, &output.final_text)
-        .await
-        .map_err(|e| anyhow!("paste failed: {e}"))?;
-    let t_paste = t_paste_start.elapsed();
-
-    if output.used_fallback {
-        if let Some(reason) = &output.fallback_reason {
-            tray::notify_fallback(app, reason);
-        }
-    }
-
-    println!(
-        "[latency] developer path hotkey→pasted={}ms (enhance={}ms paste={}ms) route={} fallback={}",
         t0.elapsed().as_millis(),
         t_enhance.as_millis(),
         t_paste.as_millis(),

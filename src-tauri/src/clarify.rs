@@ -142,7 +142,6 @@ pub async fn submit_question_card_answers(
     let pi = pipeline::PipelineInput {
         raw_input: combined_input,
         active_app: "clarify".to_string(),
-        context: None,
     };
     let output = pipeline::run(&app, pi)
         .await

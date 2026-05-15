@@ -23,6 +23,28 @@
   letter-spacing: -0.025em;
   color: var(--pf-text);
   margin: 0 0 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Small "Beta" marker next to the page title. Same accent family as
+   the sidebar pill but optical-size-adjusted to sit beside a 32px h1
+   without looking like a label competing with the title. */
+.pm-title-beta {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--pf-accent-soft);
+  color: var(--pf-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1;
+  border: 1px solid rgba(255, 122, 77, 0.22);
+  position: relative;
+  top: -2px;
+  user-select: none;
 }
 
 .pm-subtitle {
@@ -600,4 +622,28 @@
   font-weight: normal;
   font-size: 11px;
   margin-left: 4px;
+}
+
+/* ---------- Phase 2 Step 9: refresh project context ---------- */
+
+.pm-refresh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 12px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.pm-refresh-label {
+  font-size: 12px;
+  color: var(--pf-text-subtle);
+  line-height: 1.4;
+}
+
+.pm-refresh-timestamp {
+  color: var(--pf-text-muted);
 }

@@ -8,20 +8,20 @@ mod cache;
 mod clarify;
 mod clipboard;
 mod command_bar;
-mod developer_enhance;
 mod enhance;
 mod foreground_tracker;
 mod generation;
-mod github_analyze;
+pub mod github_analyze;
 mod hotkey;
 pub mod intake;
-mod pipeline;
+pub mod pipeline;
 mod project_scan;
-mod projects;
+pub mod projects;
 mod question_bank;
 pub mod router;
 mod settings;
 mod status_window;
+mod toast_window;
 mod trace;
 mod tray;
 mod updater;
@@ -88,6 +88,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             settings::api_key_status,
             settings::save_api_key,
@@ -114,6 +115,8 @@ pub fn run() {
             projects::delete_project,
             projects::set_active_project,
             projects::clear_active_project,
+            projects::refresh_project_context,
+            projects::get_cached_context_timestamp,
             projects::read_file_content,
             clarify::fetch_question_card_session,
             clarify::submit_question_card_answers,
@@ -179,6 +182,7 @@ fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
         "question-card",
         "status",
         "command-bar",
+        "toast",
     ];
 
     for label in KEEP_ALIVE_LABELS {

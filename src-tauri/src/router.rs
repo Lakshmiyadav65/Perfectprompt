@@ -15,6 +15,28 @@
 
 use crate::question_bank::{detect_domain, score_complexity, Domain};
 
+/// Base ambiguity threshold for Decline. Inputs whose ambiguity score
+/// hits or exceeds this AND whose word count is under 5 are too vague
+/// to enhance usefully. Phase 2 Mode D relaxes the ambiguity side by
+/// `+15` when project context is present — the word-count gate is a
+/// separate safety net that context cannot override.
+pub(crate) const DECLINE_THRESHOLD: u32 = 70;
+/// How many points Mode D adds to the ambiguity threshold when project
+/// context is present.
+///
+/// Set to **0** pending heuristic re-tune (Phase 2.5). The plumbing is
+/// shipped so trace logs and tests can verify the `context_present`
+/// signal end-to-end, but Mode D's live effect on routing is currently
+/// zero because the existing [`score_ambiguity`] heuristic does not
+/// produce inputs in the 70–84 band where context unlocking would
+/// matter. See `docs/migration-report.md` §6.3 and the calibration
+/// notes in this module's test block.
+///
+/// TODO(Phase 2.5): re-tune `score_ambiguity` so mid-ambiguity prompts
+/// like "refactor the auth flow" land in the 70–84 band, then re-run
+/// the calibration and pick a non-zero bump value.
+pub(crate) const CONTEXT_THRESHOLD_BUMP: u32 = 0;
+
 /// One of five routes the orchestrator dispatches on.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RoutingDecision {
@@ -33,22 +55,40 @@ pub struct RouterOutput {
     pub domain: Domain,
     pub complexity: f32,
     pub ambiguity: u32,
+    /// Phase 2 Step 8: the ambiguity threshold actually applied to this
+    /// input. Equals `DECLINE_THRESHOLD` (70) for context-free runs;
+    /// `DECLINE_THRESHOLD + CONTEXT_THRESHOLD_BUMP` (85) when the
+    /// orchestrator passed `context_present = true`. Surfaced so the
+    /// trace logger can record per-record whether Mode D changed the
+    /// outcome.
+    pub effective_threshold: u32,
 }
 
 /// Decide a route for the normalized input.
-pub fn run(normalized_input: &str) -> RouterOutput {
+///
+/// `context_present` is the orchestrator's signal that
+/// `build_context_block` returned a non-empty `<context>` bundle for
+/// this run. When true, the Decline threshold is raised by
+/// `CONTEXT_THRESHOLD_BUMP` — the brief's Mode D ("context unlocks
+/// borderline-ambiguous inputs"). The word-count gate (`< 5`) is
+/// separate from the ambiguity threshold and applies regardless: a
+/// 3-word input is structurally too thin to enhance even with rich
+/// project context.
+pub fn run(normalized_input: &str, context_present: bool) -> RouterOutput {
     let domain = detect_domain(normalized_input);
     let complexity = score_complexity(normalized_input);
     let ambiguity = score_ambiguity(normalized_input);
     let word_count = normalized_input.split_whitespace().count();
     let length = normalized_input.chars().count();
 
-    let decision = decide(domain, complexity, ambiguity, word_count, length);
+    let (decision, effective_threshold) =
+        decide(domain, complexity, ambiguity, word_count, length, context_present);
     RouterOutput {
         decision,
         domain,
         complexity,
         ambiguity,
+        effective_threshold,
     }
 }
 
@@ -58,23 +98,36 @@ fn decide(
     ambiguity: u32,
     word_count: usize,
     length: usize,
-) -> RoutingDecision {
-    // 1. Decline — too vague to enhance usefully.
-    if ambiguity >= 70 && word_count < 5 {
-        return RoutingDecision::Decline {
-            reason: "input too vague".to_string(),
-        };
+    context_present: bool,
+) -> (RoutingDecision, u32) {
+    let effective_threshold = if context_present {
+        DECLINE_THRESHOLD + CONTEXT_THRESHOLD_BUMP
+    } else {
+        DECLINE_THRESHOLD
+    };
+
+    // 1. Decline — too vague to enhance usefully. The `&&` matters:
+    //    Mode D only relaxes the ambiguity side. The word-count gate
+    //    catches structurally-thin inputs regardless of context.
+    if ambiguity >= effective_threshold && word_count < 5 {
+        return (
+            RoutingDecision::Decline {
+                reason: "input too vague".to_string(),
+            },
+            effective_threshold,
+        );
     }
     // 2. Bypass — already an excellent prompt, skip the LLM.
     if complexity >= 0.7 && ambiguity <= 20 && length >= 60 {
-        return RoutingDecision::Bypass;
+        return (RoutingDecision::Bypass, effective_threshold);
     }
     // 3. Domain dispatch.
-    match domain {
+    let r = match domain {
         Domain::Coding => RoutingDecision::Code,
         Domain::Writing | Domain::Email => RoutingDecision::Writing,
         _ => RoutingDecision::Generic,
-    }
+    };
+    (r, effective_threshold)
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -269,7 +322,7 @@ mod tests {
 
     #[test]
     fn fix_it_declines() {
-        let out = run("fix it");
+        let out = run("fix it", false);
         match out.decision {
             RoutingDecision::Decline { reason } => {
                 assert_eq!(reason, "input too vague");
@@ -280,13 +333,13 @@ mod tests {
 
     #[test]
     fn make_it_faster_declines() {
-        let out = run("make it faster");
+        let out = run("make it faster", false);
         assert!(matches!(out.decision, RoutingDecision::Decline { .. }));
     }
 
     #[test]
     fn add_error_handling_declines() {
-        let out = run("add error handling");
+        let out = run("add error handling", false);
         assert!(
             matches!(out.decision, RoutingDecision::Decline { .. }),
             "got {:?}",
@@ -298,6 +351,7 @@ mod tests {
     fn detailed_code_prompt_is_bypass_or_code() {
         let out = run(
             "refactor the user service to use async/await instead of promise chains, preserving the public API",
+            false,
         );
         assert!(
             matches!(out.decision, RoutingDecision::Bypass | RoutingDecision::Code),
@@ -308,20 +362,20 @@ mod tests {
 
     #[test]
     fn write_leave_email_routes_to_writing() {
-        let out = run("write a leave email");
+        let out = run("write a leave email", false);
         assert_eq!(out.decision, RoutingDecision::Writing);
     }
 
     #[test]
     fn summarise_paragraph_routes_to_generic() {
-        let out = run("summarise this paragraph");
+        let out = run("summarise this paragraph", false);
         assert_eq!(out.decision, RoutingDecision::Generic);
     }
 
     #[test]
     fn short_code_prompt_routes_to_code_not_bypass() {
         // Below the 60-char threshold for Bypass, so should land on Code.
-        let out = run("refactor the user service");
+        let out = run("refactor the user service", false);
         assert_eq!(out.decision, RoutingDecision::Code);
     }
 
@@ -331,4 +385,76 @@ mod tests {
         // doesn't overflow.
         assert!(score_ambiguity("hi") <= 100);
     }
+
+    // ── Phase 2 Step 8: Mode D ────────────────────────────────────
+
+    #[test]
+    fn effective_threshold_is_70_without_context() {
+        let out = run("write a leave email", false);
+        assert_eq!(out.effective_threshold, DECLINE_THRESHOLD);
+    }
+
+    #[test]
+    fn effective_threshold_includes_context_bump_when_context_present() {
+        // With the bump set to its current value (zero, pending
+        // heuristic re-tune), the effective threshold equals the base
+        // threshold even when context is present. The assertion is
+        // formulated against the consts rather than a magic number so
+        // it stays correct once Phase 2.5 changes the bump.
+        let out = run("write a leave email", true);
+        assert_eq!(
+            out.effective_threshold,
+            DECLINE_THRESHOLD + CONTEXT_THRESHOLD_BUMP
+        );
+    }
+
+    #[test]
+    fn word_count_gate_still_fires_even_with_context() {
+        // `fix it` scores 95 ambiguity (every penalty fires) — well
+        // above any plausible bumped threshold. Word count is 2
+        // (< 5). Both gates trip regardless of context_present, and
+        // regardless of what value Phase 2.5 picks for the bump.
+        // Context cannot rescue a structurally-thin input.
+        let out = run("fix it", true);
+        assert!(
+            matches!(out.decision, RoutingDecision::Decline { .. }),
+            "context must not rescue 2-word bare-pronoun inputs: got {:?}",
+            out.decision
+        );
+    }
+
+    #[test]
+    fn high_word_count_avoids_decline_regardless_of_threshold() {
+        // 5+ words bypasses the word_count gate entirely — Decline
+        // requires BOTH gates to fire. This proves the && is preserved.
+        let out = run("fix it now please right now", false);
+        assert!(
+            !matches!(out.decision, RoutingDecision::Decline { .. }),
+            "expected non-decline for 6-word input: got {:?}",
+            out.decision
+        );
+    }
+
+    // ── Phase 2 Step 8 calibration record ──────────────────────────
+    //
+    // Snapshot of `score_ambiguity` on the brief author's five
+    // calibration inputs, captured during the Step 8 dry-run. This is
+    // documentation, not a regression test — the heuristic may change
+    // (Phase 2.5) and we explicitly do not want a calibration snapshot
+    // becoming a gate that masks intended re-tuning.
+    //
+    //   input                          ambig  wc   no-ctx route (thr=70)
+    //   ----------------------------   -----  --   --------------------
+    //   refactor the auth flow            40   4   Code
+    //   make it faster                    95   3   Decline
+    //   add error handling                80   3   Decline
+    //   fix it                            95   2   Decline
+    //   update the dashboard layout       50   4   Generic
+    //
+    // Outcome of the dry-run: the heuristic does not produce inputs in
+    // the 70–84 band where Mode D's threshold bump could meaningfully
+    // unlock a Decline. `CONTEXT_THRESHOLD_BUMP` is therefore set to 0
+    // for this ship; the plumbing flows through trace logs so the
+    // signal is verifiable, but the live effect on routing is zero
+    // until Phase 2.5 re-tunes `score_ambiguity`.
 }

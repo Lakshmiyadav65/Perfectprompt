@@ -112,6 +112,26 @@ body { overflow: hidden; }
   background: var(--pf-accent-soft);
   color: var(--pf-text);
 }
+/* Small "Beta" pill badge — used to mark in-progress features in the
+   primary nav. Sits to the right of the nav-item label. Muted accent
+   colour, low contrast, optical-size-adjusted so it doesn't compete
+   with the label. */
+.pf-beta-badge {
+  margin-left: auto;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--pf-accent-soft);
+  color: var(--pf-accent);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  border: 1px solid rgba(255, 122, 77, 0.22);
+  user-select: none;
+  flex-shrink: 0;
+}
+
 .pf-nav-item.active::before {
   content: "";
   position: absolute;

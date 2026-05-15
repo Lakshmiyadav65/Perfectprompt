@@ -1,0 +1,147 @@
+/* Toast — premium PromptForge-styled in-app notification.
+ * Renders inside the borderless #/toast window. Matches the same
+ * design language as `.pm-card`, `.pf-clarify-popup`, and other
+ * elevated surfaces — surface colour, hairline border, Inter Tight
+ * typography, soft warm-off-white text, forge-flame accent.
+ *
+ * Animation: opacity 0 + translateY(12px) → 1 + 0 over 240ms with
+ * --pf-ease. Reverse on exit.
+ */
+
+body.toast-route,
+body.toast-route #root {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: default;
+  overflow: hidden;
+  font-family: var(--pf-font-sans);
+  width: 100%;
+  height: 100vh;
+}
+
+body.toast-route #root {
+  /* Inset slightly so the toast's box-shadow isn't clipped at the
+   * borderless window's edge. */
+  padding: 8px 10px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: stretch;
+}
+
+.pf-toast {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 14px 14px 16px;
+
+  /* Same surface + hairline border as .pm-card / .pf-clarify-popup.
+   * Backdrop blur softens whatever's behind the borderless window
+   * for a premium frosted-glass effect on top of working apps.
+   * Shadow intentionally omitted — relies on the dark surface +
+   * hairline border for definition (flat-premium card style). */
+  background: rgba(35, 35, 33, 0.94);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border-strong);
+  border-radius: var(--pf-radius-lg);
+  box-shadow: none;
+  backdrop-filter: blur(12px) saturate(120%);
+  -webkit-backdrop-filter: blur(12px) saturate(120%);
+
+  font-family: var(--pf-font-sans);
+
+  /* Slide-in / slide-out. The .pf-toast-visible class sets opacity:1
+   * + translateY:0 once the React listener picks up the
+   * pipeline:fallback event. */
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 240ms var(--pf-ease),
+    transform 240ms var(--pf-ease);
+  will-change: opacity, transform;
+}
+
+.pf-toast.pf-toast-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Small forge-flame dot at the left as a subtle accent. The
+ * outer "halo" is rendered with a layered box-shadow so the dot
+ * itself stays compact — looks like a soft glow rather than a
+ * heavy circle. */
+.pf-toast-dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--pf-accent);
+  box-shadow:
+    0 0 0 4px var(--pf-accent-soft),
+    0 0 10px var(--pf-accent-glow);
+}
+
+.pf-toast-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.pf-toast-message {
+  font-family: var(--pf-font-sans);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: 0.002em;
+  color: var(--pf-text);
+  /* Wrap gracefully if a fallback reason ever exceeds the 360px
+   * window width. Single-line messages stay on one line. */
+  overflow-wrap: anywhere;
+}
+
+/* Compact close button. Same icon-button style the rest of the app
+ * uses for subtle actions — transparent at rest, slight white tint
+ * on hover, accent ring on keyboard focus. */
+.pf-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: var(--pf-radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--pf-text-muted);
+  cursor: pointer;
+  transition:
+    background 0.15s var(--pf-ease),
+    color 0.15s var(--pf-ease),
+    border-color 0.15s var(--pf-ease);
+}
+
+.pf-toast-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--pf-border);
+  color: var(--pf-text);
+}
+
+.pf-toast-close:active {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pf-toast-close:focus-visible {
+  outline: 2px solid var(--pf-accent-ring);
+  outline-offset: 1px;
+}
+
+.pf-toast-close svg {
+  display: block;
+}

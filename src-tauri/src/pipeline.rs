@@ -15,32 +15,31 @@
 //! paste-as-is.
 
 use anyhow::Result;
+use std::path::Path;
+use std::sync::OnceLock;
 use std::time::Instant;
 use tauri::{AppHandle, Manager, Runtime};
 
-use crate::enhance::{call_llm, load_prompt};
+use regex::Regex;
+
+use crate::enhance::{call_llm, load_prompt, GroqError};
+use crate::github_analyze::{self, CachedRepo};
 use crate::intake::{self, IntakeResult};
+use crate::project_scan::{self, ProjectSummary};
+use crate::projects::{self, Project};
 use crate::router::{self, RoutingDecision};
 use crate::trace::{self, TraceRecord};
 use crate::validate::{self, ValidationOutcome};
 use crate::AppState;
 
 /// Input envelope into the pipeline. The hotkey/clarify callers
-/// assemble this from their capture step.
+/// assemble this from their capture step. Project context is no longer
+/// passed in by callers — `pipeline::run` resolves it from the active
+/// project via `build_context_block` (Step 6).
 #[derive(Debug, Clone)]
 pub struct PipelineInput {
     pub raw_input: String,
     pub active_app: String,
-    pub context: Option<DeveloperContext>,
-}
-
-/// Optional project context surfaced when the active app is classified
-/// as a developer environment. Step 9 will have `developer_enhance`
-/// produce this instead of its old envelope-builder.
-#[derive(Debug, Clone)]
-pub struct DeveloperContext {
-    pub project_name: String,
-    pub project_summary: String,
 }
 
 #[derive(Debug, Clone)]
@@ -62,7 +61,13 @@ const CODE_TEMPERATURE: f32 = 0.3;
 const WRITING_MAX_TOKENS: u32 = 400;
 const WRITING_TEMPERATURE: f32 = 0.6;
 const GENERIC_MAX_TOKENS: u32 = 300;
-const GENERIC_TEMPERATURE: f32 = 0.4;
+// Phase 2 — Generic route dropped from 0.4 to 0.3 after the A/B pass-1
+// dry-run showed 1.9× length variance on identical inputs (647/1240/1105
+// chars). Generic is the catch-all for inputs without strong domain
+// signal — exactly the inputs where the model has most latitude to
+// diverge. Tighter sampling = more consistent rewrites. Code (0.3) and
+// Writing (0.6, where tone variance is legitimate) are unchanged.
+const GENERIC_TEMPERATURE: f32 = 0.3;
 
 pub async fn run<R: Runtime>(
     app: &AppHandle<R>,
@@ -115,11 +120,27 @@ pub async fn run<R: Runtime>(
         });
     }
 
+    // ── Phase 2 Step 6: project-context resolution ───────────────
+    // Computed once per cache-miss invocation. Sits between Stage B and
+    // Stage C so cache hits don't pay the (cheap) IO cost — and so the
+    // router (Step 8) can read `context_present` for its Mode D
+    // threshold relaxation. `effective_threshold` is set to the base
+    // `DECLINE_THRESHOLD` here; Step 8 promotes it to 85 inside the
+    // router when context is present.
+    let active_project = projects::active_project_for(app);
+    let context_block = build_context_block(app, active_project.as_ref());
+    let context_present = context_block
+        .as_deref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+    tr.context_present = context_present;
+
     // ── Stage C: Router ───────────────────────────────────────────
-    let router_out = router::run(&normalized);
+    let router_out = router::run(&normalized, context_present);
     tr.domain = Some(format!("{:?}", router_out.domain));
     tr.complexity = Some(router_out.complexity);
     tr.ambiguity = Some(router_out.ambiguity);
+    tr.effective_threshold = router_out.effective_threshold;
 
     let (prompt_file, max_tokens, temperature) = match &router_out.decision {
         RoutingDecision::Decline { reason } => {
@@ -158,7 +179,7 @@ pub async fn run<R: Runtime>(
         }
     };
 
-    let user_message = build_user_message(&normalized, pi.context.as_ref());
+    let user_message = build_user_message(&normalized, context_block.as_deref());
     let llm_started = Instant::now();
     let llm_result =
         call_llm(app, &system_prompt, &user_message, max_tokens, temperature).await;
@@ -168,8 +189,10 @@ pub async fn run<R: Runtime>(
     let raw_output = match llm_result {
         Ok(o) => o,
         Err(e) => {
-            eprintln!("[pipeline] LLM call failed: {e}");
-            tr.reject_reason = Some(format!("llm_error: {e}"));
+            let (outcome, reason) = classify_llm_error(&e);
+            eprintln!("[pipeline] LLM call failed ({outcome}): {e}");
+            tr.validation_outcome = outcome;
+            tr.reject_reason = Some(reason);
             return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
         }
     };
@@ -188,11 +211,13 @@ pub async fn run<R: Runtime>(
             max_length_ratio: 20.0,
             min_output_chars: 20,
             min_input_chars_for_ratio: 5,
+            ..Default::default()
         },
         RoutingDecision::Generic => validate::ValidatorConfig {
             max_length_ratio: 15.0,
             min_output_chars: 15,
             min_input_chars_for_ratio: 5,
+            ..Default::default()
         },
         RoutingDecision::Code => validate::ValidatorConfig {
             // Short coding inputs that route to Code (not Decline) get
@@ -203,6 +228,7 @@ pub async fn run<R: Runtime>(
             max_length_ratio: 15.0,
             min_output_chars: 10,
             min_input_chars_for_ratio: 5,
+            ..Default::default()
         },
         _ => validate::ValidatorConfig::default(),
     };
@@ -245,6 +271,244 @@ pub async fn run<R: Runtime>(
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Context bundle assembly (Phase 2 Step 4)
+// ─────────────────────────────────────────────────────────────────────
+
+/// Hard ceiling on the assembled `<context>` block — everything inside
+/// (and including) the wrapper tags. Step 6 emits the wrapped string
+/// directly into the user message; the ceiling guards the LLM call.
+const CONTEXT_MAX_CHARS: usize = 2000;
+const CONTEXT_OPEN: &str = "<context>\n";
+const CONTEXT_CLOSE: &str = "\n</context>";
+const TRUNC_MARKER: &str = "\n... [truncated]";
+/// Minimum char budget to bother rendering a partially-truncated
+/// section. Below this we drop the section entirely — a 10-char readme
+/// excerpt followed by `... [truncated]` is more noise than signal.
+const MIN_TRUNCATED_SECTION: usize = 30;
+
+/// Orchestrator-facing context-block builder. Resolves the scan and
+/// GitHub cache for `project` via `app`, then delegates to the pure
+/// [`assemble_context_block`].
+///
+/// Returns `None` when `project` is `None`, OR when no field of the
+/// assembled bundle has any content. The wrapper tags are emitted only
+/// when there is *something* to wrap — the brief is explicit: "When
+/// no active project, `<context>` is omitted entirely. Don't emit
+/// empty context tags."
+pub(crate) fn build_context_block<R: Runtime>(
+    app: &AppHandle<R>,
+    project: Option<&Project>,
+) -> Option<String> {
+    let project = project?;
+
+    let scan = project
+        .path
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .and_then(|p| project_scan::scan_project_summary(Path::new(p)));
+
+    let cached = projects::cached_context_path(app)
+        .ok()
+        .and_then(|dir| github_analyze::cached_repo(&dir, &project.id));
+
+    assemble_context_block(Some(project), scan.as_ref(), cached.as_ref())
+}
+
+/// Pure context-bundle assembler. All sources are explicit arguments,
+/// no filesystem touch — Step 4's testable surface.
+///
+/// Field source priority (per the Phase 2 brief, §"Context source
+/// priority"):
+///
+/// - `Stack`: user description (when it contains ≥2 stack keywords) →
+///   scan output → empty.
+/// - `Tooling`, `Conventions`, `file_layout`: scan only.
+/// - `Description`: project.description, verbatim.
+/// - `Readme`: scan first, then the GitHub cache fallback.
+///
+/// The cache currently exposes no structured Stack/Tooling/Conventions
+/// fields (only repo name, description, default_branch, html_url), so
+/// it can only contribute to the Readme section via its description
+/// blob.
+/// Pure assembler — exposed for the Step 10 evaluation harness
+/// (`examples/eval_phase2_context.rs`) and any future inspector tooling
+/// that needs to render a bundle from explicit inputs. Production code
+/// should use [`build_context_block`] which resolves scan/cache from
+/// the live `AppHandle` automatically.
+pub fn assemble_context_block(
+    project: Option<&Project>,
+    scan: Option<&ProjectSummary>,
+    cached: Option<&CachedRepo>,
+) -> Option<String> {
+    let project = project?;
+
+    // ── Core (load-bearing) section. Never truncated. ──────────────
+    let mut core = String::new();
+    core.push_str(&format!("Project: {}\n", project.name));
+
+    let stack = stack_from_description(&project.description).or_else(|| {
+        scan.map(|s| s.stack.clone())
+            .filter(|s| !s.is_empty())
+    });
+    if let Some(s) = stack {
+        core.push_str(&format!("Stack: {s}\n"));
+    }
+
+    if let Some(s) = scan {
+        if !s.tooling.is_empty() {
+            core.push_str(&format!("Tooling: {}\n", s.tooling));
+        }
+        if !s.conventions.is_empty() {
+            core.push_str(&format!("Conventions: {}\n", s.conventions));
+        }
+    }
+
+    let desc = project.description.trim();
+    if !desc.is_empty() {
+        core.push_str("\nDescription:\n");
+        core.push_str(desc);
+        core.push('\n');
+    }
+
+    // ── Optional 1: file layout. Truncated second under pressure. ──
+    let layout = match scan {
+        Some(s) if !s.file_layout.is_empty() => {
+            let mut l = String::from("\nFile layout:\n");
+            for entry in &s.file_layout {
+                l.push_str("- ");
+                l.push_str(entry);
+                l.push('\n');
+            }
+            l
+        }
+        _ => String::new(),
+    };
+
+    // ── Optional 2: readme excerpt. Truncated first under pressure. ─
+    let readme_body = scan
+        .map(|s| s.readme_excerpt.clone())
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            cached
+                .map(|c| c.repo.description.clone())
+                .filter(|s| !s.is_empty())
+        });
+    let readme = match readme_body {
+        Some(b) => format!("\nReadme:\n{b}\n"),
+        None => String::new(),
+    };
+
+    let interior = fit_context_to_budget(&core, &layout, &readme);
+    let trimmed = interior.trim_end();
+    if trimmed.is_empty() {
+        return None;
+    }
+    Some(format!("{CONTEXT_OPEN}{trimmed}{CONTEXT_CLOSE}"))
+}
+
+/// Enforce the 2000-char ceiling on the assembled bundle. Truncation
+/// priority (per the brief): readme first, then file layout. Stack/
+/// tooling/conventions/description are load-bearing and never trimmed
+/// unless the core section alone exceeds the budget.
+fn fit_context_to_budget(core: &str, layout: &str, readme: &str) -> String {
+    let wrapper_len = CONTEXT_OPEN.len() + CONTEXT_CLOSE.len();
+    let budget = CONTEXT_MAX_CHARS.saturating_sub(wrapper_len);
+
+    if core.len() + layout.len() + readme.len() <= budget {
+        return format!("{core}{layout}{readme}");
+    }
+
+    // ── Truncate readme first.
+    let core_layout_len = core.len() + layout.len();
+    if core_layout_len + TRUNC_MARKER.len() + MIN_TRUNCATED_SECTION <= budget {
+        let room = budget - core_layout_len - TRUNC_MARKER.len();
+        let trunc = safe_char_truncate(readme, room);
+        return format!("{core}{layout}{trunc}{TRUNC_MARKER}");
+    }
+    if core_layout_len <= budget {
+        return format!("{core}{layout}");
+    }
+
+    // ── Readme dropped. Truncate layout.
+    let core_len = core.len();
+    if core_len + TRUNC_MARKER.len() + MIN_TRUNCATED_SECTION <= budget {
+        let room = budget - core_len - TRUNC_MARKER.len();
+        let trunc = safe_char_truncate(layout, room);
+        return format!("{core}{trunc}{TRUNC_MARKER}");
+    }
+    if core_len <= budget {
+        return core.to_string();
+    }
+
+    // ── Even core exceeds budget. Hard-cap with marker — load-bearing
+    // content is trimmed only as a last resort. We log so anyone tuning
+    // can spot the pathological case in stderr.
+    eprintln!(
+        "[context] core section exceeds {CONTEXT_MAX_CHARS}-char ceiling; truncating"
+    );
+    let target = budget.saturating_sub(TRUNC_MARKER.len());
+    format!("{}{TRUNC_MARKER}", safe_char_truncate(core, target))
+}
+
+fn safe_char_truncate(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let mut end = max;
+    while end > 0 && !s.is_char_boundary(end) {
+        end -= 1;
+    }
+    s[..end].to_string()
+}
+
+/// Inspect the user-authored description for stack indicators. If the
+/// description names ≥2 known technologies, the bundle's `Stack` line
+/// is populated from the description's matches rather than from the
+/// scan — per the Phase 2 brief example where a user-written
+/// description supersedes scan-derived stack data.
+///
+/// Returns `None` when the description has fewer than two recognised
+/// keywords. Returns `Some("Rust, Tauri, React")` for descriptions
+/// like "A Rust Tauri 2 + React 19 app." (Note: this is a normalised
+/// list — the original description text still appears verbatim in the
+/// bundle's `Description:` section, so version detail is preserved.)
+fn stack_from_description(desc: &str) -> Option<String> {
+    static KEYWORDS: OnceLock<Vec<(Regex, &'static str)>> = OnceLock::new();
+    let kws = KEYWORDS.get_or_init(|| {
+        let pairs: &[(&str, &str)] = &[
+            (r"(?i)\brust\b", "Rust"),
+            (r"(?i)\btauri\b", "Tauri"),
+            (r"(?i)\breact\b", "React"),
+            (r"(?i)\bvue(?:\.js)?\b", "Vue"),
+            (r"(?i)\bsvelte\b", "Svelte"),
+            (r"(?i)\bnext\.?js\b", "Next.js"),
+            (r"(?i)\bvite\b", "Vite"),
+            (r"(?i)\bpython\b", "Python"),
+            (r"(?i)\bdjango\b", "Django"),
+            (r"(?i)\bflask\b", "Flask"),
+            (r"(?i)\btypescript\b", "TypeScript"),
+            (r"(?i)\bnode\.?js\b", "Node.js"),
+        ];
+        pairs
+            .iter()
+            .map(|(p, l)| (Regex::new(p).expect("static stack regex"), *l))
+            .collect()
+    });
+
+    let mut found: Vec<&'static str> = Vec::new();
+    for (re, label) in kws.iter() {
+        if re.is_match(desc) {
+            found.push(label);
+        }
+    }
+    if found.len() < 2 {
+        None
+    } else {
+        Some(found.join(", "))
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────────────────────────────
 
@@ -266,18 +530,27 @@ fn base_trace(raw_input: &str) -> TraceRecord {
         validation_outcome: "n/a".into(),
         reject_reason: None,
         total_latency_ms: 0,
+        // Phase 2 Step 6: stays false / 0 until the orchestrator past
+        // Stage B computes them. Short-circuited records keep the
+        // defaults — readers learn the convention that a 0 threshold
+        // means "no router decision was made for this record."
+        context_present: false,
+        effective_threshold: 0,
     }
 }
 
-fn build_user_message(normalized: &str, context: Option<&DeveloperContext>) -> String {
-    let mut out = format!("<input>\n{normalized}\n</input>");
-    if let Some(ctx) = context {
-        out.push_str(&format!(
-            "\n\n<context>\nProject: {}\nSummary: {}\n</context>",
-            ctx.project_name, ctx.project_summary
-        ));
+/// Compose the LLM user message. The Phase 2 ordering is
+/// `<context>...</context>\n\n<input>...</input>` — context first so the
+/// model reads its grounding before the user's text. When no project is
+/// active the `<context>` block is omitted entirely; we never emit
+/// empty wrapper tags.
+fn build_user_message(normalized: &str, context_block: Option<&str>) -> String {
+    match context_block {
+        Some(block) if !block.trim().is_empty() => {
+            format!("{block}\n\n<input>\n{normalized}\n</input>")
+        }
+        _ => format!("<input>\n{normalized}\n</input>"),
     }
-    out
 }
 
 fn route_label(d: &RoutingDecision) -> &'static str {
@@ -316,7 +589,14 @@ fn finalize_fallback<R: Runtime>(
 /// Public so Step 10 can reuse the same mapping if it grows a richer
 /// notifier API; for now `pipeline::run` is the sole caller.
 pub fn friendly_reason(internal: &str) -> String {
-    if internal == "input too vague" {
+    if internal == "groq_rate_limit" {
+        // Phase 2: surface rate-limit failures distinctly so users
+        // know it's a Groq throttle (try again later) and not a
+        // rewriting failure on their input. The wording is
+        // intentionally vendor-agnostic — the in-app toast shouldn't
+        // leak that we're using Groq specifically.
+        "Your API limit has been reached.".into()
+    } else if internal == "input too vague" {
         "Kept original — input too vague".into()
     } else if internal.starts_with("adversarial:") {
         "Kept original — risky pattern in input".into()
@@ -330,6 +610,24 @@ pub fn friendly_reason(internal: &str) -> String {
         "Kept original — internal config error".into()
     } else {
         "Kept original — output didn't pass checks".into()
+    }
+}
+
+/// Pure helper for Stage D's error-dispatch. Maps a `GroqError` to
+/// the trace's `(validation_outcome, reject_reason)` pair. Rate-limit
+/// errors get a distinct outcome string so they're greppable in
+/// trace logs and the friendly_reason mapper can render the dedicated
+/// "Groq API rate limit reached" toast.
+///
+/// Returns:
+/// - `("fallback_rate_limit", "groq_rate_limit")` for `GroqError::RateLimit`
+/// - `("n/a", "llm_error: …")` for every other variant (Network,
+///   InvalidResponse, Other) — preserves the Phase 1 "n/a" semantics
+///   that the trace reader expects when validation didn't run.
+pub(crate) fn classify_llm_error(err: &GroqError) -> (String, String) {
+    match err {
+        GroqError::RateLimit { .. } => ("fallback_rate_limit".into(), "groq_rate_limit".into()),
+        other => ("n/a".into(), format!("llm_error: {other}")),
     }
 }
 
@@ -351,16 +649,24 @@ mod tests {
     }
 
     #[test]
-    fn user_message_appends_context_when_supplied() {
-        let ctx = DeveloperContext {
-            project_name: "PromptForge".into(),
-            project_summary: "Tauri + React prompt enhancer".into(),
-        };
-        let m = build_user_message("refactor X", Some(&ctx));
+    fn user_message_prepends_context_block_when_supplied() {
+        let block = "<context>\nProject: Foo\nStack: Rust + Tauri\n</context>";
+        let m = build_user_message("refactor X", Some(block));
+        // Context must come first.
+        assert!(m.starts_with("<context>\n"), "expected leading context: {m}");
+        // Blank line separator between context and input.
+        assert!(m.contains("</context>\n\n<input>\n"), "missing separator: {m}");
+        assert!(m.ends_with("\n</input>"), "expected trailing input close: {m}");
+        // The input body survives unchanged.
         assert!(m.contains("<input>\nrefactor X\n</input>"));
-        assert!(m.contains("<context>\nProject: PromptForge"));
-        assert!(m.contains("Summary: Tauri + React prompt enhancer"));
-        assert!(m.contains("</context>"));
+    }
+
+    #[test]
+    fn user_message_omits_empty_context_block() {
+        // A blank/whitespace context block must not produce empty tags.
+        let m = build_user_message("hello", Some("   \n\n   "));
+        assert!(!m.contains("<context>"), "should not emit empty context: {m}");
+        assert_eq!(m, "<input>\nhello\n</input>");
     }
 
     #[test]
@@ -385,5 +691,285 @@ mod tests {
             friendly_reason("output too long 12x input"),
             "Kept original — output didn't pass checks"
         );
+    }
+
+    // ── Phase 2: rate-limit dispatch ──────────────────────────────
+
+    /// Brief Test 4: when call_llm returns RateLimit, the trace
+    /// outcome is `fallback_rate_limit` and reject_reason is
+    /// `groq_rate_limit`. Tested via the pure helper since the full
+    /// pipeline::run requires a live AppHandle (Phase 1 §7.3).
+    #[test]
+    fn classify_llm_error_maps_rate_limit_to_dedicated_outcome() {
+        let err = GroqError::RateLimit {
+            message: "Rate limit reached...".into(),
+        };
+        let (outcome, reason) = classify_llm_error(&err);
+        assert_eq!(outcome, "fallback_rate_limit");
+        assert_eq!(reason, "groq_rate_limit");
+    }
+
+    /// Brief Test 5 (regression): non-rate-limit errors stay on the
+    /// generic Fallback path. If this regresses, every Groq failure
+    /// would surface the rate-limit toast — confusing and wrong.
+    #[test]
+    fn classify_llm_error_keeps_generic_outcome_for_non_rate_limit() {
+        let err = GroqError::Network("connection refused".into());
+        let (outcome, reason) = classify_llm_error(&err);
+        assert_eq!(outcome, "n/a");
+        assert!(
+            reason.starts_with("llm_error:"),
+            "non-rate-limit reasons should keep the llm_error: prefix: {reason}"
+        );
+        assert!(reason.contains("connection refused"));
+        // Same regression check for Other (e.g. HTTP 500).
+        let err500 = GroqError::Other {
+            status: 500,
+            body: "Internal server error".into(),
+        };
+        let (outcome500, reason500) = classify_llm_error(&err500);
+        assert_eq!(outcome500, "n/a");
+        assert!(reason500.starts_with("llm_error:"));
+        // Same regression check for InvalidResponse.
+        let err_bad = GroqError::InvalidResponse("no choices".into());
+        let (outcome_bad, reason_bad) = classify_llm_error(&err_bad);
+        assert_eq!(outcome_bad, "n/a");
+        assert!(reason_bad.starts_with("llm_error:"));
+    }
+
+    /// The friendly_reason mapping is what the in-app Toast component
+    /// ultimately renders. Pin the exact rate-limit body text so the
+    /// "Your API limit has been reached." string can't drift without
+    /// a deliberate code change.
+    #[test]
+    fn friendly_reason_maps_groq_rate_limit_to_exact_toast_text() {
+        assert_eq!(
+            friendly_reason("groq_rate_limit"),
+            "Your API limit has been reached."
+        );
+    }
+
+    /// Non-rate-limit `llm_error:` reasons still map to the generic
+    /// "LLM call failed" body — regression guard so we don't
+    /// accidentally collapse all LLM failures onto the rate-limit
+    /// toast.
+    #[test]
+    fn friendly_reason_keeps_generic_llm_error_for_non_rate_limit_path() {
+        let body = friendly_reason("llm_error: groq network error: connection refused");
+        assert_eq!(body, "Kept original — LLM call failed");
+    }
+
+    // ── Step 4: context-block assembly ────────────────────────────
+
+    fn fake_project(name: &str, desc: &str) -> Project {
+        Project {
+            id: format!("proj_{name}"),
+            name: name.to_string(),
+            description: desc.to_string(),
+            links: vec![],
+            path: None,
+            created_at: "0s".into(),
+            updated_at: "0s".into(),
+        }
+    }
+
+    fn fake_summary(stack: &str, tooling: &str, conventions: &str) -> ProjectSummary {
+        ProjectSummary {
+            stack: stack.into(),
+            tooling: tooling.into(),
+            conventions: conventions.into(),
+            file_layout: vec![],
+            readme_excerpt: String::new(),
+        }
+    }
+
+    fn fake_cached_readme(body: &str) -> CachedRepo {
+        CachedRepo {
+            repo: crate::github_analyze::AnalyzedRepo {
+                name: "example".into(),
+                description: body.into(),
+                default_branch: "main".into(),
+                html_url: "https://github.com/example/repo".into(),
+            },
+            fetched_at: "0s".into(),
+        }
+    }
+
+    #[test]
+    fn stack_from_description_finds_two_keywords() {
+        let out = stack_from_description("A Rust Tauri 2 + React 19 app.");
+        assert_eq!(out.as_deref(), Some("Rust, Tauri, React"));
+    }
+
+    #[test]
+    fn stack_from_description_returns_none_below_threshold() {
+        assert!(stack_from_description("Just a Rust thing.").is_none());
+        assert!(stack_from_description("").is_none());
+        assert!(stack_from_description("A nice description with no tech.").is_none());
+    }
+
+    #[test]
+    fn stack_from_description_is_case_insensitive() {
+        let out = stack_from_description("REACT and tauri together");
+        assert_eq!(out.as_deref(), Some("Tauri, React"));
+    }
+
+    #[test]
+    fn assemble_returns_none_without_project() {
+        assert!(assemble_context_block(None, None, None).is_none());
+    }
+
+    #[test]
+    fn assemble_emits_project_and_description_with_no_scan() {
+        // Test 1 fixture: name="Foo", description with stack keywords,
+        // no path, no scan. Expected:
+        //   - wrapped in <context>...</context>
+        //   - starts with "Project: Foo"
+        //   - Stack: line derived from description
+        //   - Description: section contains the verbatim text
+        //   - under 2000 chars
+        let p = fake_project("Foo", "Tauri 2 + React 19 app");
+        let block = assemble_context_block(Some(&p), None, None).expect("block built");
+
+        assert!(block.starts_with("<context>\n"), "block: {block}");
+        assert!(block.ends_with("\n</context>"), "block: {block}");
+        assert!(block.contains("Project: Foo"), "block: {block}");
+        let stack_line = block
+            .lines()
+            .find(|l| l.starts_with("Stack:"))
+            .expect("expected a Stack: line");
+        assert!(stack_line.contains("Tauri"), "stack: {stack_line}");
+        assert!(block.contains("\nDescription:\n"), "missing Description section");
+        assert!(
+            block.contains("Tauri 2 + React 19 app"),
+            "description not verbatim: {block}"
+        );
+        assert!(block.len() <= CONTEXT_MAX_CHARS, "exceeded budget: {}", block.len());
+    }
+
+    #[test]
+    fn assemble_uses_scan_stack_when_description_lacks_keywords() {
+        let p = fake_project("Bar", "A short description.");
+        let s = fake_summary("Rust + Tauri 2", "cargo, npm", "");
+        let block = assemble_context_block(Some(&p), Some(&s), None).expect("block built");
+        assert!(block.contains("Stack: Rust + Tauri 2"), "block: {block}");
+        assert!(block.contains("Tooling: cargo, npm"), "block: {block}");
+    }
+
+    #[test]
+    fn assemble_description_keyword_match_takes_precedence_over_scan() {
+        let p = fake_project("Baz", "Rust Tauri 2 + React 19 + Vite 7");
+        // Scan claims only Tauri + React; description wins for Stack.
+        let s = fake_summary("Tauri + React", "cargo", "");
+        let block = assemble_context_block(Some(&p), Some(&s), None).expect("block built");
+        // Description-derived stack should appear, not the scan's narrower string.
+        let stack_line = block
+            .lines()
+            .find(|l| l.starts_with("Stack:"))
+            .expect("Stack line");
+        assert!(stack_line.contains("Rust"), "description-stack should include Rust: {stack_line}");
+        assert!(stack_line.contains("Vite"), "description-stack should include Vite: {stack_line}");
+        // Description section preserves the original text (with versions).
+        assert!(block.contains("Rust Tauri 2 + React 19 + Vite 7"));
+    }
+
+    #[test]
+    fn assemble_includes_file_layout_when_scan_has_entries() {
+        let p = fake_project("L", "");
+        let mut s = fake_summary("", "", "");
+        s.file_layout = vec!["src/".into(), "src/main.rs".into(), "Cargo.toml".into()];
+        let block = assemble_context_block(Some(&p), Some(&s), None).expect("block built");
+        assert!(block.contains("\nFile layout:\n"), "missing file layout section");
+        assert!(block.contains("- src/"), "missing src/ entry");
+        assert!(block.contains("- Cargo.toml"), "missing Cargo.toml entry");
+    }
+
+    #[test]
+    fn assemble_uses_scan_readme_first() {
+        let p = fake_project("R", "");
+        let mut s = fake_summary("", "", "");
+        s.readme_excerpt = "Local readme content.".into();
+        let cached = fake_cached_readme("GitHub readme blob.");
+        let block = assemble_context_block(Some(&p), Some(&s), Some(&cached)).expect("block built");
+        assert!(block.contains("Local readme content."));
+        assert!(!block.contains("GitHub readme blob."));
+    }
+
+    #[test]
+    fn assemble_falls_back_to_cached_readme_when_scan_has_none() {
+        let p = fake_project("R", "");
+        let cached = fake_cached_readme("GitHub-only readme.");
+        let block =
+            assemble_context_block(Some(&p), None, Some(&cached)).expect("block built");
+        assert!(block.contains("GitHub-only readme."));
+    }
+
+    #[test]
+    fn fit_to_budget_no_truncation_when_under_cap() {
+        let core = "core\n".to_string();
+        let layout = "layout\n".to_string();
+        let readme = "readme\n".to_string();
+        let out = fit_context_to_budget(&core, &layout, &readme);
+        assert_eq!(out, "core\nlayout\nreadme\n");
+    }
+
+    #[test]
+    fn fit_to_budget_truncates_readme_first() {
+        let core = "C".repeat(500);
+        let layout = "L".repeat(500);
+        // 1500 char readme — would overshoot the 2000 - wrapper budget.
+        let readme = "R".repeat(1500);
+        let out = fit_context_to_budget(&core, &layout, &readme);
+        let wrap = CONTEXT_OPEN.len() + CONTEXT_CLOSE.len();
+        assert!(out.len() + wrap <= CONTEXT_MAX_CHARS);
+        assert!(out.contains(TRUNC_MARKER.trim()), "expected trunc marker: {out}");
+        // core and layout intact:
+        assert!(out.starts_with(&core));
+        assert!(out.contains(&layout));
+    }
+
+    #[test]
+    fn fit_to_budget_drops_readme_then_truncates_layout() {
+        let core = "C".repeat(500);
+        let layout = "L".repeat(2000); // bigger than budget alone
+        let readme = "R".repeat(200);
+        let out = fit_context_to_budget(&core, &layout, &readme);
+        let wrap = CONTEXT_OPEN.len() + CONTEXT_CLOSE.len();
+        assert!(out.len() + wrap <= CONTEXT_MAX_CHARS);
+        // readme should be entirely absent.
+        assert!(!out.contains("R"), "readme should be dropped: {out}");
+        assert!(out.starts_with(&core));
+        assert!(out.contains(TRUNC_MARKER.trim()));
+    }
+
+    #[test]
+    fn fit_to_budget_hard_caps_core_when_core_alone_overflows() {
+        let core = "X".repeat(3000);
+        let out = fit_context_to_budget(&core, "", "");
+        let wrap = CONTEXT_OPEN.len() + CONTEXT_CLOSE.len();
+        assert!(
+            out.len() + wrap <= CONTEXT_MAX_CHARS,
+            "hard cap failed: {} chars",
+            out.len()
+        );
+        assert!(out.ends_with(TRUNC_MARKER));
+    }
+
+    #[test]
+    fn assemble_block_stays_under_budget_with_huge_readme() {
+        let p = fake_project("Big", "Tauri + React app");
+        let mut s = fake_summary("Rust + Tauri 2", "cargo, npm", "Jest co-located tests");
+        s.readme_excerpt = "A".repeat(5000); // pathologically large
+        let block = assemble_context_block(Some(&p), Some(&s), None).expect("block built");
+        assert!(
+            block.len() <= CONTEXT_MAX_CHARS,
+            "expected <= {CONTEXT_MAX_CHARS}, got {}",
+            block.len()
+        );
+        // Load-bearing content survived:
+        assert!(block.contains("Project: Big"));
+        assert!(block.contains("Stack:"));
+        assert!(block.contains("Tooling: cargo, npm"));
+        assert!(block.contains("Conventions: Jest co-located tests"));
     }
 }

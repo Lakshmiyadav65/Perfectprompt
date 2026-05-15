@@ -13,6 +13,90 @@ const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL: &str = "llama-3.3-70b-versatile";
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
+/// Typed Groq client error. Stage D in `pipeline::run` matches on this
+/// to surface a rate-limit toast distinct from the generic
+/// "Kept original" fallback notification.
+///
+/// Detection is by HTTP status (429) and, defensively, by the
+/// `error.code == "rate_limit_exceeded"` body marker that Groq returns
+/// on every rate-limit response. Verified against today's live 429s
+/// (see `2026-05-15.jsonl` trace) — Groq does NOT use HTTP 200 with
+/// an error body for rate limits, so the status-code check is
+/// authoritative.
+#[derive(Debug)]
+pub enum GroqError {
+    /// HTTP 429, or any non-2xx response whose body contains
+    /// `"code":"rate_limit_exceeded"`.
+    RateLimit { message: String },
+    /// Network-level failure: DNS, TCP, TLS, body-read, timeout, etc.
+    Network(String),
+    /// HTTP 2xx but the response body wasn't a parseable chat
+    /// completion (malformed JSON, missing `choices`, empty content).
+    InvalidResponse(String),
+    /// Anything else — non-2xx with no rate-limit signal (401, 500, etc.).
+    Other { status: u16, body: String },
+}
+
+impl std::fmt::Display for GroqError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GroqError::RateLimit { message } => {
+                write!(f, "groq rate limit: {}", trim_for_log(message, 200))
+            }
+            GroqError::Network(e) => write!(f, "groq network error: {e}"),
+            GroqError::InvalidResponse(e) => write!(f, "groq invalid response: {e}"),
+            GroqError::Other { status, body } => {
+                write!(f, "groq http {status}: {}", trim_for_log(body, 200))
+            }
+        }
+    }
+}
+
+impl std::error::Error for GroqError {}
+
+fn trim_for_log(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        return s.to_string();
+    }
+    let mut out: String = s.chars().take(max).collect();
+    out.push('…');
+    out
+}
+
+/// Pure response classifier. Tested directly — no HTTP, no AppHandle.
+/// Caller hands in the status code and body string from a Groq response;
+/// gets back either the extracted chat-completion text or a typed error.
+///
+/// Rate-limit detection: HTTP 429, OR a non-2xx response whose body
+/// contains the literal `"code":"rate_limit_exceeded"`. The second
+/// branch is defensive — Groq doesn't currently use HTTP 200 with a
+/// rate-limit body, but if they ever start, we'll still classify it
+/// correctly.
+fn classify_response(status: u16, body: &str) -> std::result::Result<String, GroqError> {
+    let looks_rate_limited = status == 429 || body.contains(r#""code":"rate_limit_exceeded""#);
+    if looks_rate_limited {
+        return Err(GroqError::RateLimit {
+            message: body.to_string(),
+        });
+    }
+    if !(200..300).contains(&status) {
+        return Err(GroqError::Other {
+            status,
+            body: body.to_string(),
+        });
+    }
+    let parsed: ChatResponse = serde_json::from_str(body)
+        .map_err(|e| GroqError::InvalidResponse(format!("JSON parse: {e}")))?;
+    parsed
+        .choices
+        .into_iter()
+        .next()
+        .and_then(|c| c.message.content)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .ok_or_else(|| GroqError::InvalidResponse("no text content in response".to_string()))
+}
+
 /// Single-temperature chat-completion request. The orchestrator at
 /// Stage D sets a route-specific value (Code 0.3 / Writing 0.6 /
 /// Generic 0.4); `generate_clarifying_questions` uses `ChatRequestJson`
@@ -89,8 +173,8 @@ pub async fn call_llm<R: Runtime>(
     user_message: &str,
     max_tokens: u32,
     temperature: f32,
-) -> Result<String> {
-    let api_key = load_api_key(app)?;
+) -> std::result::Result<String, GroqError> {
+    let api_key = load_api_key(app).map_err(|e| GroqError::Network(format!("api key: {e}")))?;
 
     let body = ChatRequest {
         model: MODEL,
@@ -111,7 +195,7 @@ pub async fn call_llm<R: Runtime>(
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(REQUEST_TIMEOUT_SECS))
         .build()
-        .context("could not build HTTP client")?;
+        .map_err(|e| GroqError::Network(format!("client build: {e}")))?;
 
     let response = client
         .post(API_URL)
@@ -120,27 +204,15 @@ pub async fn call_llm<R: Runtime>(
         .json(&body)
         .send()
         .await
-        .context("API request failed (network or DNS issue)")?;
+        .map_err(|e| GroqError::Network(format!("request failed: {e}")))?;
 
-    let status = response.status();
-    if !status.is_success() {
-        let err_body = response.text().await.unwrap_or_default();
-        return Err(anyhow!("API returned {status}: {err_body}"));
-    }
-
-    let parsed: ChatResponse = response
-        .json()
+    let status = response.status().as_u16();
+    let body_text = response
+        .text()
         .await
-        .context("failed to parse response as JSON")?;
-
-    parsed
-        .choices
-        .into_iter()
-        .next()
-        .and_then(|c| c.message.content)
-        .ok_or_else(|| anyhow!("API response had no text content"))
+        .map_err(|e| GroqError::Network(format!("body read: {e}")))?;
+    classify_response(status, &body_text)
 }
-
 
 #[tauri::command]
 pub fn get_pending_prompt(app: tauri::AppHandle) -> String {
@@ -262,7 +334,6 @@ pub async fn submit_answers_and_enhance(app: tauri::AppHandle, prompt: String, a
         let pi = crate::pipeline::PipelineInput {
             raw_input: combined_input,
             active_app: "clarify".to_string(),
-            context: None,
         };
         let output = crate::pipeline::run(app, pi).await?;
 
@@ -325,5 +396,90 @@ fn resolve_prompt_path<R: Runtime>(app: &AppHandle<R>, name: &str) -> Result<Pat
     app.path()
         .resolve(format!("prompts/{name}"), BaseDirectory::Resource)
         .with_context(|| format!("failed to resolve prompt resource {name}"))
+}
+
+// ─── Tests ────────────────────────────────────────────────────────────
+//
+// Cover the pure `classify_response` helper. The async `call_llm` is
+// not directly tested — it's exercised end-to-end by the eval harness
+// (`cargo run --example eval_pass2`) and by manual hotkey runs.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Live-captured Groq 429 body shape from `2026-05-15.jsonl`. The
+    /// classifier must recognise this even without inspecting the HTTP
+    /// status, because the `"code":"rate_limit_exceeded"` marker is the
+    /// most reliable signal Groq sends.
+    const GROQ_429_BODY: &str = r#"{"error":{"message":"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kret3kcce0rsj8fx3b2g7hbj` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98472, Requested 1694. Please try again in 2m23.424s.","type":"tokens","code":"rate_limit_exceeded"}}"#;
+
+    /// Minimal Groq chat-completion success body — the shape
+    /// `classify_response` extracts the assistant message from.
+    const GROQ_200_BODY: &str = r#"{"choices":[{"message":{"role":"assistant","content":"Refactor the user service to use async/await."}}]}"#;
+
+    #[test]
+    fn classify_429_status_returns_rate_limit() {
+        let err = classify_response(429, GROQ_429_BODY).expect_err("expected Err");
+        match err {
+            GroqError::RateLimit { message } => {
+                assert!(
+                    message.contains("rate_limit_exceeded"),
+                    "rate-limit message should preserve Groq's body for diagnosis: {message}"
+                );
+            }
+            other => panic!("expected RateLimit, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn classify_500_status_returns_other_not_rate_limit() {
+        let err = classify_response(500, "Internal server error").expect_err("expected Err");
+        match err {
+            GroqError::Other { status, body } => {
+                assert_eq!(status, 500);
+                assert_eq!(body, "Internal server error");
+            }
+            other => panic!("expected Other, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn classify_200_with_valid_body_returns_ok_content() {
+        let ok = classify_response(200, GROQ_200_BODY).expect("expected Ok");
+        assert_eq!(ok, "Refactor the user service to use async/await.");
+    }
+
+    /// Defensive case: Groq doesn't currently use HTTP 200 with an
+    /// error body, but the classifier should still spot the
+    /// rate-limit marker if they ever change. Status is 200 but the
+    /// body carries `"code":"rate_limit_exceeded"`.
+    #[test]
+    fn classify_rate_limit_body_marker_wins_even_on_non_429_status() {
+        let err = classify_response(503, GROQ_429_BODY).expect_err("expected Err");
+        assert!(
+            matches!(err, GroqError::RateLimit { .. }),
+            "body marker should classify as RateLimit even when status isn't 429: got {err:?}"
+        );
+    }
+
+    #[test]
+    fn classify_200_with_malformed_body_returns_invalid_response() {
+        let err = classify_response(200, "not json {").expect_err("expected Err");
+        assert!(
+            matches!(err, GroqError::InvalidResponse(_)),
+            "malformed body should classify as InvalidResponse: got {err:?}"
+        );
+    }
+
+    #[test]
+    fn classify_200_with_empty_content_returns_invalid_response() {
+        let body = r#"{"choices":[{"message":{"role":"assistant","content":""}}]}"#;
+        let err = classify_response(200, body).expect_err("expected Err");
+        assert!(
+            matches!(err, GroqError::InvalidResponse(_)),
+            "empty content should classify as InvalidResponse: got {err:?}"
+        );
+    }
 }
 

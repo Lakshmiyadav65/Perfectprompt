@@ -39,6 +39,17 @@ pub struct ValidatorConfig {
     /// Below this many input chars, skip the ratio check entirely — for
     /// 2-char inputs like "?" the ratio is meaningless.
     pub min_input_chars_for_ratio: usize,
+    /// Phase 2 outsourcing-detection backstop. Below this `output / input`
+    /// ratio AND with 2+ outsourcing phrases present, the rewrite is
+    /// considered to have *referenced* the user's content categorically
+    /// instead of *preserving* it (the OUTPUT-2 failure mode at ratio
+    /// 0.28). Backstop — not a quality gate. Default 0.33.
+    pub min_length_ratio: f32,
+    /// Skip the outsourcing-detection check for inputs shorter than this
+    /// many chars. Short inputs are legitimately compressed by the
+    /// rewriter (e.g. "make it faster" → 80 chars), so the ratio signal
+    /// is noisy. Default 800.
+    pub min_input_chars_for_outsource: usize,
 }
 
 impl Default for ValidatorConfig {
@@ -47,9 +58,30 @@ impl Default for ValidatorConfig {
             max_length_ratio: 8.0,
             min_output_chars: 10,
             min_input_chars_for_ratio: 5,
+            min_length_ratio: 0.33,
+            min_input_chars_for_outsource: 800,
         }
     }
 }
+
+/// Phrases that signal the model is *referencing* the user's content
+/// categorically rather than *preserving* the specifics. The curated
+/// list deliberately EXCLUDES "the existing" and "the project's" —
+/// both appear in legitimately-grounded rewrites ("use the existing
+/// pattern in user-service", "the project's existing test framework").
+/// Trigger requires 2+ matches from this list AND a sub-threshold
+/// length ratio. Either alone is not enough.
+const OUTSOURCE_PHRASES: &[&str] = &[
+    "the specified",
+    "the listed",
+    "the above",
+    "the requirements",
+    "the constraints",
+    "as described",
+    "as outlined",
+    "the aforementioned",
+    "as mentioned",
+];
 
 /// Top-level entry point. Runs the full pipeline of validators against a
 /// raw LLM output. The pipeline is ordered cheap-first: every repair
@@ -78,6 +110,9 @@ pub fn validate_and_repair(
         return ValidationOutcome::Rejected(reason);
     }
     if let Some(reason) = reject_if_too_long(&s, original_input, cfg) {
+        return ValidationOutcome::Rejected(reason);
+    }
+    if let Some(reason) = reject_if_outsources_content(&s, original_input, cfg) {
         return ValidationOutcome::Rejected(reason);
     }
     if let Some(reason) = reject_if_likely_executed_task(&s, original_input) {
@@ -240,6 +275,52 @@ fn reject_if_too_long(output: &str, input: &str, cfg: &ValidatorConfig) -> Optio
     } else {
         None
     }
+}
+
+/// Phase 2 backstop for the OUTPUT-2 catastrophic-compression failure
+/// mode (1400-char input → 400-char output, ratio 0.28 with phrases
+/// like "the listed" and "the constraints" referencing the input
+/// categorically). Two gates that must BOTH fire:
+///
+/// 1. Input ≥ `min_input_chars_for_outsource` — ratio is noisy below
+///    that, and the existing `reject_if_too_long` already covers the
+///    short-input direction.
+/// 2. `output_chars / input_chars` < `min_length_ratio` — significant
+///    compression.
+/// 3. 2+ phrases from [`OUTSOURCE_PHRASES`] in the lowercase output —
+///    the model is *referencing* content categorically.
+///
+/// All three must hold simultaneously. Terseness alone is fine. The
+/// outsourcing-phrase signal alone is also fine — those phrases can
+/// appear in faithful rewrites that happen to use them.
+fn reject_if_outsources_content(
+    output: &str,
+    input: &str,
+    cfg: &ValidatorConfig,
+) -> Option<String> {
+    let input_chars = input.chars().count();
+    if input_chars < cfg.min_input_chars_for_outsource {
+        return None;
+    }
+    let output_chars = output.chars().count();
+    let ratio = output_chars as f32 / input_chars as f32;
+    if ratio >= cfg.min_length_ratio {
+        return None;
+    }
+    let lower = output.to_ascii_lowercase();
+    let hits: Vec<&&str> = OUTSOURCE_PHRASES
+        .iter()
+        .filter(|p| lower.contains(*p))
+        .collect();
+    if hits.len() < 2 {
+        return None;
+    }
+    Some(format!(
+        "outsourced content: ratio {ratio:.2} (output {output_chars}c / input {input_chars}c) under {:.2} AND {} outsourcing phrases matched ({:?})",
+        cfg.min_length_ratio,
+        hits.len(),
+        hits.iter().map(|s| **s).collect::<Vec<_>>(),
+    ))
 }
 
 /// Heuristic: detect outputs that look like the model *answered* the
@@ -539,5 +620,85 @@ mod tests {
         let input = "refactor the user service to use async/await instead of promise chains";
         let outcome = validate_and_repair(raw, input, &cfg());
         assert!(matches!(outcome, ValidationOutcome::Repaired(_)));
+    }
+
+    // ── Phase 2: outsourcing-detection backstop ────────────────────
+
+    /// Boundary 1: long input + compressed output + 2+ outsourcing
+    /// phrases → reject. This is the OUTPUT-2 failure mode the rule
+    /// was added to catch.
+    #[test]
+    fn outsource_rejects_long_compressed_output_with_phrases() {
+        let input = "x".repeat(1400);
+        // Compressed output (ratio 0.20) with two outsourcing phrases.
+        let output = "Implement the listed requirements as described, \
+                      preserving the constraints specified."
+            .to_string();
+        let outcome = validate_and_repair(&output, &input, &cfg());
+        match outcome {
+            ValidationOutcome::Rejected(r) => {
+                assert!(
+                    r.contains("outsourced"),
+                    "reject reason should mention 'outsourced', got: {r}"
+                );
+            }
+            ValidationOutcome::Repaired(s) => panic!("expected reject, got Repaired({s:?})"),
+        }
+    }
+
+    /// Boundary 2: long input + compressed output but ZERO outsourcing
+    /// phrases → pass. Terseness alone is not enough — the model may
+    /// have legitimately compressed because the input had a lot of
+    /// padding or repetition. We only reject when the model is also
+    /// referencing content categorically.
+    #[test]
+    fn outsource_passes_long_compressed_output_without_phrases() {
+        let input = "x".repeat(1400);
+        // Compressed output (ratio 0.07) but no outsourcing phrases.
+        let output = "Refactor user service to async/await; preserve API.".to_string();
+        let outcome = validate_and_repair(&output, &input, &cfg());
+        assert!(
+            matches!(outcome, ValidationOutcome::Repaired(_)),
+            "expected Repaired (no outsourcing phrases), got Rejected"
+        );
+    }
+
+    /// Boundary 3: long input + similar-length output + 2+ outsourcing
+    /// phrases → pass. When the output isn't compressed, the phrases
+    /// are decorative, not a sign of outsourcing.
+    #[test]
+    fn outsource_passes_similar_length_output_even_with_phrases() {
+        let input = "x".repeat(1400);
+        let mut output = String::new();
+        // Make the output ~1100 chars (ratio 0.79, above 0.33).
+        output.push_str("Implement the listed requirements as described. ");
+        while output.chars().count() < 1100 {
+            output.push_str("Continue the implementation per spec. ");
+        }
+        let outcome = validate_and_repair(&output, &input, &cfg());
+        assert!(
+            matches!(outcome, ValidationOutcome::Repaired(_)),
+            "expected Repaired (length ratio above threshold), got Rejected"
+        );
+    }
+
+    /// Boundary 4: short input (<800 chars) regardless of ratio or
+    /// phrases → pass (rule doesn't apply). The existing
+    /// `reject_if_too_long` covers the other direction; this rule
+    /// stays out of the way of normal short-input rewrites.
+    #[test]
+    fn outsource_skips_short_input_even_with_compressed_phrasey_output() {
+        let input = "x".repeat(500);
+        let output = "Implement the listed requirements as described and \
+                      preserve the constraints."
+            .to_string();
+        // Ratio is 0.13 here (well below 0.33), with 3 outsourcing
+        // phrases — the only thing keeping this from rejecting is the
+        // input-length gate. Verify the gate fires.
+        let outcome = validate_and_repair(&output, &input, &cfg());
+        assert!(
+            matches!(outcome, ValidationOutcome::Repaired(_)),
+            "expected Repaired (input below 800-char gate), got Rejected"
+        );
     }
 }

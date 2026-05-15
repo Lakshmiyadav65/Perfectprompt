@@ -33,6 +33,11 @@ export function ProjectManager() {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  /// Unix-epoch-seconds string (e.g. "1700000000s") from the cached
+  /// GitHub fetch for the project being edited. Null when no cache
+  /// exists. Phase 2 Step 9.
+  const [lastFetched, setLastFetched] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     refresh();
@@ -55,6 +60,7 @@ export function ProjectManager() {
     setFormRepoUrl("");
     setNewLink("");
     setUploadedFiles([]);
+    setLastFetched(null);
     setMsg(null);
     setFormMode({ type: "add" });
   }
@@ -72,8 +78,49 @@ export function ProjectManager() {
     setFormRepoUrl(githubLink || "");
     setNewLink("");
     setUploadedFiles([]);
+    setLastFetched(null);
     setMsg(null);
     setFormMode({ type: "edit", project });
+    // Load the cached GitHub fetch timestamp (if any) for this project
+    // so the "Last fetched:" line renders without a refresh round-trip.
+    void invoke<string | null>("get_cached_context_timestamp", { id: project.id })
+      .then((ts) => setLastFetched(ts ?? null))
+      .catch((e) => {
+        console.error("get_cached_context_timestamp failed:", e);
+        setLastFetched(null);
+      });
+  }
+
+  /// Manual refresh of the cached GitHub fetch. Only meaningful when
+  /// the project is already saved (edit mode) and has at least one
+  /// github.com link. Surfaces backend errors verbatim into the form's
+  /// message area so the user can see why a refresh failed.
+  async function handleRefreshContext() {
+    if (formMode.type !== "edit") return;
+    setRefreshing(true);
+    setMsg(null);
+    try {
+      const ts = await invoke<string>("refresh_project_context", {
+        id: formMode.project.id,
+      });
+      setLastFetched(ts);
+      setMsg({ ok: true, text: "Project context refreshed." });
+    } catch (e) {
+      setMsg({ ok: false, text: `Refresh failed: ${e}` });
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  /// Format the backend's `"{seconds}s"` timestamp into a locale string.
+  /// Returns `"never"` for `null` so callers don't need to branch.
+  function formatLastFetched(raw: string | null): string {
+    if (!raw) return "never";
+    const match = /^(\d+)s$/.exec(raw);
+    if (!match) return raw;
+    const ms = Number(match[1]) * 1000;
+    if (!Number.isFinite(ms) || ms <= 0) return raw;
+    return new Date(ms).toLocaleString();
   }
 
   async function handleAnalyzeRepo() {
@@ -243,7 +290,10 @@ export function ProjectManager() {
       {/* Header */}
       <div className="pm-header">
         <div>
-          <h1 className="pm-title">Project Context</h1>
+          <h1 className="pm-title">
+            Project Context
+            <span className="pm-title-beta" aria-label="Beta feature">Beta</span>
+          </h1>
           <p className="pm-subtitle">
             Add project descriptions to make prompt enhancements context-aware
           </p>
@@ -356,6 +406,40 @@ export function ProjectManager() {
                 {analyzing ? "Analyzing…" : "Analyze"}
               </button>
             </div>
+
+            {formMode.type === "edit" && (
+              <div className="pm-refresh-row">
+                <span className="pm-refresh-label">
+                  Project context cache —{" "}
+                  <span className="pm-refresh-timestamp">
+                    Last fetched: {formatLastFetched(lastFetched)}
+                  </span>
+                </span>
+                <button
+                  className="pm-link-add-btn"
+                  onClick={() => void handleRefreshContext()}
+                  disabled={
+                    busy ||
+                    refreshing ||
+                    !formLinks.some((l) =>
+                      /^(https?:\/\/(www\.)?)?github\.com\//i.test(l.trim()) ||
+                      /^git@github\.com:/i.test(l.trim()),
+                    )
+                  }
+                  type="button"
+                  title={
+                    formLinks.some((l) =>
+                      /^(https?:\/\/(www\.)?)?github\.com\//i.test(l.trim()) ||
+                      /^git@github\.com:/i.test(l.trim()),
+                    )
+                      ? "Re-fetch and overwrite the cached GitHub context"
+                      : "Add a github.com link to enable refresh"
+                  }
+                >
+                  {refreshing ? "Refreshing…" : "Refresh project context"}
+                </button>
+              </div>
+            )}
 
             <label>Project Name</label>
             <input

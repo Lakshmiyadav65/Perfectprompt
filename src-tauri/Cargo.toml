@@ -1,6 +1,6 @@
 [package]
 name = "promptforge"
-version = "0.2.1"
+version = "0.3.0"
 description = "PromptForge — system-tray prompt enhancer"
 authors = ["PromptForge"]
 edition = "2021"
@@ -19,6 +19,7 @@ tauri-plugin-clipboard-manager = "2"
 tauri-plugin-opener = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
+tauri-plugin-notification = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
