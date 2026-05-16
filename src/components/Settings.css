@@ -105,6 +105,12 @@
   align-items: center;
 }
 
+/* Vertical breathing room between stacked rows in the same section
+   (e.g. Account's Display-name row sits above the Sign-out row). */
+.pf-row + .pf-row {
+  margin-top: 12px;
+}
+
 .pf-row input {
   flex: 1;
   padding: 9px 12px;

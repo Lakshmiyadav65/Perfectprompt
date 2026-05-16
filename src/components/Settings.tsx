@@ -1,9 +1,20 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { useAuth } from "../hooks/useAuth";
+import { useDisplayName } from "../hooks/useDisplayName";
 import "./Settings.css";
 
 const GROQ_KEYS_URL = "https://console.groq.com/keys";
+
+interface HostedQuota {
+  used: number;
+  limit: number;
+  remaining: number;
+  plan_tier: string;
+  resets_at?: string | null;
+}
 
 type ApiKeyStatus = { from_env: boolean; from_settings: boolean };
 type ConnectionTest = { ok: boolean; latency_ms: number; message: string };
@@ -59,6 +70,11 @@ const QUESTION_MODE_OPTIONS: {
 ];
 
 export function Settings() {
+  const auth = useAuth();
+  const displayName = useDisplayName(auth.user);
+  const [nameDraft, setNameDraft] = useState<string>("");
+  const [hostedQuota, setHostedQuota] = useState<HostedQuota | null>(null);
+  const [signInBusy, setSignInBusy] = useState(false);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [hotkey, setHotkey] = useState("Alt+E");
   const [keyInput, setKeyInput] = useState("");
@@ -87,6 +103,56 @@ export function Settings() {
   useEffect(() => {
     refresh();
   }, []);
+
+  // Live quota updates from the Rust pipeline whenever a hosted /enhance
+  // call returns. Replaces polling — the Account section reflects the
+  // server count within the same tick the enhancement lands.
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen<HostedQuota>("hosted:quota", (event) => {
+      setHostedQuota(event.payload);
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
+  async function handleSignIn() {
+    setSignInBusy(true);
+    try {
+      await auth.signInWithGoogle();
+    } catch (e) {
+      console.error("[settings] signInWithGoogle failed:", e);
+    } finally {
+      setSignInBusy(false);
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      await auth.signOut();
+      setHostedQuota(null);
+    } catch (e) {
+      console.error("[settings] signOut failed:", e);
+    }
+  }
+
+  // Sync the draft input with the persisted override whenever it
+  // changes externally (e.g. another window edited it).
+  useEffect(() => {
+    setNameDraft(displayName.override);
+  }, [displayName.override]);
+
+  function handleDisplayNameSave() {
+    displayName.setOverride(nameDraft);
+  }
+
+  function handleDisplayNameReset() {
+    displayName.setOverride("");
+    setNameDraft("");
+  }
 
   async function refresh() {
     try {
@@ -305,6 +371,79 @@ export function Settings() {
             Get a free Groq API key →
           </button>
         </div>
+      )}
+
+      {auth.configured && (
+        <section>
+          <h2>Account</h2>
+          {auth.loading ? (
+            <p className="pf-hint">Loading session…</p>
+          ) : auth.user ? (
+            <>
+              <p className="pf-hint">
+                Signed in as <strong>{displayName.defaultName}</strong> ({auth.user.email})
+                {hostedQuota && (
+                  <>
+                    {" · "}
+                    {hostedQuota.plan_tier}
+                    {" · "}
+                    {hostedQuota.used}/{hostedQuota.limit} used today
+                  </>
+                )}
+              </p>
+
+              <label className="pf-hint" htmlFor="pf-display-name">
+                Display name (shown in the sidebar — overrides your Google
+                name locally)
+              </label>
+              <div className="pf-row">
+                <input
+                  id="pf-display-name"
+                  type="text"
+                  placeholder={displayName.defaultName}
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  maxLength={40}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  onClick={handleDisplayNameSave}
+                  disabled={nameDraft.trim() === displayName.override}
+                >
+                  Save
+                </button>
+                <button
+                  onClick={handleDisplayNameReset}
+                  disabled={!displayName.override}
+                  className="pf-secondary"
+                >
+                  Reset
+                </button>
+              </div>
+
+              <div className="pf-row">
+                <button onClick={handleSignOut} className="pf-secondary">
+                  Sign out
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="pf-hint">
+                Sign in to use the hosted tier — 50 enhancements/day with our
+                Groq key, no setup needed. You can still use your own key
+                instead (BYOK) by leaving this signed out.
+              </p>
+              <div className="pf-row">
+                <button onClick={handleSignIn} disabled={signInBusy}>
+                  {signInBusy ? "Opening browser…" : "Sign in with Google"}
+                </button>
+              </div>
+              {auth.error && <p className="pf-msg pf-err">{auth.error}</p>}
+            </>
+          )}
+        </section>
       )}
 
       <section>

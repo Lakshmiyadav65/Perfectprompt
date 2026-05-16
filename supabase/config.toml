@@ -1,0 +1,48 @@
+# Supabase local development config.
+# Most fields use sensible defaults; uncomment + edit only what you need.
+# Run `supabase init` once to generate a richer file if you ever want full local-stack support;
+# this minimal version is enough for `db push` and `functions deploy` against a cloud project.
+
+project_id = "promptforge"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public"]
+extra_search_path = ["public"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[functions.enhance]
+# JWT verification stays ON — the enhance endpoint requires an authenticated user.
+verify_jwt = true
+
+[auth]
+# These are local-only defaults; the cloud project's auth settings are managed via the dashboard.
+enable_signup = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["promptforge://auth/callback"]
+
+# OAuth providers are configured in the Supabase cloud dashboard,
+# not here. The fields below are only consulted when running the
+# local Supabase stack (`supabase start`). Leave disabled unless you
+# need local-stack OAuth, in which case set both client_id + secret
+# via the env(...) references.
+
+[auth.external.google]
+enabled = false
+# client_id = "env(SUPABASE_AUTH_GOOGLE_CLIENT_ID)"
+# secret    = "env(SUPABASE_AUTH_GOOGLE_SECRET)"
+
+[auth.external.github]
+enabled = false
+# client_id = "env(SUPABASE_AUTH_GITHUB_CLIENT_ID)"
+# secret    = "env(SUPABASE_AUTH_GITHUB_SECRET)"

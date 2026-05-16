@@ -4,14 +4,11 @@ import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
 import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
+import { useAuth } from "../hooks/useAuth";
+import { useDisplayName } from "../hooks/useDisplayName";
 import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
-
-/// Display name shown in the sidebar profile chip. Hardcoded for now —
-/// once we add a `display_name` field to settings.json, swap this for a
-/// settings-loaded value with this string as the fallback.
-const PROFILE_NAME = "You";
 
 interface ApiKeyStatus {
   from_env: boolean;
@@ -74,6 +71,8 @@ export function Shell({ initial }: { initial: Route }) {
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
   const usage = useEnhancementUsage();
   const usagePct = Math.min(100, Math.round((usage.used / usage.limit) * 100));
+  const auth = useAuth();
+  const displayName = useDisplayName(auth.user);
 
   useEffect(() => {
     invoke<string>("get_hotkey").then(setHotkey).catch(() => {});
@@ -253,20 +252,21 @@ export function Shell({ initial }: { initial: Route }) {
           </div>
 
           {/* Profile chip — Discord/Slack style anchor for user identity.
-              TODO: wire displayName to a settings field once we add one. */}
+              Name resolves via useDisplayName: override > Google name >
+              email local-part > "You". */}
           <button
             type="button"
             className="pf-profile-chip"
             onClick={() => setRoute("settings")}
             title="Open Settings"
-            aria-label="Your profile — open Settings"
+            aria-label={`${displayName.name} — open Settings`}
           >
             <span className="pf-profile-avatar" aria-hidden="true">
-              {PROFILE_NAME.charAt(0).toUpperCase()}
+              {displayName.name.charAt(0).toUpperCase()}
             </span>
             <span className="pf-profile-text">
               <span className="pf-profile-name-row">
-                <span className="pf-profile-name">{PROFILE_NAME}</span>
+                <span className="pf-profile-name">{displayName.name}</span>
                 {isPowerUser && (
                   <span
                     className="pf-profile-badge"

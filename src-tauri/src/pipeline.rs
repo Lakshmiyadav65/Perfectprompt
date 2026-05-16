@@ -18,12 +18,14 @@ use anyhow::Result;
 use std::path::Path;
 use std::sync::OnceLock;
 use std::time::Instant;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use regex::Regex;
 
+use crate::auth;
 use crate::enhance::{call_llm, load_prompt, GroqError};
 use crate::github_analyze::{self, CachedRepo};
+use crate::hosted::{self, HostedError};
 use crate::intake::{self, IntakeResult};
 use crate::project_scan::{self, ProjectSummary};
 use crate::projects::{self, Project};
@@ -170,30 +172,65 @@ pub async fn run<R: Runtime>(
     tr.route = route_label(&router_out.decision).into();
 
     // ── Stage D: LLM ──────────────────────────────────────────────
-    let system_prompt = match load_prompt(app, prompt_file) {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[pipeline] failed to load prompt {prompt_file}: {e}");
-            tr.reject_reason = Some("prompt load failed".into());
-            return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
-        }
-    };
+    // Tier branch: signed-in users go through Supabase /enhance (which
+    // applies the system prompt server-side using HOSTED_GROQ_API_KEY
+    // and enforces daily quota via consume_quota). Signed-out users
+    // keep the BYOK path with the user's own Groq key.
+    let state = app.state::<AppState>();
+    let token = auth::current_token(state.inner());
+    let route_str = route_label(&router_out.decision);
 
-    let user_message = build_user_message(&normalized, context_block.as_deref());
     let llm_started = Instant::now();
-    let llm_result =
-        call_llm(app, &system_prompt, &user_message, max_tokens, temperature).await;
     tr.llm_called = true;
-    tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
 
-    let raw_output = match llm_result {
-        Ok(o) => o,
-        Err(e) => {
-            let (outcome, reason) = classify_llm_error(&e);
-            eprintln!("[pipeline] LLM call failed ({outcome}): {e}");
-            tr.validation_outcome = outcome;
-            tr.reject_reason = Some(reason);
-            return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+    let raw_output = if let (Some(jwt), Some(supabase_url)) = (token, hosted::supabase_url()) {
+        // Hosted path. Skips context_block in v1 — see hosted.rs
+        // module docs for why. The frontend still sees the right
+        // quota count via emitted event.
+        let hosted_result = hosted::call(&supabase_url, &jwt, &normalized, route_str).await;
+        tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
+        match hosted_result {
+            Ok(success) => {
+                emit_quota_update(app, &success.quota);
+                success.enhanced_text
+            }
+            Err(e) => {
+                let (outcome, reason, friendly) = classify_hosted_error(&e);
+                eprintln!("[pipeline] hosted call failed ({outcome}): {e}");
+                tr.validation_outcome = outcome;
+                tr.reject_reason = Some(reason);
+                return Ok(finalize_fallback_with(
+                    app,
+                    tr,
+                    &pi.raw_input,
+                    started,
+                    friendly,
+                ));
+            }
+        }
+    } else {
+        // BYOK path (unchanged).
+        let system_prompt = match load_prompt(app, prompt_file) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[pipeline] failed to load prompt {prompt_file}: {e}");
+                tr.reject_reason = Some("prompt load failed".into());
+                return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+            }
+        };
+        let user_message = build_user_message(&normalized, context_block.as_deref());
+        let llm_result =
+            call_llm(app, &system_prompt, &user_message, max_tokens, temperature).await;
+        tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
+        match llm_result {
+            Ok(o) => o,
+            Err(e) => {
+                let (outcome, reason) = classify_llm_error(&e);
+                eprintln!("[pipeline] LLM call failed ({outcome}): {e}");
+                tr.validation_outcome = outcome;
+                tr.reject_reason = Some(reason);
+                return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+            }
         }
     };
     tr.raw_llm_output = Some(raw_output.clone());
@@ -628,6 +665,69 @@ pub(crate) fn classify_llm_error(err: &GroqError) -> (String, String) {
     match err {
         GroqError::RateLimit { .. } => ("fallback_rate_limit".into(), "groq_rate_limit".into()),
         other => ("n/a".into(), format!("llm_error: {other}")),
+    }
+}
+
+/// Map a `HostedError` to `(validation_outcome, reject_reason, toast)`.
+/// The toast string is what we surface to the user; reject_reason stays
+/// machine-greppable for trace logs.
+pub(crate) fn classify_hosted_error(err: &HostedError) -> (String, String, String) {
+    match err {
+        HostedError::Unauthorized => (
+            "fallback_auth_expired".into(),
+            "hosted_unauthorized".into(),
+            "Sign-in expired — please sign in again.".into(),
+        ),
+        HostedError::QuotaExhausted(q) => (
+            "fallback_quota".into(),
+            "hosted_quota_exhausted".into(),
+            format!(
+                "Daily limit reached — {}/{} used today. Resets at 00:00 UTC.",
+                q.used, q.limit
+            ),
+        ),
+        HostedError::Network(_) => (
+            "n/a".into(),
+            format!("hosted_network: {err}"),
+            "Couldn't reach PromptForge servers — try again or sign out to use your own key."
+                .into(),
+        ),
+        HostedError::InvalidResponse(_) | HostedError::Other { .. } => (
+            "n/a".into(),
+            format!("hosted_error: {err}"),
+            "Server error — kept original prompt.".into(),
+        ),
+    }
+}
+
+/// Finalize a fallback with an explicit user-facing reason string.
+/// Used by the hosted-tier path where the toast text comes from
+/// `classify_hosted_error` rather than the generic `friendly_reason`
+/// map (which is keyed on BYOK-side reject reasons).
+fn finalize_fallback_with<R: Runtime>(
+    app: &AppHandle<R>,
+    mut tr: TraceRecord,
+    raw_input: &str,
+    started: Instant,
+    fallback_reason: String,
+) -> PipelineOutput {
+    tr.final_pasted_output = raw_input.to_string();
+    tr.total_latency_ms = started.elapsed().as_millis() as u64;
+    trace::append(app, &tr);
+    PipelineOutput {
+        final_text: raw_input.to_string(),
+        used_fallback: true,
+        fallback_reason: Some(fallback_reason),
+        trace: tr,
+    }
+}
+
+/// Push live quota numbers to the frontend so the Account section in
+/// Settings can update without polling. Payload shape mirrors
+/// `HostedQuota` (used / limit / remaining / plan_tier / resets_at).
+fn emit_quota_update<R: Runtime>(app: &AppHandle<R>, quota: &hosted::HostedQuota) {
+    if let Err(e) = app.emit("hosted:quota", quota) {
+        eprintln!("[pipeline] emit hosted:quota failed: {e}");
     }
 }
 

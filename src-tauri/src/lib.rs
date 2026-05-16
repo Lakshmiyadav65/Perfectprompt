@@ -1,9 +1,10 @@
 use std::collections::HashMap;
 
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 mod active_app;
 mod app_classifier;
+mod auth;
 mod cache;
 mod clarify;
 mod clipboard;
@@ -12,6 +13,7 @@ mod enhance;
 mod foreground_tracker;
 mod generation;
 pub mod github_analyze;
+mod hosted;
 mod hotkey;
 pub mod intake;
 pub mod pipeline;
@@ -47,6 +49,11 @@ pub struct AppState {
     /// fingerprint, so identical input + active-app skips the LLM.
     /// Wired in at Step 8 (pipeline::run()).
     pub cache: cache::EnhancementCache,
+    /// Supabase session JWT pushed from JS after sign-in. When `Some`,
+    /// the pipeline routes through the hosted /enhance edge function
+    /// instead of calling Groq directly. JS owns the OAuth dance and
+    /// refreshes the token on its side.
+    pub session_token: std::sync::Mutex<Option<String>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -61,15 +68,30 @@ pub fn run() {
             pending_questions: std::sync::Mutex::new(None),
             remembered_answers: std::sync::Mutex::new(HashMap::new()),
             cache: cache::EnhancementCache::default(),
+            session_token: std::sync::Mutex::new(None),
         })
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PromptForge is already running,
         // bring the existing main window to the foreground instead of
         // spawning a second tray + hotkey owner. The closure receives the
-        // CLI args of the second instance, but we don't take args today —
-        // we just surface the window.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // CLI args of the second instance. On Windows, OAuth deep-link
+        // callbacks (`promptforge://auth/callback?code=...`) arrive as
+        // argv on a fresh process — the OS launches a new exe and hands
+        // the URL in. Without the bridge below, single-instance would
+        // discard those URLs before the deep-link plugin ever saw them.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             println!("[single-instance] another launch attempted — surfacing app");
+            // Forward any deep-link URLs in argv to the JS layer. The
+            // useAuth hook listens for `deep-link-from-argv` and runs the
+            // same handleCallbackUrl that the deep-link plugin would.
+            for arg in argv.iter().skip(1) {
+                if arg.starts_with("promptforge://") {
+                    println!("[single-instance] forwarding deep-link arg: {arg}");
+                    if let Err(e) = app.emit("deep-link-from-argv", arg) {
+                        eprintln!("[single-instance] emit deep-link-from-argv failed: {e}");
+                    }
+                }
+            }
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.unminimize();
                 let _ = window.show();
@@ -89,6 +111,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             settings::api_key_status,
             settings::save_api_key,
@@ -127,8 +150,21 @@ pub fn run() {
             command_bar::open_main_window,
             github_analyze::analyze_github_repo,
             hotkey::trigger_enhance,
+            auth::set_session_token,
+            auth::clear_session_token,
+            auth::get_auth_status,
         ])
         .setup(|app| {
+            // Register the promptforge:// URL scheme at runtime so OAuth
+            // callbacks survive a dev launch. Production installers register
+            // the scheme via the deep-link plugin's bundle metadata.
+            #[cfg(any(windows, target_os = "linux"))]
+            {
+                use tauri_plugin_deep_link::DeepLinkExt;
+                if let Err(e) = app.deep_link().register("promptforge") {
+                    println!("[deep-link] register failed: {e}");
+                }
+            }
             let user_settings = settings::load(app.handle());
             tray::build(app.handle())?;
             // Honour the persisted master toggle on startup. When the

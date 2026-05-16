@@ -1,15 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
+import { listen } from "@tauri-apps/api/event";
 
-/// Frontend-only daily-usage tracker for the enhancement action.
-/// Persisted in localStorage; resets when the local date rolls over.
-/// Cross-window updates flow through the native `storage` event
-/// (fires in every window that didn't write the value) plus a
-/// custom in-window event so the originating window also rerenders.
+/// Daily-usage tracker for the enhancement action.
+///
+/// Two sources, in order of precedence:
+///   1. Server-backed: when the hosted-tier pipeline emits a
+///      `hosted:quota` event (Rust → JS, fired after every signed-in
+///      /enhance call), we snapshot the server's count and ignore the
+///      localStorage path. This is authoritative — consume_quota() in
+///      Postgres is the source of truth.
+///   2. Local fallback: BYOK path or signed-out users keep the legacy
+///      localStorage counter. Resets when the local date rolls over.
 
 const STORAGE_KEY = "pf.enhancements.usage";
 const UPDATE_EVENT = "pf-usage-changed";
 
 export const DAILY_LIMIT = 50;
+
+interface HostedQuota {
+  used: number;
+  limit: number;
+  remaining: number;
+  plan_tier: string;
+  resets_at?: string | null;
+}
 
 interface StoredUsage {
   date: string; // YYYY-MM-DD (local)
@@ -48,6 +62,7 @@ function saveCount(count: number) {
 
 export function useEnhancementUsage() {
   const [used, setUsed] = useState<number>(loadCount);
+  const [hosted, setHosted] = useState<HostedQuota | null>(null);
 
   useEffect(() => {
     const refresh = () => setUsed(loadCount());
@@ -62,6 +77,18 @@ export function useEnhancementUsage() {
     };
   }, []);
 
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+    void listen<HostedQuota>("hosted:quota", (event) => {
+      setHosted(event.payload);
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, []);
+
   const increment = useCallback(() => {
     const next = Math.min(loadCount() + 1, DAILY_LIMIT);
     saveCount(next);
@@ -69,11 +96,17 @@ export function useEnhancementUsage() {
     setUsed(next);
   }, []);
 
+  // Server data wins when present — it's authoritative for signed-in
+  // users. Falls back to localStorage for BYOK / signed-out.
+  const effectiveUsed = hosted ? hosted.used : used;
+  const effectiveLimit = hosted ? hosted.limit : DAILY_LIMIT;
+
   return {
-    used,
-    limit: DAILY_LIMIT,
-    remaining: Math.max(DAILY_LIMIT - used, 0),
-    limitReached: used >= DAILY_LIMIT,
+    used: effectiveUsed,
+    limit: effectiveLimit,
+    remaining: Math.max(effectiveLimit - effectiveUsed, 0),
+    limitReached: effectiveUsed >= effectiveLimit,
+    source: hosted ? ("hosted" as const) : ("local" as const),
     increment,
   };
 }
