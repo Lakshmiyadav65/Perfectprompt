@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Default capabilities for PromptForge windows",
+  "description": "Default capabilities for PerfectPrompt windows",
   "windows": ["main", "status", "settings", "command-bar", "toast"],
   "permissions": [
     "core:default",

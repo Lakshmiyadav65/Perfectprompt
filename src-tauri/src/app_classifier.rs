@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_app::ActiveAppContext;
 use crate::settings::AppClassificationSettings;
 
-/// How PromptForge should treat the active app for the upcoming
+/// How PerfectPrompt should treat the active app for the upcoming
 /// enhancement (FR-002 of the context-aware-enhancement feature).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -200,7 +200,7 @@ mod tests {
     fn vscode_classified_as_developer() {
         let s = default_settings();
         assert_eq!(
-            classify(&ctx("Code.exe", "promptforge - Visual Studio Code"), &s),
+            classify(&ctx("Code.exe", "perfectprompt - Visual Studio Code"), &s),
             AppClassification::Developer
         );
     }
@@ -241,7 +241,7 @@ mod tests {
         let s = default_settings();
         assert_eq!(
             classify(
-                &ctx("chrome.exe", "promptforge - github.dev"),
+                &ctx("chrome.exe", "perfectprompt - github.dev"),
                 &s
             ),
             AppClassification::Developer

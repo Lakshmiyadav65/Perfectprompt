@@ -10,7 +10,7 @@ import { REDIRECT_URL, isSupabaseConfigured, supabase } from "./supabase";
 /// Supabase PKCE flow: we call signInWithOAuth which generates an
 /// authorization URL (and stashes a code_verifier in localStorage).
 /// We open that URL in the user's default browser. Once they consent,
-/// Supabase redirects to promptforge://auth/callback?code=xxx — which
+/// Supabase redirects to perfectprompt://auth/callback?code=xxx — which
 /// the deep-link listener (installed at app startup) catches and feeds
 /// to exchangeCodeForSession.
 export async function signInWithGoogle(): Promise<void> {
@@ -46,7 +46,7 @@ export async function signOut(): Promise<void> {
 ///   1. `onOpenUrl` from the deep-link plugin — fires when the app is
 ///      already focused and the OS dispatches the URL via IPC.
 ///   2. `deep-link-from-argv` — emitted by the single-instance plugin
-///      in lib.rs when a second `promptforge.exe` launch arrives with
+///      in lib.rs when a second `perfectprompt.exe` launch arrives with
 ///      the URL in argv. Without this bridge, the URL is silently
 ///      dropped because single-instance discards the new process.
 export async function installDeepLinkHandler(): Promise<() => void> {

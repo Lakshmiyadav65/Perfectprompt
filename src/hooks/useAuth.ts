@@ -68,7 +68,7 @@ export function useAuth(): AuthState {
     });
 
     // Deep link callback handler — installed once per window. Auth
-    // callbacks arrive as promptforge://auth/callback?code=... in the
+    // callbacks arrive as perfectprompt://auth/callback?code=... in the
     // main window since it has the deep-link capability.
     if (!deepLinkInstalled) {
       deepLinkInstalled = true;

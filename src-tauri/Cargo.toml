@@ -1,12 +1,12 @@
 [package]
-name = "promptforge"
+name = "perfectprompt"
 version = "0.3.0"
-description = "PromptForge — system-tray prompt enhancer"
-authors = ["PromptForge"]
+description = "PerfectPrompt — system-tray prompt enhancer"
+authors = ["PerfectPrompt"]
 edition = "2021"
 
 [lib]
-name = "promptforge_lib"
+name = "perfectprompt_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

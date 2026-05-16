@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "PromptForge",
+  "productName": "PerfectPrompt",
   "version": "0.3.0",
   "identifier": "com.promptforge.app",
   "build": {
@@ -14,7 +14,7 @@
       {
         "label": "main",
         "url": "index.html#/home",
-        "title": "PromptForge",
+        "title": "PerfectPrompt",
         "width": 1100,
         "height": 720,
         "minWidth": 880,
@@ -27,7 +27,7 @@
       {
         "label": "status",
         "url": "index.html#/status",
-        "title": "PromptForge Status",
+        "title": "PerfectPrompt Status",
         "width": 220,
         "height": 70,
         "decorations": false,
@@ -42,7 +42,7 @@
       {
         "label": "settings",
         "url": "index.html#/settings",
-        "title": "PromptForge Settings",
+        "title": "PerfectPrompt Settings",
         "width": 540,
         "height": 720,
         "resizable": true,
@@ -66,7 +66,7 @@
       {
         "label": "projects",
         "url": "index.html#/projects",
-        "title": "PromptForge — Projects",
+        "title": "PerfectPrompt — Projects",
         "width": 700,
         "height": 600,
         "resizable": true,
@@ -93,7 +93,7 @@
       {
         "label": "command-bar",
         "url": "index.html#/command-bar",
-        "title": "PromptForge",
+        "title": "PerfectPrompt",
         "width": 160,
         "height": 60,
         "resizable": false,
@@ -108,7 +108,7 @@
       {
         "label": "toast",
         "url": "index.html#/toast",
-        "title": "PromptForge Toast",
+        "title": "PerfectPrompt Toast",
         "width": 360,
         "height": 96,
         "resizable": false,
@@ -128,7 +128,7 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["promptforge"]
+        "schemes": ["perfectprompt"]
       }
     }
   },

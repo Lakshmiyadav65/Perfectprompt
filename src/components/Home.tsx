@@ -22,7 +22,7 @@ interface ApiKeyStatus {
   from_settings: boolean;
 }
 
-/// Hard-coded sample rows for the "Recent enhancements" list. PromptForge
+/// Hard-coded sample rows for the "Recent enhancements" list. PerfectPrompt
 /// doesn't persist enhancement history yet — these are illustrative.
 /// TODO: wire to a real Rust-side log once we have on-disk storage.
 const SAMPLE_RECENT = [
@@ -39,7 +39,7 @@ const SAMPLE_RECENT = [
   {
     time: "12:30 PM",
     from: "linkedin post about shipping V1",
-    to: "Write a LinkedIn post announcing PromptForge V1 with a behind-the-scenes vibe…",
+    to: "Write a LinkedIn post announcing PerfectPrompt V1 with a behind-the-scenes vibe…",
   },
   {
     time: "11:18 AM",
@@ -168,14 +168,14 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
 
         {/* ===== DEMO CARD =====
             Ported from docs/index.html's `.flow-stage` (the website's
-            "promptforge · live flow" animation). Markup mirrors the
+            "perfectprompt · live flow" animation). Markup mirrors the
             website 1:1; styles are in Home.css scaled to this card. */}
         <div className="ph-demo-card">
           <div className="ph-demo-bar">
             <div className="ph-demo-lights">
               <span /><span /><span />
             </div>
-            <span className="ph-demo-lbl">promptforge · live flow</span>
+            <span className="ph-demo-lbl">perfectprompt · live flow</span>
             <div className="ph-stage-progress" aria-hidden>
               <span className="ph-pdot p1" />
               <span className="ph-pdot p2" />

@@ -25,4 +25,4 @@ export const supabase: SupabaseClient = createClient(
   },
 );
 
-export const REDIRECT_URL = "promptforge://auth/callback";
+export const REDIRECT_URL = "perfectprompt://auth/callback";

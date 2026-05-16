@@ -351,13 +351,13 @@ export function Settings() {
 
   return (
     <div className="pf-settings">
-      <h1>PromptForge Settings</h1>
+      <h1>PerfectPrompt Settings</h1>
 
       {noKey && (
         <div className="pf-welcome">
-          <h2 className="pf-welcome-title">Welcome to PromptForge 👋</h2>
+          <h2 className="pf-welcome-title">Welcome to PerfectPrompt 👋</h2>
           <p className="pf-welcome-body">
-            To enhance prompts, PromptForge needs a Groq API key. It's free and
+            To enhance prompts, PerfectPrompt needs a Groq API key. It's free and
             takes about 30 seconds to set up — sign in with Google or GitHub at
             console.groq.com, click <strong>Create API Key</strong>, then paste
             the key below.
@@ -573,7 +573,7 @@ export function Settings() {
         <p className="pf-privacy">
           Privacy: question text, your answers, and the assembled context block
           stay in memory only — they're never logged or persisted by
-          PromptForge. They are sent to Groq as part of the LLM call and are
+          PerfectPrompt. They are sent to Groq as part of the LLM call and are
           subject to{" "}
           <a
             href="#"
@@ -598,7 +598,7 @@ export function Settings() {
         <h2>Active-App Routing</h2>
         <p className="pf-hint">
           When the hotkey fires inside a developer environment (VS Code,
-          Cursor, terminals, JetBrains IDEs, …) PromptForge skips the
+          Cursor, terminals, JetBrains IDEs, …) PerfectPrompt skips the
           questionnaire and enhances directly using your active project
           context. Everywhere else it shows the guided questionnaire.
         </p>

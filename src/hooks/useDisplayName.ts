@@ -12,7 +12,7 @@ import type { User } from "@supabase/supabase-js";
 ///   4. `"You"` — the historical fallback when signed out.
 ///
 /// Cross-window sync via the `storage` event + a custom in-window event,
-/// mirroring useEnhancementUsage so multiple PromptForge windows stay
+/// mirroring useEnhancementUsage so multiple PerfectPrompt windows stay
 /// consistent without polling.
 
 const STORAGE_KEY = "pf.display_name_override";

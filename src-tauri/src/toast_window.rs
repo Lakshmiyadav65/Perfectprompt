@@ -4,7 +4,7 @@
 //!
 //! Called from [`crate::tray::notify_fallback`] to replace the
 //! OS-native rate-limit notification with a dark-UI / orange-accent
-//! toast that matches the rest of PromptForge.
+//! toast that matches the rest of PerfectPrompt.
 //!
 //! The lifecycle is asymmetric: this module owns SHOWING the window
 //! (position + show); the React component owns HIDING (via the Tauri

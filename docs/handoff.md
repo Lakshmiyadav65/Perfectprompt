@@ -1,4 +1,4 @@
-# PromptForge — Phase 2 Handoff
+# PerfectPrompt — Phase 2 Handoff
 
 Picking up where the previous session left off. This document is the
 single source of truth for what's been done, what's in-flight, and
@@ -38,7 +38,7 @@ what's blocked — written for whoever comes in fresh (human or agent).
 
 ## 1. Project context (one paragraph)
 
-**PromptForge** is a Tauri 2 + Rust + React 19 system-tray app that
+**PerfectPrompt** is a Tauri 2 + Rust + React 19 system-tray app that
 turns rough prompt text into precise prompts via a global hotkey
 (`Ctrl+Alt+E`). It captures the user's selection via Win32 SendInput,
 runs an enhancement pipeline that hits Groq's
@@ -334,7 +334,7 @@ All four fixes are in the working tree on top of Phase 2 Steps 1-10.
 - **Mode A signal: 0 Rust-idiom hits** in 3 WITH-context Code-routed
   outputs. The tightened convention block didn't push the model
   toward `Result<T, E>` / `?` / `match`. **Mode A fix did not take.**
-- **Mode B signal: 0 "Smart Question Engine" leaks**, **2 "PromptForge"
+- **Mode B signal: 0 "Smart Question Engine" leaks**, **2 "PerfectPrompt"
   leaks.** The extended NEVER suppressed the subsystem name but the
   model still volunteered the product name. The Mode B fix
   partially took but missed the project-name case — likely because
@@ -437,7 +437,7 @@ dep) or a frontend listener (not built).
 | Option | What you get | Diff size | Notes |
 |---|---|---|---|
 | **A. `tauri-plugin-notification`** (recommended) | Real Windows Action Center toast. Visible top-right, persists in action center. | ~50 lines | New Tauri-official dep |
-| **B. Frontend toast** | Banner inside open PromptForge window, listens to existing `pipeline:fallback` event | ~80 lines | Useless when no PF window is foregrounded |
+| **B. Frontend toast** | Banner inside open PerfectPrompt window, listens to existing `pipeline:fallback` event | ~80 lines | Useless when no PF window is foregrounded |
 | **C. Always-on toast window** | Tiny Tauri window appears bottom-right ~3s | ~170 lines | Most code, most flexible |
 
 Phase 1's reasoning for the surrogate-only approach was "the brief
@@ -458,7 +458,7 @@ answer.
 | API key org | `org_01kret3kcce0rsj8fx3b2g7hbj` — daily TPD shared across all keys from this Groq account |
 | Today's trace file | `%APPDATA%\com.promptforge.app\traces\2026-05-15.jsonl` |
 | Today's TPD state | ~99,500 / 100,000 used. Resets at UTC 00:00 |
-| Active project | id `proj_1778767636512`, name `prompt`, description = PromptForge README dump (1530 chars), path = null, github link present |
+| Active project | id `proj_1778767636512`, name `prompt`, description = PerfectPrompt README dump (1530 chars), path = null, github link present |
 
 ## 10. Files changed since Phase 1 snapshot
 
@@ -545,11 +545,11 @@ Plus 4 untracked files:
      stack idioms" (the model may be resolving tension by hedging)
 
 5. **Address the lingering Mode B weakness.** Pass 2's clean signal
-   was: 0 SQE leaks, but 2 "PromptForge" leaks. The product-name
+   was: 0 SQE leaks, but 2 "PerfectPrompt" leaks. The product-name
    leak path isn't covered by the Mode B NEVER. Options:
    - Add a third BAD example specifically about product names:
-     "input `fix the bug` + context project name "PromptForge" →
-     rewrite reframes as "fix the bug in PromptForge..." (NEVER)"
+     "input `fix the bug` + context project name "PerfectPrompt" →
+     rewrite reframes as "fix the bug in PerfectPrompt..." (NEVER)"
    - Or: omit `Project: {name}` from the bundle entirely when the
      input doesn't reference the project by name. More invasive but
      cleanly cuts the leak source.
@@ -570,7 +570,7 @@ Plus 4 untracked files:
 - **Smart App Control transiently blocks freshly-built test
   binaries.** Symptom: `error: test failed ... could not execute
   process ... An Application Control policy has blocked this file.
-  (os error 4551)`. Workaround: delete `target/debug/deps/promptforge_lib-*`
+  (os error 4551)`. Workaround: delete `target/debug/deps/perfectprompt_lib-*`
   and re-build; the fresh binary content gets a different hash and
   AppControl re-evaluates.
 - **Em-dash encoding mismatch.** When the harness's `format!()`

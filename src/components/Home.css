@@ -346,7 +346,7 @@
 
 /* =========================================================
    FLOW-STAGE animation — ported from docs/index.html
-   ("promptforge · live flow"). Timings/easing match the
+   ("perfectprompt · live flow"). Timings/easing match the
    website exactly; sizes/paddings scaled to fit this card.
    Master cycle: 13s flow + 4s pause = 17s (Home.tsx re-keys
    .ph-stage-body to restart the keyframes).

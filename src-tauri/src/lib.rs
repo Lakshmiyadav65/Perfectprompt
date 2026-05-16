@@ -71,11 +71,11 @@ pub fn run() {
             session_token: std::sync::Mutex::new(None),
         })
         // Single-instance: when the user double-clicks the desktop icon
-        // (or relaunches in any way) while PromptForge is already running,
+        // (or relaunches in any way) while PerfectPrompt is already running,
         // bring the existing main window to the foreground instead of
         // spawning a second tray + hotkey owner. The closure receives the
         // CLI args of the second instance. On Windows, OAuth deep-link
-        // callbacks (`promptforge://auth/callback?code=...`) arrive as
+        // callbacks (`perfectprompt://auth/callback?code=...`) arrive as
         // argv on a fresh process — the OS launches a new exe and hands
         // the URL in. Without the bridge below, single-instance would
         // discard those URLs before the deep-link plugin ever saw them.
@@ -85,7 +85,7 @@ pub fn run() {
             // useAuth hook listens for `deep-link-from-argv` and runs the
             // same handleCallbackUrl that the deep-link plugin would.
             for arg in argv.iter().skip(1) {
-                if arg.starts_with("promptforge://") {
+                if arg.starts_with("perfectprompt://") {
                     println!("[single-instance] forwarding deep-link arg: {arg}");
                     if let Err(e) = app.emit("deep-link-from-argv", arg) {
                         eprintln!("[single-instance] emit deep-link-from-argv failed: {e}");
@@ -155,20 +155,20 @@ pub fn run() {
             auth::get_auth_status,
         ])
         .setup(|app| {
-            // Register the promptforge:// URL scheme at runtime so OAuth
+            // Register the perfectprompt:// URL scheme at runtime so OAuth
             // callbacks survive a dev launch. Production installers register
             // the scheme via the deep-link plugin's bundle metadata.
             #[cfg(any(windows, target_os = "linux"))]
             {
                 use tauri_plugin_deep_link::DeepLinkExt;
-                if let Err(e) = app.deep_link().register("promptforge") {
+                if let Err(e) = app.deep_link().register("perfectprompt") {
                     println!("[deep-link] register failed: {e}");
                 }
             }
             let user_settings = settings::load(app.handle());
             tray::build(app.handle())?;
             // Honour the persisted master toggle on startup. When the
-            // user has paused PromptForge, we still build the tray and
+            // user has paused PerfectPrompt, we still build the tray and
             // window but skip global-shortcut registration so the
             // hotkey is genuinely dormant. Flipping the toggle back on
             // from the sidebar re-registers it.
@@ -198,7 +198,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-/// PromptForge is a system-tray app, so the auxiliary windows must outlive
+/// PerfectPrompt is a system-tray app, so the auxiliary windows must outlive
 /// the user clicking their X buttons. Tauri 2's default behavior on
 /// `CloseRequested` is to *destroy* the WebviewWindow, after which
 /// `get_webview_window(label)` returns `None` and the tray menu can no

@@ -1,6 +1,6 @@
 # Backend setup (Supabase)
 
-PromptForge's optional hosted tiers run on Supabase. This doc covers
+PerfectPrompt's optional hosted tiers run on Supabase. This doc covers
 the one-time setup: creating the project, applying the schema,
 configuring auth, and deploying the `/enhance` edge function.
 
@@ -129,7 +129,7 @@ In the dashboard: **Authentication → Providers**.
 3. Paste client ID + secret into the Supabase dashboard's GitHub provider.
 
 **Redirect URLs (Tauri deep link):**
-In **Authentication → URL Configuration**, add `promptforge://auth/callback` to the **Redirect URLs** allowlist. The Tauri client will register this custom URL scheme so the OAuth flow can hand control back to the desktop app after sign-in.
+In **Authentication → URL Configuration**, add `perfectprompt://auth/callback` to the **Redirect URLs** allowlist. The Tauri client will register this custom URL scheme so the OAuth flow can hand control back to the desktop app after sign-in.
 
 ---
 
@@ -175,7 +175,7 @@ Source of truth lives in `/prompts/*.md`. The flow is:
 
 Free-tier limits that matter for this app:
 
-| Resource | Free | Estimated PromptForge ceiling |
+| Resource | Free | Estimated PerfectPrompt ceiling |
 |---|---|---|
 | DB | 500 MB | ~2.5M enhancement rows. Years, with monthly pruning. |
 | MAU | 50,000 | Not the blocker. |

@@ -154,7 +154,7 @@ export function Shell({ initial }: { initial: Route }) {
       <aside className="pf-sidebar">
         <div className="pf-brand">
           <BrandMark />
-          <div className="pf-brand-name">PromptForge</div>
+          <div className="pf-brand-name">PerfectPrompt</div>
         </div>
 
         <nav className="pf-nav" aria-label="Primary">
@@ -233,7 +233,7 @@ export function Shell({ initial }: { initial: Route }) {
                 onClick={() => void handleToggle()}
                 disabled={toggling || !ready}
                 aria-label={enabled ? "Pause" : "Activate"}
-                title={enabled ? "Pause PromptForge" : "Activate PromptForge"}
+                title={enabled ? "Pause PerfectPrompt" : "Activate PerfectPrompt"}
               >
                 <span className="pf-toggle-mini-dot" />
               </button>

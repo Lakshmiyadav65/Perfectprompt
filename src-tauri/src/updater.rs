@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 const RELEASES_API_URL: &str =
     "https://api.github.com/repos/Lakshmiyadav65/PromptEnhancer/releases/latest";
-const USER_AGENT: &str = "PromptForge-UpdateCheck";
+const USER_AGENT: &str = "PerfectPrompt-UpdateCheck";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Deserialize)]

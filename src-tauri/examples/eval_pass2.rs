@@ -1,4 +1,4 @@
-//! Pass-2 eval harness for the PromptForge pipeline.
+//! Pass-2 eval harness for the PerfectPrompt pipeline.
 //!
 //! Drives the three pure stages (intake → router → validate) and the
 //! one network stage (Groq LLM) without a live Tauri AppHandle. Mirrors
@@ -20,9 +20,9 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use promptforge_lib::intake::{self, IntakeConfig, IntakeResult};
-use promptforge_lib::router::{self, RoutingDecision};
-use promptforge_lib::validate::{self, ValidationOutcome, ValidatorConfig};
+use perfectprompt_lib::intake::{self, IntakeConfig, IntakeResult};
+use perfectprompt_lib::router::{self, RoutingDecision};
+use perfectprompt_lib::validate::{self, ValidationOutcome, ValidatorConfig};
 
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL: &str = "llama-3.3-70b-versatile";

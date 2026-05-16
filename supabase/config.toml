@@ -3,7 +3,7 @@
 # Run `supabase init` once to generate a richer file if you ever want full local-stack support;
 # this minimal version is enough for `db push` and `functions deploy` against a cloud project.
 
-project_id = "promptforge"
+project_id = "perfectprompt"
 
 [api]
 enabled = true
@@ -29,7 +29,7 @@ verify_jwt = true
 # These are local-only defaults; the cloud project's auth settings are managed via the dashboard.
 enable_signup = true
 site_url = "http://localhost:5173"
-additional_redirect_urls = ["promptforge://auth/callback"]
+additional_redirect_urls = ["perfectprompt://auth/callback"]
 
 # OAuth providers are configured in the Supabase cloud dashboard,
 # not here. The fields below are only consulted when running the

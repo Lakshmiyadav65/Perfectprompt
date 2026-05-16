@@ -32,9 +32,9 @@
 //!   permitted; with `fix the bug` + the same scan, file naming is
 //!   forbidden. Manual verification.
 
-use promptforge_lib::pipeline::{self};
-use promptforge_lib::projects::Project;
-use promptforge_lib::router::{self, RoutingDecision};
+use perfectprompt_lib::pipeline::{self};
+use perfectprompt_lib::projects::Project;
+use perfectprompt_lib::router::{self, RoutingDecision};
 
 fn main() {
     println!("=================================================================");

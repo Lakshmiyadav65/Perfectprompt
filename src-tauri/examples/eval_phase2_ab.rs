@@ -35,11 +35,11 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use promptforge_lib::intake::{self, IntakeConfig, IntakeResult};
-use promptforge_lib::pipeline;
-use promptforge_lib::projects::{Project, ProjectStore};
-use promptforge_lib::router::{self, RoutingDecision};
-use promptforge_lib::validate::{self, ValidationOutcome, ValidatorConfig};
+use perfectprompt_lib::intake::{self, IntakeConfig, IntakeResult};
+use perfectprompt_lib::pipeline;
+use perfectprompt_lib::projects::{Project, ProjectStore};
+use perfectprompt_lib::router::{self, RoutingDecision};
+use perfectprompt_lib::validate::{self, ValidationOutcome, ValidatorConfig};
 
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL: &str = "llama-3.3-70b-versatile";
@@ -527,14 +527,14 @@ const PRE_PROMPT2_INPUT_LEN: usize = 1107;
 const PRE_VALIDATOR_FIRINGS: usize = 0;
 const PRE_SQE_LEAKS: usize = 0;
 
-/// PromptForge-specific names from the active project's description
+/// PerfectPrompt-specific names from the active project's description
 /// that the LLM should NOT volunteer unless the input names them.
 /// Each is a Mode-B context-bleed risk. Used by the diff section to
 /// count post-fix leaks vs the pass-1 baseline (which was 0).
 const SUBSYSTEM_NAMES: &[&str] = &[
     "Smart Question Engine",
     "Wispr Flow",
-    "PromptForge",
+    "PerfectPrompt",
 ];
 
 fn mean_ratio(lens: &[usize], input_len: usize) -> f32 {
@@ -735,7 +735,7 @@ fn render_diff_section(results: &[(String, RunResult)]) -> String {
         sqe_leaks_total as i64 - PRE_SQE_LEAKS as i64
     ));
     s.push_str(&format!(
-        "| Other subsystem-name leaks (PromptForge / Wispr Flow) | 0 | {} | {:+} |\n",
+        "| Other subsystem-name leaks (PerfectPrompt / Wispr Flow) | 0 | {} | {:+} |\n",
         other_subsystem_leaks_total, other_subsystem_leaks_total as i64
     ));
     s.push_str("\n");
@@ -868,7 +868,7 @@ async fn main() {
             std::process::exit(1);
         }
     };
-    let cached = promptforge_lib::github_analyze::cached_repo(&cache_dir, &project.id);
+    let cached = perfectprompt_lib::github_analyze::cached_repo(&cache_dir, &project.id);
     println!(
         "[ab] cached github fetch: {}",
         if cached.is_some() { "present" } else { "absent" }

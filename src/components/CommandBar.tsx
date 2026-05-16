@@ -177,7 +177,7 @@ export function CommandBar() {
       <div
         className="cb-row"
         role="toolbar"
-        aria-label="PromptForge command bar"
+        aria-label="PerfectPrompt command bar"
         tabIndex={0}
       >
         <button
@@ -215,7 +215,7 @@ export function CommandBar() {
           title="Enhance the selected text (same as Ctrl+Alt+E)"
         >
           <img
-            src="/promptforge.svg"
+            src="/perfectprompt.svg"
             width="14"
             height="14"
             alt=""
@@ -238,7 +238,7 @@ export function CommandBar() {
       </div>
 
       {pickerOpen && (
-        <div className="cb-picker-pop" role="dialog" aria-label="PromptForge picker">
+        <div className="cb-picker-pop" role="dialog" aria-label="PerfectPrompt picker">
           <div className="cb-picker-section" role="listbox" aria-label="Active project">
             <button
               type="button"

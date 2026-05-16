@@ -190,7 +190,7 @@ body.cb-route.cb-picker-open .cb-icon-btn {
   box-shadow: 0 0 0 2px var(--pf-accent-ring);
 }
 
-/* The enhance button now hosts the PromptForge logo (gradient art).
+/* The enhance button now hosts the PerfectPrompt logo (gradient art).
    Hover stays the neutral .cb-icon-btn treatment so the orange accent
    doesn't sit behind the gradient and clash. The logo is sized to
    match the other two icons (14x14). */

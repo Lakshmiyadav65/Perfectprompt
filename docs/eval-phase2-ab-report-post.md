@@ -24,7 +24,7 @@ Stack: Rust, Tauri, React, TypeScript
 
 Description:
 --- README ---
-# PromptForge
+# PerfectPrompt
 
 > A system-tray prompt enhancer. Press a global hotkey anywhere on your computer to turn rough prompts into precise ones — works in any app where you can select text.
 
@@ -36,13 +36,13 @@ Built with Tauri 2 + Rust + React + TypeScript.
 
 1. Select rough prompt text in any app (Notepad, Brave, VS Code chat, terminal, anywhere).
 2. Press the global hotkey (default `Ctrl+Alt+E` on Windows, `Cmd+Option+E` on macOS).
-3. PromptForge captures the selection and runs the **Smart Question Engine** (see below). The result is pasted back over your selection.
+3. PerfectPrompt captures the selection and runs the **Smart Question Engine** (see below). The result is pasted back over your selection.
 
 Think Wispr Flow, but for written prompts to coding agents (Claude Code, Cursor, ChatGPT) instead of voice.
 
 ### Two paths after the hotkey
 
-PromptForge scores the captured input for "enhancement ambiguity" and branches:
+PerfectPrompt scores the captured input for "enhancement ambiguity" and branches:
 
 - **Silent fast-path** (`score < threshold`, or `question_mode = Silent`, or **`Shift`+hotkey**): one LLM call, a small "Enhancing…" pill near your cursor, the enhanced text replaces your selection in ~2–3 seconds.
 - **Question-card path** (`score ≥ threshold`, or `question_mode = Always ask`): a 360px floating card appears with 2–4 chip questions about audience / tone / goal / constraints / format. Pick the most defensible answers (Enter submits, Escape skips, arrow keys navigate), and the enhanced prompt — informed by your answers — replaces your selection.
@@ -138,7 +138,7 @@ Develop tests to cover marking and unmarking favorites, the 50-favorite limit, p
 **Final output:**
 
 ```
-Implement a "favorite prompts" feature in the PromptForge application. Add a star icon to each recent-history item, allowing users to toggle favorite status. Create a new "Favorites" section in the sidebar, positioned between "Recent" and the usage card, which is collapsible and limited to 50 favorites. Ensure that favorites persist across app restarts, are stored on disk alongside other settings, and are synced to the trace log for eval reports. Develop tests to cover marking and unmarking favorites, the 50-favorite limit, persistence across restarts, and verify that recent-history filtering remains functional. Maintain a consistent visual style with the existing sidebar and do not alter the existing recent-history behavior.
+Implement a "favorite prompts" feature in the PerfectPrompt application. Add a star icon to each recent-history item, allowing users to toggle favorite status. Create a new "Favorites" section in the sidebar, positioned between "Recent" and the usage card, which is collapsible and limited to 50 favorites. Ensure that favorites persist across app restarts, are stored on disk alongside other settings, and are synced to the trace log for eval reports. Develop tests to cover marking and unmarking favorites, the 50-favorite limit, persistence across restarts, and verify that recent-history filtering remains functional. Maintain a consistent visual style with the existing sidebar and do not alter the existing recent-history behavior.
 ```
 
 ---
@@ -175,7 +175,7 @@ Develop tests to cover marking and unmarking favorites, the 50-favorite limit, p
 **Final output:**
 
 ```
-Implement a "favorite prompts" feature in the PromptForge application. Add a star icon to each recent-history item, allowing users to toggle favorite status. Create a new "Favorites" section in the sidebar, positioned between "Recent" and the usage card, which is collapsible. Limit the number of favorites to 50, displaying a tray notification when this limit is exceeded. Ensure that removing a favorite from the Favorites section also unfavorites it everywhere. Persist favorites on disk alongside other settings and sync them to the trace log for eval reports. Maintain the existing recent-history behavior and visual style, and ensure that tests cover marking/unmarking, the 50-limit, persistence across restarts, and that recent-history filtering still works.
+Implement a "favorite prompts" feature in the PerfectPrompt application. Add a star icon to each recent-history item, allowing users to toggle favorite status. Create a new "Favorites" section in the sidebar, positioned between "Recent" and the usage card, which is collapsible. Limit the number of favorites to 50, displaying a tray notification when this limit is exceeded. Ensure that removing a favorite from the Favorites section also unfavorites it everywhere. Persist favorites on disk alongside other settings and sync them to the trace log for eval reports. Maintain the existing recent-history behavior and visual style, and ensure that tests cover marking/unmarking, the 50-limit, persistence across restarts, and that recent-history filtering still works.
 ```
 
 ---
@@ -427,7 +427,7 @@ Pass-1 values were captured from the pre-fix run's console output (see `eval-pha
 | Prompt 2 WITH ratio | 0.47 | 1.00 | +0.53 |
 | Validator firings (rejections, any of 14) | 0 | 0 | +0 |
 | "Smart Question Engine" leaks across WITH outputs | 0 | 0 | +0 |
-| Other subsystem-name leaks (PromptForge / Wispr Flow) | 0 | 2 | +2 |
+| Other subsystem-name leaks (PerfectPrompt / Wispr Flow) | 0 | 2 | +2 |
 
 ### Mode A signal — Prompt 1.5 WITH outputs (the Code-routed test case)
 

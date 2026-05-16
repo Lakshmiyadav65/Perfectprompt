@@ -1,4 +1,4 @@
-//! Tracks the most recent non-PromptForge foreground window on Windows
+//! Tracks the most recent non-PerfectPrompt foreground window on Windows
 //! so the floating capsule's Enhance button can restore that window's
 //! focus before synthesising Ctrl+C. The global hotkey path doesn't need
 //! this because it captures while the user is still focused in their

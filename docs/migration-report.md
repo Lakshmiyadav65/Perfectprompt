@@ -1,4 +1,4 @@
-# PromptForge — Architecture Migration Report
+# PerfectPrompt — Architecture Migration Report
 
 Migration: single-LLM-call architecture → Progressive Pipeline with Domain Routing (Stages A–F).
 

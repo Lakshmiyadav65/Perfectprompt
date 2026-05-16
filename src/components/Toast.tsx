@@ -4,7 +4,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import "./Toast.css";
 
 /**
- * In-app PromptForge-styled toast. Renders inside the borderless,
+ * In-app PerfectPrompt-styled toast. Renders inside the borderless,
  * always-on-top `toast` window (`#/toast` route) — the Rust side in
  * `toast_window.rs` positions and shows the window; this component
  * listens for `pipeline:fallback` events to pick up the message,

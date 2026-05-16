@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 const API_BASE: &str = "https://api.github.com";
 const RAW_BASE: &str = "https://raw.githubusercontent.com";
-const USER_AGENT: &str = "promptforge-app";
+const USER_AGENT: &str = "perfectprompt-app";
 const TIMEOUT_SECS: u64 = 8;
 
 /// Maximum README chars stitched into the description. Keeps the form

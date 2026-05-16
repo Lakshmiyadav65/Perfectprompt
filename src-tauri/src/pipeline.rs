@@ -689,7 +689,7 @@ pub(crate) fn classify_hosted_error(err: &HostedError) -> (String, String, Strin
         HostedError::Network(_) => (
             "n/a".into(),
             format!("hosted_network: {err}"),
-            "Couldn't reach PromptForge servers — try again or sign out to use your own key."
+            "Couldn't reach PerfectPrompt servers — try again or sign out to use your own key."
                 .into(),
         ),
         HostedError::InvalidResponse(_) | HostedError::Other { .. } => (
