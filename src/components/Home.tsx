@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { EnhancementDetail, type EnhancementRecord } from "./EnhancementDetail";
 import "./Home.css";
 
 interface Project {
@@ -23,35 +24,43 @@ interface ApiKeyStatus {
   from_settings: boolean;
 }
 
-/// Hard-coded sample rows for the "Recent enhancements" list. PerfectPrompt
-/// doesn't persist enhancement history yet — these are illustrative.
-/// TODO: wire to a real Rust-side log once we have on-disk storage.
-const SAMPLE_RECENT = [
-  {
-    time: "2:08 PM",
-    from: "fix the dashboard",
-    to: "Refactor the Analytics dashboard's initial-load path to reduce TTI…",
-  },
-  {
-    time: "1:42 PM",
-    from: "email my manager about PTO",
-    to: "Write a short, warm-but-professional email to my manager…",
-  },
-  {
-    time: "12:30 PM",
-    from: "linkedin post about shipping V1",
-    to: "Write a LinkedIn post announcing PerfectPrompt V1 with a behind-the-scenes vibe…",
-  },
-  {
-    time: "11:18 AM",
-    from: "make this image cinematic",
-    to: "Transform the attached image into a cinematic, moody portrait…",
-  },
-];
+/// Cap on the recent-enhancements list shown on the dashboard. The
+/// full history lives on disk; this is just the most-recent N.
+const RECENT_LIMIT = 10;
 
-/// Same caveat as SAMPLE_RECENT — 7-day activity bars are mocked
-/// against a believable pattern until we have telemetry.
+/// 7-day activity bars are still placeholder against a believable
+/// pattern until we wire daily aggregation off the history file.
 const SAMPLE_ACTIVITY: Array<"" | "lo" | "md" | "hi"> = ["lo", "md", "lo", "hi", "md", "", "md"];
+
+/// Render an ISO-8601 timestamp as "2:08 PM" when same-day, else
+/// "May 17, 2:08 PM". Keeps the dashboard rows compact regardless
+/// of how old the entry is.
+function formatRecentTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  if (sameDay) {
+    return d.toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function truncate(text: string, max: number): string {
+  if (text.length <= max) return text;
+  return text.slice(0, max - 1).trimEnd() + "…";
+}
 
 function dayTimeNow(): string {
   const d = new Date();
@@ -78,6 +87,8 @@ export function Home({
   // Key on the demo pane — bumping this forces a remount so the CSS
   // animations restart from t=0.
   const [demoKey, setDemoKey] = useState(0);
+  const [recent, setRecent] = useState<EnhancementRecord[]>([]);
+  const [selected, setSelected] = useState<EnhancementRecord | null>(null);
 
   useEffect(() => {
     void refresh();
@@ -96,6 +107,40 @@ export function Home({
     return () => {
       window.clearInterval(id);
       unlisten?.();
+    };
+  }, []);
+
+  // Pull the persisted enhancement history once on mount, then keep
+  // it live via the Rust-side event bus.
+  useEffect(() => {
+    let alive = true;
+    invoke<EnhancementRecord[]>("list_enhancements", { limit: RECENT_LIMIT })
+      .then((rows) => {
+        if (alive) setRecent(rows);
+      })
+      .catch((e) => console.error("[home] list_enhancements failed:", e));
+
+    let unlistenNew: (() => void) | undefined;
+    let unlistenDel: (() => void) | undefined;
+    void listen<EnhancementRecord>("enhancement-history:new", (event) => {
+      // Prepend the new record, cap at the dashboard limit. No need
+      // to re-sort — the event arrives in real time, newer than
+      // anything already in the list.
+      setRecent((prev) => [event.payload, ...prev].slice(0, RECENT_LIMIT));
+    }).then((u) => {
+      unlistenNew = u;
+    });
+    void listen<string>("enhancement-history:deleted", (event) => {
+      setRecent((prev) => prev.filter((r) => r.id !== event.payload));
+      setSelected((sel) => (sel?.id === event.payload ? null : sel));
+    }).then((u) => {
+      unlistenDel = u;
+    });
+
+    return () => {
+      alive = false;
+      unlistenNew?.();
+      unlistenDel?.();
     };
   }, []);
 
@@ -386,22 +431,45 @@ export function Home({
             </div>
           </div>
 
-          <div className="ph-recent-list">
-            {SAMPLE_RECENT.map((r, i) => (
-              <div key={i} className="ph-recent-row">
-                <div className="ph-recent-time">{r.time}</div>
-                <div className="ph-recent-preview">
-                  <span className="from">{r.from}</span>
-                  <span className="arrow">→</span>
-                  <span className="to">{r.to}</span>
-                </div>
-                <div className="ph-recent-action">
-                  Open
-                  <ArrowRight size={11} />
-                </div>
-              </div>
-            ))}
-          </div>
+          {recent.length === 0 ? (
+            <div className="ph-recent-empty">
+              <p>
+                <strong>No enhancements yet.</strong>
+              </p>
+              <p className="ph-recent-empty-sub">
+                Your enhanced prompts will appear here.
+              </p>
+            </div>
+          ) : (
+            <div className="ph-recent-list">
+              {recent.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  className="ph-recent-row"
+                  onClick={() => setSelected(r)}
+                >
+                  <div className="ph-recent-time">
+                    {formatRecentTime(r.created_at)}
+                  </div>
+                  <div className="ph-recent-preview">
+                    <span className="from">{truncate(r.rough, 60)}</span>
+                    <span className="arrow">→</span>
+                    <span className="to">{truncate(r.enhanced, 140)}</span>
+                  </div>
+                  {r.project_name && (
+                    <div className="ph-recent-project" title={`Project: ${r.project_name}`}>
+                      {r.project_name}
+                    </div>
+                  )}
+                  <div className="ph-recent-action">
+                    Open
+                    <ArrowRight size={11} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         {!hasKey && (
@@ -419,6 +487,13 @@ export function Home({
           </div>
         )}
       </div>
+
+      {selected && (
+        <EnhancementDetail
+          record={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }

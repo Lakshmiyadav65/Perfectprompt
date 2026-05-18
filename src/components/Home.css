@@ -779,14 +779,30 @@
   border-top: 1px solid var(--pf-line);
 }
 .ph-recent-row {
+  /* Now rendered as a <button>, so strip the default button chrome
+     and let the row layout take over. */
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--pf-line);
+  text-align: left;
+  font: inherit;
+  color: inherit;
+
   display: grid;
-  grid-template-columns: 90px 1fr auto;
+  grid-template-columns: 90px 1fr auto auto;
   align-items: center;
   gap: 18px;
   padding: 16px 4px;
-  border-bottom: 1px solid var(--pf-line);
   cursor: pointer;
-  transition: all 0.15s var(--pf-ease, ease);
+  transition: background 0.15s var(--pf-ease, ease),
+              padding 0.15s var(--pf-ease, ease);
+}
+
+.ph-recent-row:focus-visible {
+  outline: none;
+  background: rgba(255, 255, 255, 0.025);
+  padding-left: 12px;
 }
 .ph-recent-row:hover {
   background: rgba(255, 255, 255, 0.015);
@@ -828,6 +844,45 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+/* Project name chip shown when an enhancement was run with an
+   active project context. Sits between the preview and the Open
+   affordance so the row stays compact. */
+.ph-recent-project {
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--pf-text-subtle);
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Empty state — replaces the row list when there's no history yet. */
+.ph-recent-empty {
+  margin-top: 16px;
+  border-top: 1px solid var(--pf-line);
+  padding: 36px 4px 12px;
+  text-align: center;
+  color: var(--pf-text-muted);
+}
+
+.ph-recent-empty p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.ph-recent-empty-sub {
+  margin-top: 6px !important;
+  font-size: 13px !important;
+  color: var(--pf-text-subtle) !important;
 }
 
 /* ---------- 7-day activity dots (in the recent-enhancements head) ---------- */

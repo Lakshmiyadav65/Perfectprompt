@@ -10,6 +10,7 @@ mod clarify;
 mod clipboard;
 mod command_bar;
 mod enhance;
+mod enhancement_history;
 mod foreground_tracker;
 mod generation;
 pub mod github_analyze;
@@ -153,6 +154,8 @@ pub fn run() {
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,
+            enhancement_history::list_enhancements,
+            enhancement_history::delete_enhancement,
         ])
         .setup(|app| {
             // Register the perfectprompt:// URL scheme at runtime so OAuth

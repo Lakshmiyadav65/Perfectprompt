@@ -24,6 +24,7 @@ use regex::Regex;
 
 use crate::auth;
 use crate::enhance::{call_llm, load_prompt, GroqError};
+use crate::enhancement_history;
 use crate::github_analyze::{self, CachedRepo};
 use crate::hosted::{self, HostedError};
 use crate::intake::{self, IntakeResult};
@@ -298,6 +299,26 @@ pub async fn run<R: Runtime>(
         None
     };
     trace::append(app, &tr);
+
+    // Persist this run to the user-facing history if it's actually
+    // an enhancement worth showing. Cache hits return earlier (their
+    // record was created on the original enhancement), Decline and
+    // intake-failures take the fallback path, and Bypass returns
+    // earlier inside the routing match — so by the time we're here
+    // and `!used_fallback`, the route is one of code/writing/generic
+    // and the model produced something meaningful.
+    if !used_fallback
+        && matches!(tr.route.as_str(), "code" | "writing" | "generic")
+    {
+        enhancement_history::append(
+            app,
+            pi.raw_input.clone(),
+            final_text.clone(),
+            tr.route.clone(),
+            active_project.as_ref().map(|p| p.id.clone()),
+            active_project.as_ref().map(|p| p.name.clone()),
+        );
+    }
 
     Ok(PipelineOutput {
         final_text,

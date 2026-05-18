@@ -1,0 +1,269 @@
+/* Detail modal for a saved enhancement.
+   Centered card over a dimmed backdrop. Matches the rest of the
+   app's dark premium UI tokens — no new colour vocabulary. */
+
+.pf-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 8, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  z-index: 40;
+  animation: pf-detail-fade 140ms var(--pf-ease, ease-out) both;
+}
+
+@keyframes pf-detail-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.pf-detail-card {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 64px);
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 14px;
+  padding: 22px 26px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 24px 60px rgba(0, 0, 0, 0.55);
+  font-family: var(--pf-font-sans);
+  color: var(--pf-text);
+  animation: pf-detail-card-in 200ms var(--pf-ease, ease-out) both;
+}
+
+@keyframes pf-detail-card-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-detail-backdrop,
+  .pf-detail-card {
+    animation: none;
+  }
+}
+
+/* ---- Header ---- */
+
+.pf-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pf-detail-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.pf-detail-route {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--pf-accent-soft);
+  color: var(--pf-accent);
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pf-detail-project {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  color: var(--pf-text-muted);
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pf-detail-time {
+  font-size: 12px;
+  color: var(--pf-text-subtle);
+}
+
+.pf-detail-close {
+  background: transparent;
+  border: 1px solid var(--pf-line-strong);
+  color: var(--pf-text-muted);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.12s var(--pf-ease, ease),
+              border-color 0.12s var(--pf-ease, ease),
+              color 0.12s var(--pf-ease, ease);
+  flex-shrink: 0;
+}
+
+.pf-detail-close:hover {
+  background: var(--pf-bg);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: var(--pf-text);
+}
+
+/* ---- Body sections ---- */
+
+.pf-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Constrain each section's body so the modal stays manageable on
+     long prompts; scroll within the body, not the whole modal. */
+  min-height: 0;
+}
+
+.pf-detail-section:last-of-type {
+  flex: 1;
+  min-height: 0;
+}
+
+.pf-detail-label {
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pf-text-subtle);
+}
+
+.pf-detail-body {
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--pf-text);
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+}
+
+.pf-detail-section:last-of-type .pf-detail-body {
+  max-height: none;
+  flex: 1;
+}
+
+.pf-detail-body-rough {
+  color: var(--pf-text-muted);
+  font-family: var(--pf-font-mono);
+  font-size: 12.5px;
+}
+
+.pf-detail-body-enhanced {
+  color: var(--pf-text);
+}
+
+/* ---- Footer actions ---- */
+
+.pf-detail-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+}
+
+.pf-detail-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms var(--pf-ease, ease),
+              border-color 120ms var(--pf-ease, ease),
+              transform 80ms var(--pf-ease, ease);
+}
+
+.pf-detail-btn-primary {
+  background: var(--pf-accent);
+  border: 1px solid var(--pf-accent);
+  color: var(--pf-text-on-accent);
+}
+
+.pf-detail-btn-primary:hover:not(:disabled) {
+  background: var(--pf-accent-hover);
+  border-color: var(--pf-accent-hover);
+}
+
+.pf-detail-btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pf-detail-link-btn {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pf-text-muted);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 120ms var(--pf-ease, ease),
+              background 120ms var(--pf-ease, ease);
+}
+
+.pf-detail-link-btn:hover:not(:disabled) {
+  color: var(--pf-text);
+  background: var(--pf-bg);
+}
+
+.pf-detail-link-btn-danger {
+  color: var(--pf-text-subtle);
+}
+
+.pf-detail-link-btn-danger:hover:not(:disabled) {
+  color: #ff9b9b;
+  background: rgba(255, 90, 90, 0.08);
+}
+
+.pf-detail-link-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pf-detail-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pf-detail-confirm-text {
+  font-size: 12.5px;
+  color: var(--pf-text-muted);
+  margin-right: 4px;
+}
