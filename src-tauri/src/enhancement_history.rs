@@ -11,6 +11,7 @@
 //! drop entries via `delete_enhancement` (rewrites the file without the
 //! matching id).
 
+use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -130,6 +131,27 @@ pub fn append<R: Runtime>(
         return;
     }
 
+    // Skip if the same content sits in the tail of the file. Guards
+    // against any path that calls append() twice for one enhancement
+    // (hotkey double-fire, cache miss on a whitespace-different
+    // fingerprint, retry on transient validation). Looking at only
+    // the last 5 records keeps legitimate "re-enhance this same text
+    // later" usage intact — by the time you re-run, other entries
+    // have pushed the prior one out of the window.
+    if let Ok(existing) = read_all(app) {
+        let trimmed_rough = rough.trim();
+        let trimmed_enhanced = enhanced.trim();
+        let is_dup = existing.iter().rev().take(5).any(|r| {
+            r.rough.trim() == trimmed_rough && r.enhanced.trim() == trimmed_enhanced
+        });
+        if is_dup {
+            eprintln!(
+                "[enhancement_history] skipping duplicate append for recent entry"
+            );
+            return;
+        }
+    }
+
     let record = EnhancementRecord {
         id: make_id(&rough),
         created_at: iso_now(),
@@ -187,6 +209,76 @@ fn read_all<R: Runtime>(app: &AppHandle<R>) -> Result<Vec<EnhancementRecord>> {
         }
     }
     Ok(out)
+}
+
+/// One-shot cleanup invoked from `lib.rs::setup()` at app start.
+///
+/// Reads the history, drops entries that share `(rough_trim,
+/// enhanced_trim)` with an earlier entry, sorts the survivors
+/// chronologically (ascending — the on-disk natural order),
+/// rewrites the file atomically via tmp + rename.
+///
+/// Persistence failures are logged and swallowed: a missed
+/// cleanup leaves the file as-is, which is no worse than not
+/// running cleanup at all.
+pub fn dedupe_and_sort_file<R: Runtime>(app: &AppHandle<R>) {
+    let mut records = match read_all(app) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("[enhancement_history] dedupe read failed: {e:#}");
+            return;
+        }
+    };
+    if records.is_empty() {
+        return;
+    }
+
+    // Sort ascending first so "first occurrence wins" picks the
+    // earliest timestamp for each duplicate group.
+    records.sort_by(|a, b| a.created_at.cmp(&b.created_at));
+
+    let before = records.len();
+    let mut seen: HashSet<(String, String)> = HashSet::new();
+    records.retain(|r| {
+        let key = (r.rough.trim().to_string(), r.enhanced.trim().to_string());
+        seen.insert(key)
+    });
+    let after = records.len();
+
+    if before == after {
+        return;
+    }
+
+    let path = match history_path(app) {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[enhancement_history] dedupe path failed: {e:#}");
+            return;
+        }
+    };
+    let tmp = path.with_extension("jsonl.tmp");
+    let result = (|| -> Result<()> {
+        let mut f = File::create(&tmp)
+            .with_context(|| format!("create tmp: {}", tmp.display()))?;
+        for r in &records {
+            let line = serde_json::to_string(r).context("serialize record")?;
+            writeln!(f, "{line}").context("write tmp line")?;
+        }
+        drop(f);
+        std::fs::rename(&tmp, &path).context("rename tmp")?;
+        Ok(())
+    })();
+    if let Err(e) = result {
+        eprintln!("[enhancement_history] dedupe rewrite failed: {e:#}");
+        let _ = std::fs::remove_file(&tmp);
+        return;
+    }
+
+    eprintln!(
+        "[enhancement_history] cleanup removed {} duplicate(s); {} remain",
+        before - after,
+        after,
+    );
 }
 
 // ───────── Tauri commands ─────────

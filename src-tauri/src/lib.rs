@@ -169,6 +169,13 @@ pub fn run() {
                 }
             }
             let user_settings = settings::load(app.handle());
+
+            // One-shot cleanup of the user-facing enhancement history.
+            // Removes content-duplicate entries that may have made it
+            // to disk before the in-append dedup landed, and rewrites
+            // the file in chronological order.
+            enhancement_history::dedupe_and_sort_file(app.handle());
+
             tray::build(app.handle())?;
             // Honour the persisted master toggle on startup. When the
             // user has paused PerfectPrompt, we still build the tray and
