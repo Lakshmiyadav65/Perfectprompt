@@ -98,13 +98,24 @@ export function Home({
     // API-key state is event-driven so the setup card disappears
     // instantly when the user saves a key in Settings, instead of
     // waiting up to 2s for the next poll.
+    let alive = true;
     let unlisten: (() => void) | undefined;
     void listen<ApiKeyStatus>("settings:key-changed", (event) => {
+      if (!alive) return;
       setKeyStatus(event.payload);
     }).then((u) => {
+      // Same StrictMode race fix used by the history effect below
+      // — if cleanup already ran, unsubscribe the moment the
+      // promise resolves so the listener doesn't leak across the
+      // dev double-mount.
+      if (!alive) {
+        u();
+        return;
+      }
       unlisten = u;
     });
     return () => {
+      alive = false;
       window.clearInterval(id);
       unlisten?.();
     };
@@ -112,28 +123,53 @@ export function Home({
 
   // Pull the persisted enhancement history once on mount, then keep
   // it live via the Rust-side event bus.
+  //
+  // The `alive` flag closes a race with StrictMode: in dev, React
+  // runs each effect twice (mount → simulated unmount → mount). If
+  // a `listen()` call's promise resolves AFTER the simulated
+  // unmount's cleanup ran, the resulting unlisten function would
+  // never get called and the listener leaks — causing every emit
+  // to fire twice on the next mount. Checking `!alive` inside the
+  // `.then` callback unsubscribes immediately in that case.
   useEffect(() => {
     let alive = true;
+    let unlistenNew: (() => void) | undefined;
+    let unlistenDel: (() => void) | undefined;
+
     invoke<EnhancementRecord[]>("list_enhancements", { limit: RECENT_LIMIT })
       .then((rows) => {
         if (alive) setRecent(rows);
       })
       .catch((e) => console.error("[home] list_enhancements failed:", e));
 
-    let unlistenNew: (() => void) | undefined;
-    let unlistenDel: (() => void) | undefined;
     void listen<EnhancementRecord>("enhancement-history:new", (event) => {
-      // Prepend the new record, cap at the dashboard limit. No need
-      // to re-sort — the event arrives in real time, newer than
-      // anything already in the list.
-      setRecent((prev) => [event.payload, ...prev].slice(0, RECENT_LIMIT));
+      if (!alive) return;
+      // Dedupe by id — defends against any future path that could
+      // double-deliver the same record (e.g. an initial fetch
+      // racing with the live event), independently of the
+      // StrictMode listener-leak fix below.
+      setRecent((prev) =>
+        prev.some((r) => r.id === event.payload.id)
+          ? prev
+          : [event.payload, ...prev].slice(0, RECENT_LIMIT),
+      );
     }).then((u) => {
+      if (!alive) {
+        u();
+        return;
+      }
       unlistenNew = u;
     });
+
     void listen<string>("enhancement-history:deleted", (event) => {
+      if (!alive) return;
       setRecent((prev) => prev.filter((r) => r.id !== event.payload));
       setSelected((sel) => (sel?.id === event.payload ? null : sel));
     }).then((u) => {
+      if (!alive) {
+        u();
+        return;
+      }
       unlistenDel = u;
     });
 

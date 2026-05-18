@@ -78,13 +78,24 @@ export function useEnhancementUsage() {
   }, []);
 
   useEffect(() => {
+    // `alive` closes the StrictMode listen-race: in dev, effects run
+    // twice on mount, so if the listen() promise resolves AFTER the
+    // simulated unmount, the unlisten function leaks and the next
+    // mount registers a second active listener for the same event.
+    let alive = true;
     let unlisten: (() => void) | undefined;
     void listen<HostedQuota>("hosted:quota", (event) => {
+      if (!alive) return;
       setHosted(event.payload);
     }).then((u) => {
+      if (!alive) {
+        u();
+        return;
+      }
       unlisten = u;
     });
     return () => {
+      alive = false;
       unlisten?.();
     };
   }, []);
