@@ -83,7 +83,9 @@ export function useEnhancementUsage() {
     // simulated unmount, the unlisten function leaks and the next
     // mount registers a second active listener for the same event.
     let alive = true;
-    let unlisten: (() => void) | undefined;
+    let unlistenHosted: (() => void) | undefined;
+    let unlistenHistory: (() => void) | undefined;
+
     void listen<HostedQuota>("hosted:quota", (event) => {
       if (!alive) return;
       setHosted(event.payload);
@@ -92,15 +94,48 @@ export function useEnhancementUsage() {
         u();
         return;
       }
-      unlisten = u;
+      unlistenHosted = u;
     });
+
+    // Single source of truth for the local (BYOK) counter: the same
+    // enhancement-history:new event the dashboard listens to. Fires
+    // from Rust after every successful pipeline run, so the count
+    // ticks regardless of which UI surface (silent hotkey, clarify
+    // popup, question card) triggered the enhancement. The previous
+    // setup relied on UI-side increment() calls, which missed the
+    // silent hotkey path entirely.
+    //
+    // On hosted, the local count quietly drifts forward alongside
+    // hosted.used — `effectiveUsed` still displays hosted.used, so
+    // there's no visible bug; the local value is just a stale
+    // shadow that the UI never reads while hosted is set.
+    void listen<unknown>("enhancement-history:new", () => {
+      if (!alive) return;
+      const next = Math.min(loadCount() + 1, DAILY_LIMIT);
+      saveCount(next);
+      window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+      setUsed(next);
+    }).then((u) => {
+      if (!alive) {
+        u();
+        return;
+      }
+      unlistenHistory = u;
+    });
+
     return () => {
       alive = false;
-      unlisten?.();
+      unlistenHosted?.();
+      unlistenHistory?.();
     };
   }, []);
 
   const increment = useCallback(() => {
+    // Retained for compatibility — call sites that explicitly mark a
+    // successful enhancement still bump the count. The
+    // enhancement-history:new listener above is now the primary
+    // path; this stays as a manual fallback for code that needs to
+    // count an enhancement without going through the Rust pipeline.
     const next = Math.min(loadCount() + 1, DAILY_LIMIT);
     saveCount(next);
     window.dispatchEvent(new CustomEvent(UPDATE_EVENT));

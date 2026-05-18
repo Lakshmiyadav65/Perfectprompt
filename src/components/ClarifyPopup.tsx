@@ -103,7 +103,9 @@ export function ClarifyPopup() {
         prompt,
         answers: formattedAnswers
       });
-      usage.increment();
+      // Counter ticks automatically via useEnhancementUsage's
+      // enhancement-history:new listener — no manual increment
+      // here would just double-count.
       // The backend handles hiding the window after pasting
 
       // Reset state for next time

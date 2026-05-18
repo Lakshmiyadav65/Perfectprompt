@@ -156,7 +156,8 @@ export function QuestionCard() {
 
     try {
       await invoke("submit_question_card_answers", { answers: payload });
-      usage.increment();
+      // Counter ticks automatically via useEnhancementUsage's
+      // enhancement-history:new listener.
       await appWindow.hide();
     } catch (err) {
       setErrorMsg(String(err));
