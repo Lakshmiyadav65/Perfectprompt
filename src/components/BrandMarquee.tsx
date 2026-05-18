@@ -8,7 +8,6 @@ const TAGLINES = [
   "refine prompts in place",
   "ctrl + alt + e, from anywhere",
   "rough → ready in about a second",
-  "powered by groq",
 ];
 
 /// Length of one full reveal → hold → fade cycle, in ms.
