@@ -2,6 +2,7 @@ import { StatusIndicator } from "./components/StatusIndicator";
 import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
 import { CommandBar } from "./components/CommandBar";
+import { PasswordRecovery } from "./components/PasswordRecovery";
 import { Shell } from "./components/Shell";
 import { SignupGate } from "./components/SignupGate";
 import { Toast } from "./components/Toast";
@@ -35,6 +36,14 @@ function MainAppGated({ hash }: { hash: string }) {
     // state instead of flashing the gate at users who already have a
     // persisted session.
     return <AuthLoading />;
+  }
+
+  // Recovery preempts both the gate and the shell: the user has a
+  // valid session from a reset email but their password is still the
+  // old (forgotten) one. Force them through the new-password form
+  // before any main-app surface renders.
+  if (auth.configured && auth.user && auth.recoveryMode) {
+    return <PasswordRecovery />;
   }
 
   if (gateActive) return <SignupGate />;
