@@ -493,8 +493,114 @@ body { overflow: hidden; }
 .pf-profile-chev {
   flex-shrink: 0;
   color: var(--pf-text-subtle);
+  transition: transform 160ms var(--pf-ease), color 120ms var(--pf-ease);
 }
 .pf-profile-chip:hover .pf-profile-chev { color: var(--pf-text-muted); }
+.pf-profile-chip.open .pf-profile-chev {
+  /* Rotate the right-chevron to point up while the menu is open. */
+  transform: rotate(-90deg);
+  color: var(--pf-text-muted);
+}
+
+/* ---------- Profile menu ---------- */
+
+.pf-profile-wrapper {
+  position: relative;
+}
+
+.pf-profile-menu {
+  position: absolute;
+  /* Anchor above the chip, leaving an 8px gap. */
+  bottom: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 20;
+  animation: pf-profile-menu-in 120ms var(--pf-ease) both;
+}
+
+@keyframes pf-profile-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-profile-menu { animation: none; }
+}
+
+.pf-profile-menu-header {
+  padding: 8px 10px 10px;
+  border-bottom: 1px solid var(--pf-line);
+  margin-bottom: 4px;
+}
+
+.pf-profile-menu-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pf-text);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-profile-menu-email {
+  margin-top: 2px;
+  font-size: 11.5px;
+  color: var(--pf-text-subtle);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pf-profile-menu-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--pf-text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 100ms var(--pf-ease), color 100ms var(--pf-ease);
+}
+
+.pf-profile-menu-item:hover:not(:disabled),
+.pf-profile-menu-item:focus-visible {
+  background: var(--pf-bg);
+  outline: none;
+}
+
+.pf-profile-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pf-profile-menu-item-danger {
+  color: var(--pf-text-muted);
+}
+
+.pf-profile-menu-item-danger:hover:not(:disabled),
+.pf-profile-menu-item-danger:focus-visible {
+  background: rgba(255, 90, 90, 0.10);
+  color: #ff9b9b;
+}
 
 /* ---------- Main pane ---------- */
 

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
@@ -105,6 +105,9 @@ export function Shell({ initial }: { initial: Route }) {
   const usagePct = Math.min(100, Math.round((usage.used / usage.limit) * 100));
   const auth = useAuth();
   const displayName = useDisplayName(auth.user);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileChipRef = useRef<HTMLButtonElement>(null);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     invoke<string>("get_hotkey").then(setHotkey).catch(() => {});
@@ -122,6 +125,41 @@ export function Shell({ initial }: { initial: Route }) {
     }, 1500);
     return () => window.clearInterval(id);
   }, [toggling]);
+
+  // Close the profile menu when the user clicks anywhere outside it
+  // or hits Escape. Listener only attaches while the menu is open so
+  // we don't pay the cost on every render.
+  useEffect(() => {
+    if (!profileMenuOpen) return;
+    function onPointer(e: MouseEvent) {
+      const target = e.target as Node;
+      if (
+        profileMenuRef.current?.contains(target) ||
+        profileChipRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setProfileMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setProfileMenuOpen(false);
+    }
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [profileMenuOpen]);
+
+  async function handleSignOut() {
+    setProfileMenuOpen(false);
+    try {
+      await auth.signOut();
+    } catch (e) {
+      console.error("[shell] sign out failed:", e);
+    }
+  }
 
   async function handleToggle() {
     if (toggling) return;
@@ -292,57 +330,99 @@ export function Shell({ initial }: { initial: Route }) {
             </div>
           </div>
 
-          {/* Profile chip — Discord/Slack style anchor for user identity.
-              Name resolves via useDisplayName: override > Google name >
-              email local-part > "You". */}
-          <button
-            type="button"
-            className="pf-profile-chip"
-            onClick={() => setRoute("settings")}
-            title="Open Settings"
-            aria-label={`${displayName.name} — open Settings`}
-          >
-            <span className="pf-profile-avatar" aria-hidden="true">
-              {displayName.name.charAt(0).toUpperCase()}
-            </span>
-            <span className="pf-profile-text">
-              <span className="pf-profile-name-row">
-                <span className="pf-profile-name">{displayName.name}</span>
-                {isPowerUser && (
-                  <span
-                    className="pf-profile-badge"
-                    title="Top 2% — based on your local activity"
-                    aria-label="Top two percent"
-                  >
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="9"
-                      height="9"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 2l2.6 6.3 6.8.6-5.2 4.5 1.6 6.6L12 16.8 6.2 20l1.6-6.6L2.6 8.9l6.8-.6L12 2z" />
-                    </svg>
-                    Top 2%
-                  </span>
-                )}
-              </span>
-            </span>
-            <svg
-              className="pf-profile-chev"
-              viewBox="0 0 24 24"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
+          {/* Profile chip — Discord/Slack style anchor for user
+              identity. Clicking opens a small menu with Settings +
+              Sign out so the sign-out path doesn't require digging
+              into Settings → Account. Name resolves via
+              useDisplayName: override > Google name > email
+              local-part > "You". */}
+          <div className="pf-profile-wrapper">
+            {profileMenuOpen && (
+              <div
+                ref={profileMenuRef}
+                className="pf-profile-menu"
+                role="menu"
+                aria-label="Account menu"
+              >
+                <div className="pf-profile-menu-header">
+                  <div className="pf-profile-menu-name">{displayName.name}</div>
+                  {auth.user?.email && (
+                    <div className="pf-profile-menu-email">{auth.user.email}</div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="pf-profile-menu-item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
+                    setRoute("settings");
+                  }}
+                >
+                  Open Settings
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="pf-profile-menu-item pf-profile-menu-item-danger"
+                  onClick={() => void handleSignOut()}
+                  disabled={!auth.user}
+                >
+                  Sign out
+                </button>
+              </div>
+            )}
+            <button
+              ref={profileChipRef}
+              type="button"
+              className={`pf-profile-chip ${profileMenuOpen ? "open" : ""}`}
+              onClick={() => setProfileMenuOpen((open) => !open)}
+              aria-haspopup="menu"
+              aria-expanded={profileMenuOpen}
+              aria-label={`${displayName.name} — account menu`}
             >
-              <path d="M9 6l6 6-6 6" />
-            </svg>
-          </button>
+              <span className="pf-profile-avatar" aria-hidden="true">
+                {displayName.name.charAt(0).toUpperCase()}
+              </span>
+              <span className="pf-profile-text">
+                <span className="pf-profile-name-row">
+                  <span className="pf-profile-name">{displayName.name}</span>
+                  {isPowerUser && (
+                    <span
+                      className="pf-profile-badge"
+                      title="Top 2% — based on your local activity"
+                      aria-label="Top two percent"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="9"
+                        height="9"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M12 2l2.6 6.3 6.8.6-5.2 4.5 1.6 6.6L12 16.8 6.2 20l1.6-6.6L2.6 8.9l6.8-.6L12 2z" />
+                      </svg>
+                      Top 2%
+                    </span>
+                  )}
+                </span>
+              </span>
+              <svg
+                className="pf-profile-chev"
+                viewBox="0 0 24 24"
+                width="14"
+                height="14"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 6l6 6-6 6" />
+              </svg>
+            </button>
+          </div>
         </div>
       </aside>
 
