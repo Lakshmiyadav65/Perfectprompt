@@ -100,6 +100,17 @@ export async function resetPasswordForEmail(email: string): Promise<void> {
   if (error) throw new Error(friendlyAuthError(error.message));
 }
 
+/// Set a new password for the currently authenticated user. Called
+/// from the PasswordRecovery screen after the user clicks a reset
+/// email link and lands back in the app with an active session.
+export async function updatePassword(newPassword: string): Promise<void> {
+  if (!isSupabaseConfigured) {
+    throw new Error("Account features aren't configured for this build.");
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw new Error(friendlyAuthError(error.message));
+}
+
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
   try {
