@@ -1,6 +1,5 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
-import { BrandMarquee } from "./BrandMarquee";
 import "./SignupGate.css";
 
 type Mode = "signin" | "signup" | "reset";
@@ -120,7 +119,6 @@ export function SignupGate() {
             Back to sign in
           </button>
         </div>
-        <BrandMarquee />
       </div>
     );
   }
@@ -147,7 +145,6 @@ export function SignupGate() {
             Back to sign in
           </button>
         </div>
-        <BrandMarquee />
       </div>
     );
   }
@@ -325,7 +322,6 @@ export function SignupGate() {
           .
         </p>
       </div>
-      <BrandMarquee />
     </div>
   );
 }
