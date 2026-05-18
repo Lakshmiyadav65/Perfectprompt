@@ -11,6 +11,7 @@ import {
   signOut as signOutImpl,
   signUpWithPassword as signUpWithPasswordImpl,
   syncSessionToRust,
+  updatePassword as updatePasswordImpl,
 } from "../lib/auth";
 
 export interface AuthState {
@@ -28,6 +29,15 @@ export interface AuthState {
     password: string,
   ) => Promise<{ needsEmailConfirmation: boolean }>;
   resetPasswordForEmail: (email: string) => Promise<void>;
+  /// True when the user arrived via a password-reset email link. The
+  /// session is established but the UI should force a "set a new
+  /// password" step before falling through to the main app.
+  recoveryMode: boolean;
+  /// Set a new password and exit recovery mode. Session stays active.
+  updatePassword: (newPassword: string) => Promise<void>;
+  /// Exit recovery mode without changing the password. Signs out so
+  /// the gate reappears.
+  cancelRecovery: () => Promise<void>;
   signOut: () => Promise<void>;
   /// Surface the last OAuth error (PKCE failure, provider rejection,
   /// network blip during exchangeCodeForSession). Cleared on the next
@@ -41,6 +51,7 @@ export function useAuth(): AuthState {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [recoveryMode, setRecoveryMode] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -95,10 +106,22 @@ export function useAuth(): AuthState {
     };
     window.addEventListener("pf-auth-error", onAuthError);
 
+    // Recovery-mode broadcast bridge. Multiple useAuth instances live
+    // in the tree (App, Shell, Settings, etc.) — when one calls
+    // updatePassword/cancelRecovery, every instance needs to flip its
+    // local recoveryMode flag so MainAppGated re-renders and lets the
+    // user through.
+    const onRecoveryEnter = () => setRecoveryMode(true);
+    const onRecoveryComplete = () => setRecoveryMode(false);
+    window.addEventListener("pf-recovery-mode", onRecoveryEnter);
+    window.addEventListener("pf-recovery-complete", onRecoveryComplete);
+
     return () => {
       active = false;
       sub.subscription.unsubscribe();
       window.removeEventListener("pf-auth-error", onAuthError);
+      window.removeEventListener("pf-recovery-mode", onRecoveryEnter);
+      window.removeEventListener("pf-recovery-complete", onRecoveryComplete);
     };
   }, []);
 
@@ -156,6 +179,25 @@ export function useAuth(): AuthState {
         const msg = (e as Error)?.message ?? String(e);
         setError(msg);
         throw e;
+      }
+    },
+    recoveryMode,
+    updatePassword: async (newPassword) => {
+      setError(null);
+      try {
+        await updatePasswordImpl(newPassword);
+        window.dispatchEvent(new CustomEvent("pf-recovery-complete"));
+      } catch (e) {
+        const msg = (e as Error)?.message ?? String(e);
+        setError(msg);
+        throw e;
+      }
+    },
+    cancelRecovery: async () => {
+      try {
+        await signOutImpl();
+      } finally {
+        window.dispatchEvent(new CustomEvent("pf-recovery-complete"));
       }
     },
     signOut: async () => {
