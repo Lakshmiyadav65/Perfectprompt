@@ -117,20 +117,7 @@ export function PostAuthSetup() {
               >
                 Set up Groq API key
               </button>
-              <button
-                type="button"
-                className="pf-gate-btn"
-                onClick={handleContinue}
-                disabled={busy}
-              >
-                Skip for now
-              </button>
             </div>
-            <p className="pf-gate-fineprint">
-              You can also use the hosted tier (50 enhancements/day)
-              without a key — set up later from Settings whenever
-              you're ready.
-            </p>
           </>
         )}
       </div>
