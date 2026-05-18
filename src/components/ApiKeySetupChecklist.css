@@ -360,3 +360,17 @@
   color: var(--pf-accent);
   flex-shrink: 0;
 }
+
+/* "Manage" row that surfaces below the All-set footer once the
+   user has finished setup. The inline links in step 2 are easy to
+   miss when the user comes back to swap keys later — this row
+   gives them a more obvious entry point. */
+.pf-setup-manage {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--pf-line);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}

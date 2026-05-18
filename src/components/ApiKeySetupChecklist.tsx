@@ -289,13 +289,57 @@ export function ApiKeySetupChecklist({
       </ol>
 
       {allDone && (
-        <div className="pf-setup-done" role="status">
-          <CheckMark />
-          <span>All set — PerfectPrompt is ready to enhance.</span>
-        </div>
+        <>
+          <div className="pf-setup-done" role="status">
+            <CheckMark />
+            <span>All set — PerfectPrompt is ready to enhance.</span>
+          </div>
+          <div className="pf-setup-manage">
+            <button
+              type="button"
+              className="pf-setup-btn-secondary"
+              onClick={handleChangeFromManage}
+              disabled={busyKey || keyStatus.from_env}
+              title={
+                keyStatus.from_env
+                  ? "Edit the GROQ_API_KEY value in your .env file to change the env-var key."
+                  : undefined
+              }
+            >
+              Change API key
+            </button>
+            <button
+              type="button"
+              className="pf-setup-link-btn pf-setup-link-btn-danger"
+              onClick={handleClearKey}
+              disabled={busyKey || !keyStatus.from_settings}
+              title={
+                keyStatus.from_env && !keyStatus.from_settings
+                  ? "Remove the .env override manually — only settings.json keys can be cleared from here."
+                  : undefined
+              }
+            >
+              Remove key
+            </button>
+          </div>
+        </>
       )}
     </section>
   );
+
+  function handleChangeFromManage() {
+    setKeyMsg(null);
+    setEditingKey(true);
+    // Scroll step 2 into view and focus the input so the user lands
+    // exactly where they need to be without hunting for the field.
+    if (sectionRef?.current) {
+      sectionRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    // Defer the focus until after the edit-mode render commits.
+    window.requestAnimationFrame(() => {
+      apiKeyInputRef?.current?.focus();
+    });
+  }
 }
 
 interface StepProps {
