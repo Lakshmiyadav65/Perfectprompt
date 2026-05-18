@@ -8,6 +8,10 @@ const GROQ_KEYS_URL = "https://console.groq.com/keys";
 interface ApiKeyStatus {
   from_env: boolean;
   from_settings: boolean;
+  /// Persisted outcome of the most recent test_connection call.
+  /// Lets step 3 stay ✓ across app restarts without forcing the
+  /// user to re-test a key that already works.
+  last_test_passed: boolean;
 }
 
 interface ConnectionTest {
@@ -59,7 +63,11 @@ export function ApiKeySetupChecklist({
   // this session or already have a saved key, we treat it as done.
   const step1Done = step1Clicked || hasKey;
   const step2Done = hasKey;
-  const step3Done = testMsg?.ok === true;
+  // Step 3 honors either the in-session test result or the persisted
+  // flag from settings.json — so after a fresh restart a previously
+  // verified key still reads as tested instead of dropping back to
+  // pending on every launch.
+  const step3Done = testMsg?.ok === true || keyStatus.last_test_passed === true;
   const completed = [step1Done, step2Done, step3Done].filter(Boolean).length;
   const allDone = completed === 3;
 

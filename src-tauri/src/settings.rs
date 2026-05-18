@@ -59,6 +59,13 @@ pub struct UserSettings {
     /// pipeline is dormant. Persisted across launches.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
+    /// Last `test_connection` outcome. Drives the API-key setup
+    /// checklist's step 3 across app restarts — without this the step
+    /// would reset to pending every launch, forcing the user to
+    /// re-test a key that's known to work. Cleared whenever the key
+    /// itself changes (save or clear).
+    #[serde(default)]
+    pub last_test_passed: bool,
 }
 
 impl Default for UserSettings {
@@ -71,6 +78,7 @@ impl Default for UserSettings {
             remembered_contexts: HashMap::new(),
             app_classification: AppClassificationSettings::default(),
             enabled: default_enabled(),
+            last_test_passed: false,
         }
     }
 }
@@ -148,6 +156,11 @@ fn save<R: Runtime>(app: &AppHandle<R>, settings: &UserSettings) -> Result<()> {
 pub struct ApiKeyStatus {
     pub from_env: bool,
     pub from_settings: bool,
+    /// Persisted result of the most recent `test_connection` call.
+    /// Reset by save_api_key / clear_api_key so a fresh key always
+    /// requires a re-test before the checklist's step 3 ticks back
+    /// to ✓.
+    pub last_test_passed: bool,
 }
 
 #[tauri::command]
@@ -156,7 +169,8 @@ pub fn api_key_status<R: Runtime>(app: AppHandle<R>) -> ApiKeyStatus {
         .map(|v| !v.trim().is_empty())
         .unwrap_or(false);
 
-    let from_settings = load(&app)
+    let settings = load(&app);
+    let from_settings = settings
         .api_key
         .as_ref()
         .map(|k| !k.trim().is_empty())
@@ -165,6 +179,7 @@ pub fn api_key_status<R: Runtime>(app: AppHandle<R>) -> ApiKeyStatus {
     ApiKeyStatus {
         from_env,
         from_settings,
+        last_test_passed: settings.last_test_passed,
     }
 }
 
@@ -179,6 +194,9 @@ pub fn save_api_key<R: Runtime>(
     }
     let mut settings = load(&app);
     settings.api_key = Some(trimmed.to_string());
+    // A fresh key invalidates the previous test result — the user
+    // must re-verify with the new credential.
+    settings.last_test_passed = false;
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
     emit_key_changed(&app);
     Ok(())
@@ -188,6 +206,7 @@ pub fn save_api_key<R: Runtime>(
 pub fn clear_api_key<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), String> {
     let mut settings = load(&app);
     settings.api_key = None;
+    settings.last_test_passed = false;
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
     emit_key_changed(&app);
     Ok(())
@@ -290,6 +309,8 @@ pub async fn test_connection<R: Runtime>(app: AppHandle<R>) -> ConnectionTest {
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        // A failed test invalidates any previously-persisted pass.
+        persist_test_result(&app, false);
         return ConnectionTest {
             ok: false,
             latency_ms,
@@ -297,11 +318,30 @@ pub async fn test_connection<R: Runtime>(app: AppHandle<R>) -> ConnectionTest {
         };
     }
 
+    persist_test_result(&app, true);
     ConnectionTest {
         ok: true,
         latency_ms,
         message: "ok".into(),
     }
+}
+
+/// Write the new test outcome to settings.json and broadcast
+/// settings:key-changed so the frontend re-fetches api_key_status.
+/// Persistence failure is logged but non-fatal — at worst the user
+/// re-tests next launch.
+fn persist_test_result<R: Runtime>(app: &AppHandle<R>, passed: bool) {
+    let mut settings = load(app);
+    if settings.last_test_passed == passed {
+        // No-op write — skip the disk hit and the broadcast.
+        return;
+    }
+    settings.last_test_passed = passed;
+    if let Err(e) = save(app, &settings) {
+        eprintln!("[settings] persist test result failed: {e:#}");
+        return;
+    }
+    emit_key_changed(app);
 }
 
 #[derive(Serialize, Deserialize)]

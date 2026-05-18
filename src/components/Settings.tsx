@@ -5,7 +5,11 @@ import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
 
-type ApiKeyStatus = { from_env: boolean; from_settings: boolean };
+type ApiKeyStatus = {
+  from_env: boolean;
+  from_settings: boolean;
+  last_test_passed: boolean;
+};
 type UpdateInfo = {
   current_version: string;
   latest_version: string;
