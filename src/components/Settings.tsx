@@ -8,8 +8,6 @@ import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
 
-const GROQ_KEYS_URL = "https://console.groq.com/keys";
-
 interface HostedQuota {
   used: number;
   limit: number;
@@ -19,7 +17,6 @@ interface HostedQuota {
 }
 
 type ApiKeyStatus = { from_env: boolean; from_settings: boolean };
-type ConnectionTest = { ok: boolean; latency_ms: number; message: string };
 type UpdateInfo = {
   current_version: string;
   latest_version: string;
@@ -87,9 +84,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [hostedQuota, setHostedQuota] = useState<HostedQuota | null>(null);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [hotkey, setHotkey] = useState("Alt+E");
-  const [keyInput, setKeyInput] = useState("");
-  const [keyMsg, setKeyMsg] = useState<Msg>(null);
-  const [testMsg, setTestMsg] = useState<Msg>(null);
   const [hotkeyMsg, setHotkeyMsg] = useState<Msg>(null);
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
@@ -112,24 +106,10 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const apiKeySectionRef = useRef<HTMLElement>(null);
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const [apiKeyHighlighted, setApiKeyHighlighted] = useState(false);
-  // Three-step setup flow takes over the page when the user has no
-  // key on first mount. Once all three steps are checked off, the
-  // checklist self-dismisses and the regular management sections
-  // (Groq API Key + Test Connection) reappear. `null` means we
-  // haven't decided yet because keyStatus hasn't loaded.
-  const [setupMode, setSetupMode] = useState<boolean | null>(null);
 
   useEffect(() => {
     refresh();
   }, []);
-
-  // Decide setup mode the first time keyStatus resolves. After that
-  // it sticks unless the checklist dismisses itself.
-  useEffect(() => {
-    if (keyStatus === null || setupMode !== null) return;
-    const hasKey = keyStatus.from_env || keyStatus.from_settings;
-    setSetupMode(!hasKey);
-  }, [keyStatus, setupMode]);
 
   // Cross-screen focus handler. When Shell tells us the user arrived
   // via an "api-key" CTA (Home setup card, banner, or status tile),
@@ -271,53 +251,10 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     }
   }
 
-  async function saveKey() {
-    if (!keyInput.trim()) return;
-    setBusy("key");
-    setKeyMsg(null);
-    try {
-      await invoke("save_api_key", { key: keyInput.trim() });
-      setKeyInput("");
-      setKeyMsg({ ok: true, text: "Saved to settings.json." });
-      await refresh();
-    } catch (e) {
-      setKeyMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function clearKey() {
-    setBusy("key");
-    setKeyMsg(null);
-    try {
-      await invoke("clear_api_key");
-      setKeyMsg({ ok: true, text: "Key cleared." });
-      await refresh();
-    } catch (e) {
-      setKeyMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(null);
-    }
-  }
-
-  async function testConnection() {
-    setBusy("test");
-    setTestMsg(null);
-    try {
-      const result = await invoke<ConnectionTest>("test_connection");
-      setTestMsg({
-        ok: result.ok,
-        text: result.ok
-          ? `Connected — round-trip ${result.latency_ms}ms`
-          : result.message,
-      });
-    } catch (e) {
-      setTestMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(null);
-    }
-  }
+  // saveKey / clearKey / testConnection used to live here. They were
+  // moved into ApiKeySetupChecklist so the checklist is the single
+  // source of truth for API-key state. Settings.tsx now just hosts
+  // the checklist plus the unrelated sections (hotkey, engine, etc.).
 
   async function checkForUpdates() {
     setBusy("update");
@@ -379,47 +316,17 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     );
   }
 
-  const noKey = !keyStatus.from_env && !keyStatus.from_settings;
-
-  const keyHint = keyStatus.from_env
-    ? "Currently using key from .env (env var takes precedence)"
-    : keyStatus.from_settings
-      ? "Currently using key from settings.json (saved via this window)"
-      : "No key configured yet";
-
   return (
     <div className="pf-settings">
       <h1>PerfectPrompt Settings</h1>
 
-      {setupMode === true && (
-        <ApiKeySetupChecklist
-          keyStatus={keyStatus}
-          onKeyStatusChange={refresh}
-          onAllComplete={() => setSetupMode(false)}
-          sectionRef={apiKeySectionRef}
-          apiKeyInputRef={apiKeyInputRef}
-          highlightClass={apiKeyHighlighted ? "pf-section-highlight" : ""}
-        />
-      )}
-
-      {setupMode === false && noKey && (
-        <div className="pf-welcome">
-          <h2 className="pf-welcome-title">Want unlimited enhancements?</h2>
-          <p className="pf-welcome-body">
-            You're on the hosted tier — 50 enhancements/day, no setup
-            required. Add your own Groq API key below for unlimited use.
-            It's free at console.groq.com and takes about 30 seconds.
-          </p>
-          <button
-            className="pf-cta"
-            onClick={() => {
-              openUrl(GROQ_KEYS_URL).catch((e) => console.error("openUrl failed:", e));
-            }}
-          >
-            Get a free Groq API key →
-          </button>
-        </div>
-      )}
+      <ApiKeySetupChecklist
+        keyStatus={keyStatus}
+        onKeyStatusChange={refresh}
+        sectionRef={apiKeySectionRef}
+        apiKeyInputRef={apiKeyInputRef}
+        highlightClass={apiKeyHighlighted ? "pf-section-highlight" : ""}
+      />
 
       {auth.configured && auth.user && (
         <section>
@@ -474,55 +381,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         </section>
       )}
 
-      {setupMode === false && (
-        <>
-          <section
-            ref={apiKeySectionRef}
-            className={apiKeyHighlighted ? "pf-section-highlight" : undefined}
-          >
-            <h2>Groq API Key</h2>
-            <p className="pf-hint">{keyHint}</p>
-            <div className="pf-row">
-              <input
-                ref={apiKeyInputRef}
-                type="password"
-                placeholder="gsk_..."
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                disabled={busy === "key"}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button onClick={saveKey} disabled={busy === "key" || !keyInput.trim()}>
-                Save
-              </button>
-              <button
-                onClick={clearKey}
-                disabled={busy === "key" || !keyStatus.from_settings}
-                className="pf-secondary"
-              >
-                Clear
-              </button>
-            </div>
-            {keyMsg && (
-              <p className={keyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{keyMsg.text}</p>
-            )}
-          </section>
-
-          <section>
-            <h2>Test Connection</h2>
-            <p className="pf-hint">Pings Groq with the currently-active key.</p>
-            <div className="pf-row">
-              <button onClick={testConnection} disabled={busy === "test"}>
-                {busy === "test" ? "Testing…" : "Test Connection"}
-              </button>
-            </div>
-            {testMsg && (
-              <p className={testMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{testMsg.text}</p>
-            )}
-          </section>
-        </>
-      )}
 
       <section>
         <h2>Global Hotkey</h2>

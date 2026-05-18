@@ -1,4 +1,4 @@
-import { RefObject, useEffect, useState } from "react";
+import { RefObject, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import "./ApiKeySetupChecklist.css";
@@ -23,15 +23,11 @@ interface Props {
   /// Called after the checklist successfully mutates key state, so
   /// the parent can re-fetch keyStatus from Rust and re-render.
   onKeyStatusChange: () => void | Promise<void>;
-  /// Fired when all three steps are complete. Parent can use this to
-  /// dismiss the checklist after a beat and reveal the regular
-  /// management sections.
-  onAllComplete?: () => void;
   /// Optional ref the parent attaches to the password input for the
   /// "scroll + focus" deep-link behavior from Home's setup card.
   apiKeyInputRef?: RefObject<HTMLInputElement | null>;
   /// Optional ref attached to the outer <section> so the parent's
-  /// "scroll into view" effect lands on this card when in setup mode.
+  /// "scroll into view" effect lands on this card.
   sectionRef?: RefObject<HTMLElement | null>;
   /// Optional class added when the parent wants to draw attention to
   /// the section (the existing pf-section-highlight pulse).
@@ -41,7 +37,6 @@ interface Props {
 export function ApiKeySetupChecklist({
   keyStatus,
   onKeyStatusChange,
-  onAllComplete,
   apiKeyInputRef,
   sectionRef,
   highlightClass,
@@ -52,6 +47,11 @@ export function ApiKeySetupChecklist({
   const [keyMsg, setKeyMsg] = useState<Msg>(null);
   const [busyTest, setBusyTest] = useState(false);
   const [testMsg, setTestMsg] = useState<Msg>(null);
+  // When the user clicks "Change" on a saved key, flip step 2 back
+  // into edit mode so they can paste a new value. The previous key
+  // stays active until they save the new one — escape via Cancel
+  // returns to the saved state.
+  const [editingKey, setEditingKey] = useState(false);
 
   const hasKey = keyStatus.from_env || keyStatus.from_settings;
   // Step 1 is "user has a key in hand" — we can't verify that
@@ -66,13 +66,6 @@ export function ApiKeySetupChecklist({
   // Compute the active step (next one needing user action). Used for
   // the focus ring + "active" styling on the indicator.
   const activeStep = !step1Done ? 1 : !step2Done ? 2 : !step3Done ? 3 : null;
-
-  useEffect(() => {
-    if (allDone) onAllComplete?.();
-    // Only fire when the boolean transitions to true; onAllComplete
-    // is stable for our usage so we don't include it in deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allDone]);
 
   async function handleOpenGroq() {
     try {
@@ -91,6 +84,28 @@ export function ApiKeySetupChecklist({
       await invoke("save_api_key", { key: keyInput.trim() });
       setKeyInput("");
       setKeyMsg({ ok: true, text: "Saved." });
+      // Any prior "Connected" result was for the previous key, not
+      // this one — wipe it so step 3 reads correctly.
+      setTestMsg(null);
+      setEditingKey(false);
+      await onKeyStatusChange();
+    } catch (e) {
+      setKeyMsg({ ok: false, text: friendlyError(e) });
+    } finally {
+      setBusyKey(false);
+    }
+  }
+
+  async function handleClearKey() {
+    if (busyKey) return;
+    setBusyKey(true);
+    setKeyMsg(null);
+    try {
+      await invoke("clear_api_key");
+      setKeyMsg({ ok: true, text: "Key removed." });
+      setTestMsg(null);
+      setEditingKey(false);
+      setKeyInput("");
       await onKeyStatusChange();
     } catch (e) {
       setKeyMsg({ ok: false, text: friendlyError(e) });
@@ -126,9 +141,13 @@ export function ApiKeySetupChecklist({
     >
       <header className="pf-setup-head">
         <div>
-          <h2 className="pf-setup-title">Set up your Groq API key</h2>
+          <h2 className="pf-setup-title">
+            {allDone ? "Your Groq API key" : "Set up your Groq API key"}
+          </h2>
           <p className="pf-setup-subtitle">
-            Three short steps. Free, no credit card, takes about a minute.
+            {allDone
+              ? "Connected, tested, ready. Change or remove the key any time below."
+              : "Three short steps. Free, no credit card, takes about a minute."}
           </p>
         </div>
         <div className="pf-setup-progress" aria-label={`${completed} of 3 steps complete`}>
@@ -162,33 +181,82 @@ export function ApiKeySetupChecklist({
           title="Paste your key here and save"
           desc="Stored locally on this machine. Your key never leaves your device until you use a hosted enhancement."
         >
-          {step2Done ? (
-            <div className="pf-setup-step-status">
-              {keyStatus.from_env
-                ? "✓ Using key from .env (env var takes precedence)"
-                : "✓ Key saved to settings.json"}
+          {step2Done && !editingKey ? (
+            <div className="pf-setup-step-status-row">
+              <div className="pf-setup-step-status">
+                {keyStatus.from_env
+                  ? "✓ Using key from .env (env var takes precedence)"
+                  : "✓ Key saved to settings.json"}
+              </div>
+              <div className="pf-setup-inline-actions">
+                <button
+                  type="button"
+                  className="pf-setup-link-btn"
+                  onClick={() => {
+                    setKeyMsg(null);
+                    setEditingKey(true);
+                  }}
+                  disabled={busyKey || keyStatus.from_env}
+                  title={
+                    keyStatus.from_env
+                      ? "Edit the GROQ_API_KEY value in your .env file to change the env-var key."
+                      : undefined
+                  }
+                >
+                  Change API key
+                </button>
+                <button
+                  type="button"
+                  className="pf-setup-link-btn pf-setup-link-btn-danger"
+                  onClick={handleClearKey}
+                  disabled={busyKey || !keyStatus.from_settings}
+                  title={
+                    keyStatus.from_env && !keyStatus.from_settings
+                      ? "Remove the .env override manually — only settings.json keys can be cleared from here."
+                      : undefined
+                  }
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="pf-setup-key-row">
-              <input
-                ref={apiKeyInputRef}
-                type="password"
-                placeholder="gsk_..."
-                value={keyInput}
-                onChange={(e) => setKeyInput(e.target.value)}
-                disabled={busyKey || !step1Done}
-                autoComplete="off"
-                spellCheck={false}
-              />
-              <button
-                type="button"
-                className="pf-setup-btn-primary"
-                onClick={handleSaveKey}
-                disabled={busyKey || !keyInput.trim()}
-              >
-                {busyKey ? "Saving…" : "Save"}
-              </button>
-            </div>
+            <>
+              <div className="pf-setup-key-row">
+                <input
+                  ref={apiKeyInputRef}
+                  type="password"
+                  placeholder="gsk_..."
+                  value={keyInput}
+                  onChange={(e) => setKeyInput(e.target.value)}
+                  disabled={busyKey || !step1Done}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="pf-setup-btn-primary"
+                  onClick={handleSaveKey}
+                  disabled={busyKey || !keyInput.trim()}
+                >
+                  {busyKey ? "Saving…" : "Save"}
+                </button>
+                {editingKey && (
+                  <button
+                    type="button"
+                    className="pf-setup-btn-secondary"
+                    onClick={() => {
+                      setKeyInput("");
+                      setKeyMsg(null);
+                      setEditingKey(false);
+                    }}
+                    disabled={busyKey}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </>
           )}
           {keyMsg && (
             <p className={keyMsg.ok ? "pf-setup-msg ok" : "pf-setup-msg err"}>

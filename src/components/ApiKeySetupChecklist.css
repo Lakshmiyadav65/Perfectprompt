@@ -187,6 +187,54 @@
   border-radius: 8px;
 }
 
+/* Step-2 done state: status pill on the left, inline link-style
+   actions on the right. Wraps below the status on narrow widths
+   so the actions don't get cramped. */
+.pf-setup-step-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.pf-setup-inline-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.pf-setup-link-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--pf-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.pf-setup-link-btn:hover:not(:disabled) {
+  color: var(--pf-accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pf-setup-link-btn:disabled {
+  color: var(--pf-text-subtle);
+  cursor: not-allowed;
+}
+
+.pf-setup-link-btn-danger {
+  color: var(--pf-text-muted);
+}
+
+.pf-setup-link-btn-danger:hover:not(:disabled) {
+  color: #ff9b9b;
+}
+
 /* ---- Step-2 input row ---- */
 
 .pf-setup-key-row {
