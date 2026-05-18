@@ -197,11 +197,22 @@ async function handleCallbackUrl(rawUrl: string): Promise<void> {
       console.warn("[auth] callback URL missing 'code' param:", rawUrl);
       return;
     }
+    // Supabase appends `type=recovery` to the redirect URL for
+    // password-reset emails. We detect that BEFORE the exchange so
+    // the UI can route the user to a "set a new password" screen
+    // instead of dropping them into the main app with an unchanged
+    // password.
+    const isRecovery = url.searchParams.get("type") === "recovery";
+
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) throw error;
     const token = data.session?.access_token;
     if (!token) throw new Error("exchangeCodeForSession returned no access_token");
     await invoke("set_session_token", { token });
+
+    if (isRecovery) {
+      window.dispatchEvent(new CustomEvent("pf-recovery-mode"));
+    }
   } catch (e) {
     const message = (e as Error)?.message ?? String(e);
     console.error("[auth] callback handling failed:", message);
