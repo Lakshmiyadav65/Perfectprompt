@@ -1,17 +1,20 @@
-/* Minimal brand footer for the auth surfaces.
-   Tiny lowercase wordmark + hair-line + a single accent pulse that
-   traces along the line. No giant typography, no opacity wrestling
-   with the card above. */
+/* Minimal brand footer with rhythm.
+   Static wordmark "perfectprompt." sits at the bottom of the
+   viewport; a cycling tagline beside it types in left-to-right
+   via clip-path, holds, then fades out before the next one
+   takes its place. A small accent cursor blinks after the
+   tagline like a terminal prompt — gives the whole footer a
+   subtle heartbeat without resorting to a giant wordmark or
+   ambient demo card. */
 
 .pf-marquee {
   position: fixed;
-  bottom: 28px;
+  bottom: 26px;
   left: 50%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: min(440px, 72vw);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: min(640px, 86vw);
   pointer-events: none;
   user-select: none;
   z-index: 0;
@@ -23,59 +26,90 @@
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-.pf-marquee-word {
+.pf-marquee-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
   font-family: var(--pf-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.2em;
+  font-size: 11px;
+  letter-spacing: 0.18em;
   text-transform: lowercase;
-  color: var(--pf-text-subtle);
+  white-space: nowrap;
+}
+
+/* ---- Static wordmark ---- */
+
+.pf-marquee-word {
+  color: var(--pf-text-muted);
 }
 
 .pf-marquee-dot {
   color: var(--pf-accent);
+  /* Subtle breathing on the brand-period so the static half of
+     the footer also has a heartbeat — the cycling tagline does
+     most of the work, but a totally static brand mark would
+     read as cold next to the moving text. */
+  animation: pf-marquee-breath 3.2s ease-in-out infinite;
 }
 
-.pf-marquee-line {
-  position: relative;
-  width: 100%;
-  height: 1px;
-  background: var(--pf-line-strong);
-  overflow: hidden;
+@keyframes pf-marquee-breath {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.45; }
 }
 
-.pf-marquee-pulse {
-  position: absolute;
-  top: -1px;
-  left: 0;
-  width: 38px;
-  height: 3px;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--pf-accent) 50%,
-    transparent
-  );
-  border-radius: 2px;
-  /* Soft glow so the pulse reads as light moving along the wire,
-     not a hard pill sliding across. */
-  filter: blur(0.2px);
-  animation: pf-marquee-pulse 5.4s cubic-bezier(0.55, 0, 0.45, 1) infinite;
+/* ---- Cycling tagline ---- */
+
+.pf-marquee-tagline {
+  color: var(--pf-text-subtle);
+  letter-spacing: 0.14em;
+  /* Reveal via clip-path so the natural text width is preserved
+     (no `ch`-counting per phrase). The clip slides from
+     fully-clipped (right edge at 100%) to fully-open at 20% of
+     the cycle, holds through 78%, then opacity fades out. */
+  clip-path: inset(0 100% 0 0);
+  animation: pf-marquee-tagline-cycle 5.6s var(--pf-ease, ease-out) both;
 }
 
-@keyframes pf-marquee-pulse {
-  0%   { left: -10%; opacity: 0; }
-  8%   { opacity: 1; }
-  92%  { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
+@keyframes pf-marquee-tagline-cycle {
+  0%   { clip-path: inset(0 100% 0 0); opacity: 1; }
+  20%  { clip-path: inset(0 0 0 0);    opacity: 1; }
+  78%  { clip-path: inset(0 0 0 0);    opacity: 1; }
+  100% { clip-path: inset(0 0 0 0);    opacity: 0; }
 }
+
+/* ---- Terminal-style cursor ---- */
+
+.pf-marquee-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 11px;
+  background: var(--pf-accent);
+  /* Small upward translate so the cursor sits centered on the
+     mono x-height rather than dropping below the baseline. */
+  transform: translateY(1px);
+  animation: pf-marquee-cursor-blink 1100ms steps(2, end) infinite;
+}
+
+@keyframes pf-marquee-cursor-blink {
+  to { opacity: 0; }
+}
+
+/* ---- Reduced motion ---- */
 
 @media (prefers-reduced-motion: reduce) {
   .pf-marquee {
     animation: none;
     transform: translateX(-50%);
   }
-  .pf-marquee-pulse {
+  .pf-marquee-dot,
+  .pf-marquee-cursor {
     animation: none;
-    opacity: 0;
+  }
+  .pf-marquee-tagline {
+    /* Skip the type-in; reveal the current tagline statically and
+       let the React rotation handle the swap. */
+    animation: none;
+    clip-path: none;
+    opacity: 1;
   }
 }
