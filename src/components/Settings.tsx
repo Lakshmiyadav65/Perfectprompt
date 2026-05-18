@@ -1,20 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { useAuth } from "../hooks/useAuth";
-import { useDisplayName } from "../hooks/useDisplayName";
 import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
-
-interface HostedQuota {
-  used: number;
-  limit: number;
-  remaining: number;
-  plan_tier: string;
-  resets_at?: string | null;
-}
 
 type ApiKeyStatus = { from_env: boolean; from_settings: boolean };
 type UpdateInfo = {
@@ -78,10 +67,6 @@ interface SettingsProps {
 }
 
 export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
-  const auth = useAuth();
-  const displayName = useDisplayName(auth.user);
-  const [nameDraft, setNameDraft] = useState<string>("");
-  const [hostedQuota, setHostedQuota] = useState<HostedQuota | null>(null);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [hotkey, setHotkey] = useState("Alt+E");
   const [hotkeyMsg, setHotkeyMsg] = useState<Msg>(null);
@@ -132,45 +117,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     });
     return () => window.cancelAnimationFrame(id);
   }, [focusTarget, onFocusHandled]);
-
-  // Live quota updates from the Rust pipeline whenever a hosted /enhance
-  // call returns. Replaces polling — the Account section reflects the
-  // server count within the same tick the enhancement lands.
-  useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    void listen<HostedQuota>("hosted:quota", (event) => {
-      setHostedQuota(event.payload);
-    }).then((u) => {
-      unlisten = u;
-    });
-    return () => {
-      unlisten?.();
-    };
-  }, []);
-
-  async function handleSignOut() {
-    try {
-      await auth.signOut();
-      setHostedQuota(null);
-    } catch (e) {
-      console.error("[settings] signOut failed:", e);
-    }
-  }
-
-  // Sync the draft input with the persisted override whenever it
-  // changes externally (e.g. another window edited it).
-  useEffect(() => {
-    setNameDraft(displayName.override);
-  }, [displayName.override]);
-
-  function handleDisplayNameSave() {
-    displayName.setOverride(nameDraft);
-  }
-
-  function handleDisplayNameReset() {
-    displayName.setOverride("");
-    setNameDraft("");
-  }
 
   async function refresh() {
     try {
@@ -328,58 +274,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         highlightClass={apiKeyHighlighted ? "pf-section-highlight" : ""}
       />
 
-      {auth.configured && auth.user && (
-        <section>
-          <h2>Account</h2>
-          <p className="pf-hint">
-            Signed in as <strong>{displayName.defaultName}</strong> ({auth.user.email})
-            {hostedQuota && (
-              <>
-                {" · "}
-                {hostedQuota.plan_tier}
-                {" · "}
-                {hostedQuota.used}/{hostedQuota.limit} used today
-              </>
-            )}
-          </p>
-
-          <label className="pf-hint" htmlFor="pf-display-name">
-            Display name (shown in the sidebar — overrides your Google
-            name locally)
-          </label>
-          <div className="pf-row">
-            <input
-              id="pf-display-name"
-              type="text"
-              placeholder={displayName.defaultName}
-              value={nameDraft}
-              onChange={(e) => setNameDraft(e.target.value)}
-              maxLength={40}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            <button
-              onClick={handleDisplayNameSave}
-              disabled={nameDraft.trim() === displayName.override}
-            >
-              Save
-            </button>
-            <button
-              onClick={handleDisplayNameReset}
-              disabled={!displayName.override}
-              className="pf-secondary"
-            >
-              Reset
-            </button>
-          </div>
-
-          <div className="pf-row">
-            <button onClick={handleSignOut} className="pf-secondary">
-              Sign out
-            </button>
-          </div>
-        </section>
-      )}
 
 
       <section>
