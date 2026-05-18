@@ -4,9 +4,12 @@ import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import {
   installDeepLinkHandler,
+  resetPasswordForEmail as resetPasswordForEmailImpl,
   signInWithGitHub as signInWithGitHubImpl,
   signInWithGoogle as signInWithGoogleImpl,
+  signInWithPassword as signInWithPasswordImpl,
   signOut as signOutImpl,
+  signUpWithPassword as signUpWithPasswordImpl,
   syncSessionToRust,
 } from "../lib/auth";
 
@@ -18,6 +21,13 @@ export interface AuthState {
   session: Session | null;
   signInWithGoogle: () => Promise<void>;
   signInWithGitHub: () => Promise<void>;
+  signInWithPassword: (email: string, password: string) => Promise<void>;
+  signUpWithPassword: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<{ needsEmailConfirmation: boolean }>;
+  resetPasswordForEmail: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   /// Surface the last OAuth error (PKCE failure, provider rejection,
   /// network blip during exchangeCodeForSession). Cleared on the next
@@ -112,6 +122,36 @@ export function useAuth(): AuthState {
       setError(null);
       try {
         await signInWithGitHubImpl();
+      } catch (e) {
+        const msg = (e as Error)?.message ?? String(e);
+        setError(msg);
+        throw e;
+      }
+    },
+    signInWithPassword: async (email, password) => {
+      setError(null);
+      try {
+        await signInWithPasswordImpl(email, password);
+      } catch (e) {
+        const msg = (e as Error)?.message ?? String(e);
+        setError(msg);
+        throw e;
+      }
+    },
+    signUpWithPassword: async (name, email, password) => {
+      setError(null);
+      try {
+        return await signUpWithPasswordImpl(name, email, password);
+      } catch (e) {
+        const msg = (e as Error)?.message ?? String(e);
+        setError(msg);
+        throw e;
+      }
+    },
+    resetPasswordForEmail: async (email) => {
+      setError(null);
+      try {
+        await resetPasswordForEmailImpl(email);
       } catch (e) {
         const msg = (e as Error)?.message ?? String(e);
         setError(msg);
