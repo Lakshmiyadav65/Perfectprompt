@@ -78,6 +78,25 @@
   margin: 0 0 8px;
 }
 
+/* Success indicator chip used by PostAuthSetup. Stays in the
+   accent palette rather than green so it reads as "you're in"
+   not "validation passed" — the brief was explicit about not
+   feeling like a system message. */
+.pf-gate-success-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--pf-accent-soft);
+  color: var(--pf-accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .pf-gate-sub {
   font-size: 14px;
   line-height: 1.5;

@@ -3,6 +3,7 @@ import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
 import { CommandBar } from "./components/CommandBar";
 import { PasswordRecovery } from "./components/PasswordRecovery";
+import { PostAuthSetup } from "./components/PostAuthSetup";
 import { Shell } from "./components/Shell";
 import { SignupGate } from "./components/SignupGate";
 import { Toast } from "./components/Toast";
@@ -44,6 +45,14 @@ function MainAppGated({ hash }: { hash: string }) {
   // before any main-app surface renders.
   if (auth.configured && auth.user && auth.recoveryMode) {
     return <PasswordRecovery />;
+  }
+
+  // Just-signed-in interstitial. Sits between auth completion and the
+  // main app — confirms the sign-in and prompts the user to set up
+  // their Groq API key. Returning users with a key already configured
+  // get bounced through automatically inside PostAuthSetup itself.
+  if (auth.configured && auth.user && auth.justSignedIn) {
+    return <PostAuthSetup />;
   }
 
   if (gateActive) return <SignupGate />;

@@ -38,6 +38,14 @@ export interface AuthState {
   /// Exit recovery mode without changing the password. Signs out so
   /// the gate reappears.
   cancelRecovery: () => Promise<void>;
+  /// True when the user *just* completed a fresh sign-in or sign-up
+  /// (Supabase SIGNED_IN event). Stays false on app reload with a
+  /// persisted session (INITIAL_SESSION event). Drives the
+  /// PostAuthSetup interstitial.
+  justSignedIn: boolean;
+  /// Clear justSignedIn. Broadcasts to every useAuth instance so the
+  /// App-level gate re-renders into Shell.
+  dismissJustSignedIn: () => void;
   signOut: () => Promise<void>;
   /// Surface the last OAuth error (PKCE failure, provider rejection,
   /// network blip during exchangeCodeForSession). Cleared on the next
@@ -52,6 +60,7 @@ export function useAuth(): AuthState {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [recoveryMode, setRecoveryMode] = useState<boolean>(false);
+  const [justSignedIn, setJustSignedIn] = useState<boolean>(false);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -85,6 +94,16 @@ export function useAuth(): AuthState {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
         setError(null);
       }
+      // SIGNED_IN fires for fresh auth (OAuth callback, password
+      // sign-in/sign-up). INITIAL_SESSION fires on app reload with a
+      // persisted session — we deliberately ignore that one so
+      // returning users don't see the post-auth interstitial.
+      if (event === "SIGNED_IN") {
+        window.dispatchEvent(new CustomEvent("pf-just-signed-in"));
+      }
+      if (event === "SIGNED_OUT") {
+        window.dispatchEvent(new CustomEvent("pf-clear-just-signed-in"));
+      }
       // Mirror the new auth state into Rust so the pipeline picks
       // it up on the next enhancement call.
       void syncSessionToRust();
@@ -116,12 +135,22 @@ export function useAuth(): AuthState {
     window.addEventListener("pf-recovery-mode", onRecoveryEnter);
     window.addEventListener("pf-recovery-complete", onRecoveryComplete);
 
+    // justSignedIn cross-instance bridge — every useAuth instance in
+    // the tree flips together so App can show the interstitial,
+    // PostAuthSetup can dismiss it, and Shell ends up rendered.
+    const onJustSignedIn = () => setJustSignedIn(true);
+    const onClearJustSignedIn = () => setJustSignedIn(false);
+    window.addEventListener("pf-just-signed-in", onJustSignedIn);
+    window.addEventListener("pf-clear-just-signed-in", onClearJustSignedIn);
+
     return () => {
       active = false;
       sub.subscription.unsubscribe();
       window.removeEventListener("pf-auth-error", onAuthError);
       window.removeEventListener("pf-recovery-mode", onRecoveryEnter);
       window.removeEventListener("pf-recovery-complete", onRecoveryComplete);
+      window.removeEventListener("pf-just-signed-in", onJustSignedIn);
+      window.removeEventListener("pf-clear-just-signed-in", onClearJustSignedIn);
     };
   }, []);
 
@@ -199,6 +228,10 @@ export function useAuth(): AuthState {
       } finally {
         window.dispatchEvent(new CustomEvent("pf-recovery-complete"));
       }
+    },
+    justSignedIn,
+    dismissJustSignedIn: () => {
+      window.dispatchEvent(new CustomEvent("pf-clear-just-signed-in"));
     },
     signOut: async () => {
       await signOutImpl();

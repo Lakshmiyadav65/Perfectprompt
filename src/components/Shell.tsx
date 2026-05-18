@@ -63,13 +63,39 @@ const NAV: { route: Route; label: string; icon: ReactNode }[] = [
   },
 ];
 
+// Reads (and clears) a pending post-auth focus breadcrumb dropped by
+// PostAuthSetup. Returns the initial route + focus target Shell should
+// boot into. Falls back to whatever the parent passed (typically
+// "home") when nothing is pending.
+function consumePostAuthBreadcrumb(fallback: Route): {
+  route: Route;
+  focus: FocusTarget;
+} {
+  try {
+    const pending = sessionStorage.getItem("pf:post-auth-focus");
+    if (pending === "api-key") {
+      sessionStorage.removeItem("pf:post-auth-focus");
+      return { route: "settings", focus: "api-key" };
+    }
+  } catch {
+    // sessionStorage can throw in private-mode embeds / sandboxes —
+    // not worth crashing the shell over.
+  }
+  return { route: fallback, focus: null };
+}
+
 export function Shell({ initial }: { initial: Route }) {
-  const [route, setRoute] = useState<Route>(initial);
+  // Boot lazily from the breadcrumb so we never flicker through Home
+  // on the way to Settings — the user explicitly asked for the API
+  // setup section, hand it to them on the first render. Lazy init so
+  // the sessionStorage read + clear runs exactly once.
+  const [boot] = useState(() => consumePostAuthBreadcrumb(initial));
+  const [route, setRoute] = useState<Route>(boot.route);
   // When a deep-link CTA (Home setup card, banner, status tile) sends
   // the user to Settings, we pass an explicit focus target so Settings
   // can scroll + focus the right section instead of dumping them at
   // the page top.
-  const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
+  const [focusTarget, setFocusTarget] = useState<FocusTarget>(boot.focus);
   const [hotkey, setHotkey] = useState<string>("Ctrl+Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [enabled, setEnabled] = useState<boolean>(true);
