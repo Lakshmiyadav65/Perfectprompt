@@ -4,6 +4,7 @@ import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
+import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
 
@@ -111,10 +112,24 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const apiKeySectionRef = useRef<HTMLElement>(null);
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const [apiKeyHighlighted, setApiKeyHighlighted] = useState(false);
+  // Three-step setup flow takes over the page when the user has no
+  // key on first mount. Once all three steps are checked off, the
+  // checklist self-dismisses and the regular management sections
+  // (Groq API Key + Test Connection) reappear. `null` means we
+  // haven't decided yet because keyStatus hasn't loaded.
+  const [setupMode, setSetupMode] = useState<boolean | null>(null);
 
   useEffect(() => {
     refresh();
   }, []);
+
+  // Decide setup mode the first time keyStatus resolves. After that
+  // it sticks unless the checklist dismisses itself.
+  useEffect(() => {
+    if (keyStatus === null || setupMode !== null) return;
+    const hasKey = keyStatus.from_env || keyStatus.from_settings;
+    setSetupMode(!hasKey);
+  }, [keyStatus, setupMode]);
 
   // Cross-screen focus handler. When Shell tells us the user arrived
   // via an "api-key" CTA (Home setup card, banner, or status tile),
@@ -376,7 +391,18 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     <div className="pf-settings">
       <h1>PerfectPrompt Settings</h1>
 
-      {noKey && (
+      {setupMode === true && (
+        <ApiKeySetupChecklist
+          keyStatus={keyStatus}
+          onKeyStatusChange={refresh}
+          onAllComplete={() => setSetupMode(false)}
+          sectionRef={apiKeySectionRef}
+          apiKeyInputRef={apiKeyInputRef}
+          highlightClass={apiKeyHighlighted ? "pf-section-highlight" : ""}
+        />
+      )}
+
+      {setupMode === false && noKey && (
         <div className="pf-welcome">
           <h2 className="pf-welcome-title">Want unlimited enhancements?</h2>
           <p className="pf-welcome-body">
@@ -448,51 +474,55 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         </section>
       )}
 
-      <section
-        ref={apiKeySectionRef}
-        className={apiKeyHighlighted ? "pf-section-highlight" : undefined}
-      >
-        <h2>Groq API Key</h2>
-        <p className="pf-hint">{keyHint}</p>
-        <div className="pf-row">
-          <input
-            ref={apiKeyInputRef}
-            type="password"
-            placeholder="gsk_..."
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            disabled={busy === "key"}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <button onClick={saveKey} disabled={busy === "key" || !keyInput.trim()}>
-            Save
-          </button>
-          <button
-            onClick={clearKey}
-            disabled={busy === "key" || !keyStatus.from_settings}
-            className="pf-secondary"
+      {setupMode === false && (
+        <>
+          <section
+            ref={apiKeySectionRef}
+            className={apiKeyHighlighted ? "pf-section-highlight" : undefined}
           >
-            Clear
-          </button>
-        </div>
-        {keyMsg && (
-          <p className={keyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{keyMsg.text}</p>
-        )}
-      </section>
+            <h2>Groq API Key</h2>
+            <p className="pf-hint">{keyHint}</p>
+            <div className="pf-row">
+              <input
+                ref={apiKeyInputRef}
+                type="password"
+                placeholder="gsk_..."
+                value={keyInput}
+                onChange={(e) => setKeyInput(e.target.value)}
+                disabled={busy === "key"}
+                autoComplete="off"
+                spellCheck={false}
+              />
+              <button onClick={saveKey} disabled={busy === "key" || !keyInput.trim()}>
+                Save
+              </button>
+              <button
+                onClick={clearKey}
+                disabled={busy === "key" || !keyStatus.from_settings}
+                className="pf-secondary"
+              >
+                Clear
+              </button>
+            </div>
+            {keyMsg && (
+              <p className={keyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{keyMsg.text}</p>
+            )}
+          </section>
 
-      <section>
-        <h2>Test Connection</h2>
-        <p className="pf-hint">Pings Groq with the currently-active key.</p>
-        <div className="pf-row">
-          <button onClick={testConnection} disabled={busy === "test"}>
-            {busy === "test" ? "Testing…" : "Test Connection"}
-          </button>
-        </div>
-        {testMsg && (
-          <p className={testMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{testMsg.text}</p>
-        )}
-      </section>
+          <section>
+            <h2>Test Connection</h2>
+            <p className="pf-hint">Pings Groq with the currently-active key.</p>
+            <div className="pf-row">
+              <button onClick={testConnection} disabled={busy === "test"}>
+                {busy === "test" ? "Testing…" : "Test Connection"}
+              </button>
+            </div>
+            {testMsg && (
+              <p className={testMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>{testMsg.text}</p>
+            )}
+          </section>
+        </>
+      )}
 
       <section>
         <h2>Global Hotkey</h2>

@@ -1,0 +1,314 @@
+/* Three-step setup checklist that takes over the top of Settings
+   during first-time API-key setup. Reuses the page's spacing tokens
+   so it sits flush with the surrounding sections. */
+
+.pf-setup-checklist {
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: var(--pf-radius);
+  padding: 24px 26px 22px;
+  margin: 0 0 32px;
+  color: var(--pf-text);
+  scroll-margin-top: 16px;
+}
+
+.pf-setup-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.pf-setup-title {
+  font-family: var(--pf-font-display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0 0 4px;
+  color: var(--pf-text);
+  /* Override the global `.pf-settings h2` mono-uppercase styling. */
+  text-transform: none;
+}
+
+.pf-setup-subtitle {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pf-text-muted);
+}
+
+.pf-setup-progress {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  font-family: var(--pf-font-mono);
+  font-size: 12px;
+  color: var(--pf-text-muted);
+  flex-shrink: 0;
+}
+
+.pf-setup-progress-count {
+  color: var(--pf-accent);
+  font-weight: 600;
+}
+
+.pf-setup-progress-divider {
+  margin: 0 1px;
+  color: var(--pf-text-subtle);
+}
+
+/* ---- Step list ---- */
+
+.pf-setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.pf-setup-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 16px;
+  padding: 16px 0;
+  border-top: 1px solid var(--pf-line);
+}
+
+.pf-setup-step:first-child {
+  border-top: none;
+  padding-top: 4px;
+}
+
+/* Vertical connector between indicators. Sits behind them so the
+   indicator's solid background occludes it where present. */
+.pf-setup-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 44px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--pf-line);
+}
+
+.pf-setup-step.done:not(:last-child)::after {
+  background: var(--pf-accent-strong);
+}
+
+/* ---- Indicator (number / active ring / checkmark) ---- */
+
+.pf-setup-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  color: var(--pf-text-muted);
+  font-family: var(--pf-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 1;
+  transition: all 200ms var(--pf-ease);
+}
+
+.pf-setup-step.active .pf-setup-indicator {
+  background: var(--pf-bg);
+  border-color: var(--pf-accent);
+  color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+.pf-setup-step.done .pf-setup-indicator {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: var(--pf-text-on-accent);
+}
+
+.pf-setup-indicator-num {
+  line-height: 1;
+}
+
+/* ---- Step body ---- */
+
+.pf-setup-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pf-setup-step-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pf-text);
+  line-height: 1.4;
+}
+
+.pf-setup-step.pending .pf-setup-step-title {
+  color: var(--pf-text-muted);
+}
+
+.pf-setup-step.done .pf-setup-step-title {
+  color: var(--pf-text-muted);
+}
+
+.pf-setup-step-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--pf-text-subtle);
+}
+
+.pf-setup-step-action {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pf-setup-step-status {
+  font-size: 13px;
+  color: var(--pf-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 8px;
+}
+
+/* ---- Step-2 input row ---- */
+
+.pf-setup-key-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.pf-setup-key-row input {
+  flex: 1;
+  height: 38px;
+  padding: 0 12px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 9px;
+  color: var(--pf-text);
+  font: inherit;
+  font-size: 14px;
+  transition: border-color 120ms var(--pf-ease), box-shadow 120ms var(--pf-ease);
+}
+
+.pf-setup-key-row input::placeholder {
+  color: var(--pf-text-subtle);
+}
+
+.pf-setup-key-row input:focus {
+  outline: none;
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+.pf-setup-key-row input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Buttons ---- */
+
+.pf-setup-btn-primary,
+.pf-setup-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 18px;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms var(--pf-ease), border-color 120ms var(--pf-ease), transform 80ms var(--pf-ease);
+  white-space: nowrap;
+}
+
+.pf-setup-btn-primary {
+  background: var(--pf-accent);
+  border: 1px solid var(--pf-accent);
+  color: var(--pf-text-on-accent);
+}
+
+.pf-setup-btn-primary:hover:not(:disabled) {
+  background: var(--pf-accent-hover);
+  border-color: var(--pf-accent-hover);
+}
+
+.pf-setup-btn-secondary {
+  background: transparent;
+  border: 1px solid var(--pf-line-strong);
+  color: var(--pf-text);
+}
+
+.pf-setup-btn-secondary:hover:not(:disabled) {
+  background: var(--pf-bg);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.pf-setup-btn-primary:active:not(:disabled),
+.pf-setup-btn-secondary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pf-setup-btn-primary:disabled,
+.pf-setup-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Status messages under each step ---- */
+
+.pf-setup-msg {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.pf-setup-msg.ok {
+  color: var(--pf-accent);
+}
+
+.pf-setup-msg.err {
+  color: #ff9b9b;
+}
+
+/* ---- "All set" footer when all three done ---- */
+
+.pf-setup-done {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--pf-accent-soft);
+  border: 1px solid var(--pf-accent-strong);
+  color: var(--pf-text);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pf-setup-done svg {
+  color: var(--pf-accent);
+  flex-shrink: 0;
+}
