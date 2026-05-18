@@ -328,7 +328,7 @@ export function Home({
 
           <button
             className={`ph-strip-card ${hasKey ? "connected" : "cta empty"}`}
-            onClick={() => onNavigate("settings", "api-key")}
+            onClick={() => onNavigate("settings", hasKey ? null : "api-key")}
             type="button"
           >
             <div className="ph-stl">API key</div>
