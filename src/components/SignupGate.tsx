@@ -315,7 +315,9 @@ export function SignupGate() {
 
         <p className="pf-gate-fineprint">
           By continuing you agree to enhancement requests being proxied
-          through our servers to Groq. Your prompts are subject to{" "}
+          through our servers to Groq, and to successful enhancements
+          being saved to your account on our servers so your history
+          is available across devices. Prompts are subject to{" "}
           <a href="https://groq.com/privacy-policy" target="_blank" rel="noreferrer">
             Groq's data policy
           </a>

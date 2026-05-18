@@ -15,11 +15,14 @@ use std::collections::HashSet;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager, Runtime};
+
+use crate::hosted;
+use crate::AppState;
 
 const HISTORY_FILE: &str = "enhancement_history.jsonl";
 
@@ -170,6 +173,143 @@ pub fn append<R: Runtime>(
     if let Err(e) = app.emit("enhancement-history:new", &record) {
         eprintln!("[enhancement_history] emit failed: {e}");
     }
+
+    // Best-effort backend mirror. Runs in the background so a slow
+    // or failing Supabase round-trip never blocks the paste. The
+    // local JSONL is still the source of truth for display; this
+    // sync gives the user account-bound history that survives a
+    // device wipe and (later) supports cross-device dashboards.
+    spawn_remote_sync(app, &record);
+}
+
+/// Background-spawn the remote sync. Pulls SUPABASE_URL +
+/// SUPABASE_ANON_KEY from the dotenv-loaded env and the user JWT
+/// from AppState. Returns immediately if any of the three are
+/// missing (dev installs without Supabase config, signed-out
+/// users) so the function is a no-op outside the supported path.
+fn spawn_remote_sync<R: Runtime>(app: &AppHandle<R>, record: &EnhancementRecord) {
+    let url = match hosted::supabase_url() {
+        Some(u) => u,
+        None => return,
+    };
+    let anon = match supabase_anon_key() {
+        Some(k) => k,
+        None => {
+            eprintln!(
+                "[enhancement_history] SUPABASE_ANON_KEY not set — skipping remote sync"
+            );
+            return;
+        }
+    };
+    let token = {
+        let state = app.state::<AppState>();
+        let guard = match state.session_token.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        match guard.clone() {
+            Some(t) => t,
+            None => return, // signed out — nothing to sync
+        }
+    };
+
+    let record = record.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = sync_to_remote(&url, &anon, &token, &record).await {
+            // Don't propagate — local write already succeeded and
+            // the dashboard is fine. The next successful sync will
+            // simply land newer rows on top of the gap.
+            eprintln!("[enhancement_history] remote sync failed: {e}");
+        }
+    });
+}
+
+fn supabase_anon_key() -> Option<String> {
+    std::env::var("SUPABASE_ANON_KEY")
+        .ok()
+        .filter(|s| !s.is_empty())
+}
+
+/// POST a single record to {SUPABASE_URL}/rest/v1/enhancements
+/// using the user's JWT. The server-side trigger fills in
+/// `user_id` from auth.uid() so we don't ship it from the client.
+/// The unique (user_id, md5(rough), md5(enhanced)) index in the
+/// schema dedupes any duplicate that slips past the client-side
+/// guard — we treat 409 Conflict as success.
+async fn sync_to_remote(
+    supabase_url: &str,
+    anon_key: &str,
+    user_jwt: &str,
+    record: &EnhancementRecord,
+) -> Result<(), String> {
+    #[derive(Serialize)]
+    struct InsertBody<'a> {
+        id: &'a str,
+        created_at: &'a str,
+        rough: &'a str,
+        enhanced: &'a str,
+        route: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        project_id: Option<&'a str>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        project_name: Option<&'a str>,
+    }
+
+    let url = format!(
+        "{}/rest/v1/enhancements",
+        supabase_url.trim_end_matches('/')
+    );
+
+    let body = InsertBody {
+        id: &record.id,
+        created_at: &record.created_at,
+        rough: &record.rough,
+        enhanced: &record.enhanced,
+        route: &record.route,
+        project_id: record.project_id.as_deref(),
+        project_name: record.project_name.as_deref(),
+    };
+
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .build()
+        .map_err(|e| format!("client build: {e}"))?;
+
+    let resp = client
+        .post(&url)
+        .header("apikey", anon_key)
+        .bearer_auth(user_jwt)
+        .header("Content-Type", "application/json")
+        .header("Prefer", "return=minimal")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("network: {e}"))?;
+
+    let status = resp.status();
+    if status.is_success() {
+        return Ok(());
+    }
+    // 409: duplicate hit the (user_id, content_hash) unique index.
+    // That's exactly the dedup guarantee we want; treat as success.
+    if status.as_u16() == 409 {
+        return Ok(());
+    }
+    let detail = resp.text().await.unwrap_or_default();
+    Err(format!(
+        "supabase {} on insert: {}",
+        status,
+        trim_for_log(&detail, 240)
+    ))
+}
+
+fn trim_for_log(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        return s.to_string();
+    }
+    let mut out = s[..max].to_string();
+    out.push_str("…");
+    out
 }
 
 fn write_one<R: Runtime>(app: &AppHandle<R>, record: &EnhancementRecord) -> Result<()> {
