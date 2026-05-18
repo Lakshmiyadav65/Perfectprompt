@@ -74,7 +74,6 @@ export function Settings() {
   const displayName = useDisplayName(auth.user);
   const [nameDraft, setNameDraft] = useState<string>("");
   const [hostedQuota, setHostedQuota] = useState<HostedQuota | null>(null);
-  const [signInBusy, setSignInBusy] = useState(false);
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [hotkey, setHotkey] = useState("Alt+E");
   const [keyInput, setKeyInput] = useState("");
@@ -118,17 +117,6 @@ export function Settings() {
       unlisten?.();
     };
   }, []);
-
-  async function handleSignIn() {
-    setSignInBusy(true);
-    try {
-      await auth.signInWithGoogle();
-    } catch (e) {
-      console.error("[settings] signInWithGoogle failed:", e);
-    } finally {
-      setSignInBusy(false);
-    }
-  }
 
   async function handleSignOut() {
     try {
@@ -355,12 +343,11 @@ export function Settings() {
 
       {noKey && (
         <div className="pf-welcome">
-          <h2 className="pf-welcome-title">Welcome to PerfectPrompt 👋</h2>
+          <h2 className="pf-welcome-title">Want unlimited enhancements?</h2>
           <p className="pf-welcome-body">
-            To enhance prompts, PerfectPrompt needs a Groq API key. It's free and
-            takes about 30 seconds to set up — sign in with Google or GitHub at
-            console.groq.com, click <strong>Create API Key</strong>, then paste
-            the key below.
+            You're on the hosted tier — 50 enhancements/day, no setup
+            required. Add your own Groq API key below for unlimited use.
+            It's free at console.groq.com and takes about 30 seconds.
           </p>
           <button
             className="pf-cta"
@@ -373,76 +360,56 @@ export function Settings() {
         </div>
       )}
 
-      {auth.configured && (
+      {auth.configured && auth.user && (
         <section>
           <h2>Account</h2>
-          {auth.loading ? (
-            <p className="pf-hint">Loading session…</p>
-          ) : auth.user ? (
-            <>
-              <p className="pf-hint">
-                Signed in as <strong>{displayName.defaultName}</strong> ({auth.user.email})
-                {hostedQuota && (
-                  <>
-                    {" · "}
-                    {hostedQuota.plan_tier}
-                    {" · "}
-                    {hostedQuota.used}/{hostedQuota.limit} used today
-                  </>
-                )}
-              </p>
+          <p className="pf-hint">
+            Signed in as <strong>{displayName.defaultName}</strong> ({auth.user.email})
+            {hostedQuota && (
+              <>
+                {" · "}
+                {hostedQuota.plan_tier}
+                {" · "}
+                {hostedQuota.used}/{hostedQuota.limit} used today
+              </>
+            )}
+          </p>
 
-              <label className="pf-hint" htmlFor="pf-display-name">
-                Display name (shown in the sidebar — overrides your Google
-                name locally)
-              </label>
-              <div className="pf-row">
-                <input
-                  id="pf-display-name"
-                  type="text"
-                  placeholder={displayName.defaultName}
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  maxLength={40}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  onClick={handleDisplayNameSave}
-                  disabled={nameDraft.trim() === displayName.override}
-                >
-                  Save
-                </button>
-                <button
-                  onClick={handleDisplayNameReset}
-                  disabled={!displayName.override}
-                  className="pf-secondary"
-                >
-                  Reset
-                </button>
-              </div>
+          <label className="pf-hint" htmlFor="pf-display-name">
+            Display name (shown in the sidebar — overrides your Google
+            name locally)
+          </label>
+          <div className="pf-row">
+            <input
+              id="pf-display-name"
+              type="text"
+              placeholder={displayName.defaultName}
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              maxLength={40}
+              autoComplete="off"
+              spellCheck={false}
+            />
+            <button
+              onClick={handleDisplayNameSave}
+              disabled={nameDraft.trim() === displayName.override}
+            >
+              Save
+            </button>
+            <button
+              onClick={handleDisplayNameReset}
+              disabled={!displayName.override}
+              className="pf-secondary"
+            >
+              Reset
+            </button>
+          </div>
 
-              <div className="pf-row">
-                <button onClick={handleSignOut} className="pf-secondary">
-                  Sign out
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="pf-hint">
-                Sign in to use the hosted tier — 50 enhancements/day with our
-                Groq key, no setup needed. You can still use your own key
-                instead (BYOK) by leaving this signed out.
-              </p>
-              <div className="pf-row">
-                <button onClick={handleSignIn} disabled={signInBusy}>
-                  {signInBusy ? "Opening browser…" : "Sign in with Google"}
-                </button>
-              </div>
-              {auth.error && <p className="pf-msg pf-err">{auth.error}</p>}
-            </>
-          )}
+          <div className="pf-row">
+            <button onClick={handleSignOut} className="pf-secondary">
+              Sign out
+            </button>
+          </div>
         </section>
       )}
 

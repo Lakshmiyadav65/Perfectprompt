@@ -1,0 +1,161 @@
+.pf-gate {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+      ellipse at top,
+      rgba(255, 122, 77, 0.06),
+      transparent 60%
+    ),
+    var(--pf-bg-deep, var(--pf-bg));
+  padding: 24px;
+  font-family: var(--pf-font-sans);
+  color: var(--pf-text);
+}
+
+.pf-gate-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--pf-bg-2);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 14px;
+  padding: 32px 32px 24px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.03) inset,
+    0 20px 60px rgba(0, 0, 0, 0.45);
+}
+
+.pf-gate-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+
+.pf-gate-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 220deg,
+    #2a2a30,
+    var(--pf-text) 40%,
+    #2a2a30 70%,
+    var(--pf-text)
+  );
+  box-shadow:
+    inset 0 0 0 4px var(--pf-bg-2),
+    0 0 0 1px var(--pf-line-strong);
+  animation: pf-gate-brand-spin 12s linear infinite;
+  will-change: transform;
+}
+
+@keyframes pf-gate-brand-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-gate-brand-mark { animation: none; }
+}
+
+.pf-gate-brand-name {
+  font-family: var(--pf-font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.pf-gate-title {
+  font-family: var(--pf-font-display);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  margin: 0 0 10px;
+}
+
+.pf-gate-sub {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--pf-text-muted);
+  margin: 0 0 24px;
+}
+
+.pf-gate-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pf-gate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  background: var(--pf-bg);
+  border: 1px solid var(--pf-line-strong);
+  border-radius: 10px;
+  color: var(--pf-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, transform 80ms ease;
+}
+
+.pf-gate-btn:hover:not(:disabled) {
+  background: #25251f;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.pf-gate-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.pf-gate-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pf-gate-btn-primary {
+  background: var(--pf-accent);
+  border-color: var(--pf-accent);
+  color: var(--pf-text-on-accent);
+}
+
+.pf-gate-btn-primary:hover:not(:disabled) {
+  background: var(--pf-accent-hover);
+  border-color: var(--pf-accent-hover);
+}
+
+.pf-gate-error {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 80, 80, 0.3);
+  color: #ffb3b3;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.pf-gate-fineprint {
+  margin: 22px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--pf-text-subtle);
+}
+
+.pf-gate-fineprint a {
+  color: var(--pf-text-muted);
+  text-decoration: underline;
+  text-decoration-color: var(--pf-line-strong);
+}
+
+.pf-gate-fineprint a:hover {
+  color: var(--pf-text);
+}

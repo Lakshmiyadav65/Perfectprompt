@@ -4,6 +4,7 @@ import type { Session, User } from "@supabase/supabase-js";
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 import {
   installDeepLinkHandler,
+  signInWithGitHub as signInWithGitHubImpl,
   signInWithGoogle as signInWithGoogleImpl,
   signOut as signOutImpl,
   syncSessionToRust,
@@ -16,6 +17,7 @@ export interface AuthState {
   user: User | null;
   session: Session | null;
   signInWithGoogle: () => Promise<void>;
+  signInWithGitHub: () => Promise<void>;
   signOut: () => Promise<void>;
   /// Surface the last OAuth error (PKCE failure, provider rejection,
   /// network blip during exchangeCodeForSession). Cleared on the next
@@ -100,6 +102,16 @@ export function useAuth(): AuthState {
       setError(null);
       try {
         await signInWithGoogleImpl();
+      } catch (e) {
+        const msg = (e as Error)?.message ?? String(e);
+        setError(msg);
+        throw e;
+      }
+    },
+    signInWithGitHub: async () => {
+      setError(null);
+      try {
+        await signInWithGitHubImpl();
       } catch (e) {
         const msg = (e as Error)?.message ?? String(e);
         setError(msg);

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import "./Home.css";
 
 interface Project {
@@ -73,8 +74,22 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
 
   useEffect(() => {
     void refresh();
+    // 2s poll still catches external changes to hotkey/enabled/projects
+    // (sidebar toggle, tray actions, project edits in other windows).
     const id = window.setInterval(() => void refresh(), 2000);
-    return () => window.clearInterval(id);
+    // API-key state is event-driven so the setup card disappears
+    // instantly when the user saves a key in Settings, instead of
+    // waiting up to 2s for the next poll.
+    let unlisten: (() => void) | undefined;
+    void listen<ApiKeyStatus>("settings:key-changed", (event) => {
+      setKeyStatus(event.payload);
+    }).then((u) => {
+      unlisten = u;
+    });
+    return () => {
+      window.clearInterval(id);
+      unlisten?.();
+    };
   }, []);
 
   // Demo loop = 18.5s. Output paragraphs in pane 3 stagger in at
@@ -143,26 +158,29 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
               </div>
             </div>
 
-            {/* Top-right setup card. Sits in the empty hero space and
-                routes to Settings for the API-key flow. */}
-            <div className="ph-setup-card">
-              <div className="ph-setup-eyebrow">
-                <KeyIcon />
-                <span>Setup</span>
+            {/* Top-right setup card. Only renders when no API key is
+                configured — once a key is saved (env or settings.json),
+                this disappears. Reappears if the key is cleared. */}
+            {!hasKey && (
+              <div className="ph-setup-card">
+                <div className="ph-setup-eyebrow">
+                  <KeyIcon />
+                  <span>Setup</span>
+                </div>
+                <div className="ph-setup-title">Set up your API</div>
+                <p className="ph-setup-sub">
+                  Connect your API key to start enhancing prompts instantly.
+                </p>
+                <button
+                  className="ph-btn ph-btn-primary ph-setup-cta"
+                  onClick={() => onNavigate("settings")}
+                  type="button"
+                >
+                  Set Up Now
+                  <ArrowRight />
+                </button>
               </div>
-              <div className="ph-setup-title">Set up your API</div>
-              <p className="ph-setup-sub">
-                Connect your API key to start enhancing prompts instantly.
-              </p>
-              <button
-                className="ph-btn ph-btn-primary ph-setup-cta"
-                onClick={() => onNavigate("settings")}
-                type="button"
-              >
-                Set Up Now
-                <ArrowRight />
-              </button>
-            </div>
+            )}
           </div>
         </div>
 

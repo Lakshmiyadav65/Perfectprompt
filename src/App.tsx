@@ -3,23 +3,40 @@ import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
 import { CommandBar } from "./components/CommandBar";
 import { Shell } from "./components/Shell";
+import { SignupGate } from "./components/SignupGate";
 import { Toast } from "./components/Toast";
+import { useAuth } from "./hooks/useAuth";
 
 function App() {
   const hash = window.location.hash;
+
   // Floating popups stay independent — they live in their own borderless,
-  // transparent windows with their own bespoke styling.
+  // transparent windows with their own bespoke styling. They never block
+  // on auth: the hotkey flow needs to fire regardless of sign-in state.
   if (hash === "#/status") return <StatusIndicator />;
   if (hash === "#/clarify") return <ClarifyPopup />;
   if (hash === "#/question-card") return <QuestionCard />;
   if (hash === "#/command-bar") return <CommandBar />;
   if (hash === "#/toast") return <Toast />;
 
-  // Anything else (main / home / settings / projects, plus the legacy
-  // "/settings" or "/projects" deep-links from the tray) renders the
-  // shell with the requested initial route. The sidebar lets the user
-  // navigate between Home, Projects, and Settings without spawning new
-  // windows.
+  return <MainAppGated hash={hash} />;
+}
+
+function MainAppGated({ hash }: { hash: string }) {
+  const auth = useAuth();
+
+  // Don't lock dev / unconfigured installs out — if Supabase env vars
+  // are missing, fall straight through to the shell.
+  const gateActive = auth.configured && !auth.loading && !auth.user;
+
+  if (auth.configured && auth.loading) {
+    // Initial getSession() in flight — render nothing rather than
+    // flash the gate at users who already have a persisted session.
+    return null;
+  }
+
+  if (gateActive) return <SignupGate />;
+
   if (hash === "#/projects") return <Shell initial="projects" />;
   if (hash === "#/settings") return <Shell initial="settings" />;
   return <Shell initial="home" />;

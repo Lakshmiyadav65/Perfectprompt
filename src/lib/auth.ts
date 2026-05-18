@@ -29,6 +29,22 @@ export async function signInWithGoogle(): Promise<void> {
   await openUrl(data.url);
 }
 
+export async function signInWithGitHub(): Promise<void> {
+  if (!isSupabaseConfigured) {
+    throw new Error("Supabase not configured");
+  }
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "github",
+    options: {
+      redirectTo: REDIRECT_URL,
+      skipBrowserRedirect: true,
+    },
+  });
+  if (error) throw error;
+  if (!data?.url) throw new Error("Supabase did not return an OAuth URL");
+  await openUrl(data.url);
+}
+
 export async function signOut(): Promise<void> {
   await supabase.auth.signOut();
   try {

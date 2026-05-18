@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use tauri::{AppHandle, Manager, Runtime};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 use std::collections::HashMap;
 
@@ -180,6 +180,7 @@ pub fn save_api_key<R: Runtime>(
     let mut settings = load(&app);
     settings.api_key = Some(trimmed.to_string());
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+    emit_key_changed(&app);
     Ok(())
 }
 
@@ -187,7 +188,19 @@ pub fn save_api_key<R: Runtime>(
 pub fn clear_api_key<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), String> {
     let mut settings = load(&app);
     settings.api_key = None;
-    save(&app, &settings).map_err(|e| format!("{e:#}"))
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+    emit_key_changed(&app);
+    Ok(())
+}
+
+/// Broadcast a key-state change so frontend windows can refresh
+/// immediately instead of waiting on a polling cycle. Failure to emit
+/// is non-fatal — frontends still re-fetch on their next poll.
+fn emit_key_changed<R: Runtime>(app: &AppHandle<R>) {
+    let payload = api_key_status(app.clone());
+    if let Err(e) = app.emit("settings:key-changed", &payload) {
+        eprintln!("[settings] emit settings:key-changed failed: {e}");
+    }
 }
 
 #[tauri::command]
