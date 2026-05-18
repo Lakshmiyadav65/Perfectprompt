@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
+import { AuthFlowPreview } from "./AuthFlowPreview";
 import "./SignupGate.css";
 
 interface ApiKeyStatus {
@@ -121,6 +122,7 @@ export function PostAuthSetup() {
           </>
         )}
       </div>
+      <AuthFlowPreview />
     </div>
   );
 }

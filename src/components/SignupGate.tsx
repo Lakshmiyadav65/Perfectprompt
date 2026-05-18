@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { AuthFlowPreview } from "./AuthFlowPreview";
 import "./SignupGate.css";
 
 type Mode = "signin" | "signup" | "reset";
@@ -119,6 +120,7 @@ export function SignupGate() {
             Back to sign in
           </button>
         </div>
+        <AuthFlowPreview />
       </div>
     );
   }
@@ -145,6 +147,7 @@ export function SignupGate() {
             Back to sign in
           </button>
         </div>
+        <AuthFlowPreview />
       </div>
     );
   }
@@ -322,6 +325,7 @@ export function SignupGate() {
           .
         </p>
       </div>
+      <AuthFlowPreview />
     </div>
   );
 }
