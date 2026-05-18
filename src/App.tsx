@@ -6,6 +6,7 @@ import { Shell } from "./components/Shell";
 import { SignupGate } from "./components/SignupGate";
 import { Toast } from "./components/Toast";
 import { useAuth } from "./hooks/useAuth";
+import "./components/SignupGate.css";
 
 function App() {
   const hash = window.location.hash;
@@ -30,9 +31,10 @@ function MainAppGated({ hash }: { hash: string }) {
   const gateActive = auth.configured && !auth.loading && !auth.user;
 
   if (auth.configured && auth.loading) {
-    // Initial getSession() in flight — render nothing rather than
-    // flash the gate at users who already have a persisted session.
-    return null;
+    // Initial getSession() in flight — show a small branded loading
+    // state instead of flashing the gate at users who already have a
+    // persisted session.
+    return <AuthLoading />;
   }
 
   if (gateActive) return <SignupGate />;
@@ -40,6 +42,15 @@ function MainAppGated({ hash }: { hash: string }) {
   if (hash === "#/projects") return <Shell initial="projects" />;
   if (hash === "#/settings") return <Shell initial="settings" />;
   return <Shell initial="home" />;
+}
+
+function AuthLoading() {
+  return (
+    <div className="pf-gate-loading">
+      <div className="pf-gate-loading-mark" aria-hidden="true" />
+      <span>Checking your session…</span>
+    </div>
+  );
 }
 
 export default App;
