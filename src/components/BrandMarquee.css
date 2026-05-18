@@ -1,91 +1,81 @@
-/* Large-display wordmark marquee that scrolls horizontally along
-   the bottom edge of the auth surfaces. The text is sized big
-   enough to overflow vertically — only the top portion shows,
-   giving the brand mark some grit and atmosphere without competing
-   with the auth card sitting above it. */
+/* Minimal brand footer for the auth surfaces.
+   Tiny lowercase wordmark + hair-line + a single accent pulse that
+   traces along the line. No giant typography, no opacity wrestling
+   with the card above. */
 
 .pf-marquee {
-  /* Fixed so it stays glued to the viewport bottom even when the
-     gate's overflow-y scrolls long content (e.g., the signup form
-     on short windows). The marquee component is only rendered from
-     inside the gate / setup screens, so there's no risk of it
-     bleeding into the main app. */
   position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  /* Tall enough that the full glyph height including descenders
-     gets a generous slice, but the bottom of the text falls off
-     the viewport edge for the "infinite wordmark" effect. */
-  height: 180px;
-  overflow: hidden;
+  bottom: 28px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: min(440px, 72vw);
   pointer-events: none;
   user-select: none;
   z-index: 0;
-  /* Soft horizontal fade so the marquee dissolves into the gate
-     background at both edges instead of slamming into the viewport
-     boundary. */
-  -webkit-mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 6%,
-    black 94%,
-    transparent 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    transparent 0%,
-    black 6%,
-    black 94%,
-    transparent 100%
-  );
+  animation: pf-marquee-fade 700ms 200ms var(--pf-ease, ease-out) both;
 }
 
-.pf-marquee-track {
-  display: flex;
-  align-items: flex-end;
-  gap: 64px;
-  width: max-content;
-  /* Anchor the type to the bottom of the marquee strip and let it
-     overflow below the viewport edge naturally. */
-  height: 100%;
-  padding-bottom: 0;
-  animation: pf-marquee-slide 38s linear infinite;
-  will-change: transform;
+@keyframes pf-marquee-fade {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-@keyframes pf-marquee-slide {
-  from { transform: translateX(0); }
-  to   { transform: translateX(-50%); }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .pf-marquee-track { animation: none; }
-}
-
-.pf-marquee-item {
-  font-family: var(--pf-font-display);
-  font-size: clamp(120px, 18vw, 240px);
-  font-weight: 500;
-  letter-spacing: -0.035em;
-  line-height: 0.95;
-  color: var(--pf-text);
-  /* Slightly translucent so the wordmark reads as background
-     atmosphere rather than a competing UI surface. */
-  opacity: 0.5;
-  white-space: nowrap;
-  /* Bottom-anchor each glyph so the baseline sits roughly on the
-     viewport edge regardless of font size. */
-  display: inline-block;
-  padding-bottom: 0;
+.pf-marquee-word {
+  font-family: var(--pf-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  text-transform: lowercase;
+  color: var(--pf-text-subtle);
 }
 
 .pf-marquee-dot {
-  /* The period after the wordmark — recolored to accent so the
-     repeating pattern has a single beat of brand color per cycle.
-     Keep it the same character ("."); just colour-shift via the
-     inline span instead of replacing it with a custom shape, so
-     the metrics stay tied to the font and the dot scales with the
-     responsive font-size. */
   color: var(--pf-accent);
+}
+
+.pf-marquee-line {
+  position: relative;
+  width: 100%;
+  height: 1px;
+  background: var(--pf-line-strong);
+  overflow: hidden;
+}
+
+.pf-marquee-pulse {
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 38px;
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--pf-accent) 50%,
+    transparent
+  );
+  border-radius: 2px;
+  /* Soft glow so the pulse reads as light moving along the wire,
+     not a hard pill sliding across. */
+  filter: blur(0.2px);
+  animation: pf-marquee-pulse 5.4s cubic-bezier(0.55, 0, 0.45, 1) infinite;
+}
+
+@keyframes pf-marquee-pulse {
+  0%   { left: -10%; opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-marquee {
+    animation: none;
+    transform: translateX(-50%);
+  }
+  .pf-marquee-pulse {
+    animation: none;
+    opacity: 0;
+  }
 }
