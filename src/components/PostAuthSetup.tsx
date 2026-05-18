@@ -10,11 +10,11 @@ interface ApiKeyStatus {
 }
 
 /// One-shot interstitial that runs immediately after a fresh sign-in
-/// or sign-up. If the user already has an API key configured, this
-/// component auto-dismisses so returning users go straight to Home.
-/// If no key is set yet, it shows a "Signed in — connect your Groq
-/// key" card with a CTA that hands off to Shell to land them on the
-/// API Key section in Settings.
+/// or sign-up. Always shows up after auth — the user explicitly asked
+/// for a "you successfully logged in" confirmation page. The API-key
+/// CTA is contextual within that page: prompted when the key is
+/// missing, replaced with a plain Continue button when it's already
+/// configured.
 export function PostAuthSetup() {
   const auth = useAuth();
   const displayName = useDisplayName(auth.user);
@@ -26,13 +26,7 @@ export function PostAuthSetup() {
     invoke<ApiKeyStatus>("api_key_status")
       .then((status) => {
         if (cancelled) return;
-        const present = status.from_env || status.from_settings;
-        setHasKey(present);
-        if (present) {
-          // Returning user — no API setup step needed. Dismiss
-          // immediately so MainAppGated re-renders into Shell.
-          auth.dismissJustSignedIn();
-        }
+        setHasKey(status.from_env || status.from_settings);
       })
       .catch((e) => {
         console.error("[post-auth] api_key_status failed:", e);
@@ -41,15 +35,12 @@ export function PostAuthSetup() {
     return () => {
       cancelled = true;
     };
-    // We intentionally do not depend on auth — calling
-    // dismissJustSignedIn is a one-shot side-effect; re-running on
-    // identity changes would loop.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // While the api-key check is in flight, render nothing rather than
-  // flash the interstitial at a returning user with a configured key.
-  if (hasKey === null || hasKey) return null;
+  // Brief loading frame while the api-key check resolves — keeps the
+  // UI from flickering between "set up your key" and "you're all set"
+  // depending on which state lands first.
+  if (hasKey === null) return null;
 
   function handleSetupKey() {
     if (busy) return;
@@ -66,7 +57,7 @@ export function PostAuthSetup() {
     auth.dismissJustSignedIn();
   }
 
-  function handleSkip() {
+  function handleContinue() {
     if (busy) return;
     setBusy(true);
     auth.dismissJustSignedIn();
@@ -92,35 +83,56 @@ export function PostAuthSetup() {
         <h1 className="pf-gate-title">
           {firstName ? `Welcome, ${firstName}.` : "You're in."}
         </h1>
-        <p className="pf-gate-sub">
-          One last step — connect your free Groq API key so you can
-          enhance prompts from anywhere with your hotkey. It takes
-          about 30 seconds at console.groq.com.
-        </p>
 
-        <div className="pf-gate-actions">
-          <button
-            type="button"
-            className="pf-gate-btn pf-gate-btn-primary"
-            onClick={handleSetupKey}
-            disabled={busy}
-          >
-            Set up Groq API key
-          </button>
-          <button
-            type="button"
-            className="pf-gate-btn"
-            onClick={handleSkip}
-            disabled={busy}
-          >
-            Skip for now
-          </button>
-        </div>
-
-        <p className="pf-gate-fineprint">
-          You can also use the hosted tier (50 enhancements/day) without
-          a key — set up later from Settings whenever you're ready.
-        </p>
+        {hasKey ? (
+          <>
+            <p className="pf-gate-sub">
+              Your Groq API key is already connected. You're ready to
+              start enhancing prompts from anywhere with your hotkey.
+            </p>
+            <div className="pf-gate-actions">
+              <button
+                type="button"
+                className="pf-gate-btn pf-gate-btn-primary"
+                onClick={handleContinue}
+                disabled={busy}
+              >
+                Continue to PerfectPrompt
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="pf-gate-sub">
+              One last step — connect your free Groq API key so you can
+              enhance prompts from anywhere with your hotkey. It takes
+              about 30 seconds at console.groq.com.
+            </p>
+            <div className="pf-gate-actions">
+              <button
+                type="button"
+                className="pf-gate-btn pf-gate-btn-primary"
+                onClick={handleSetupKey}
+                disabled={busy}
+              >
+                Set up Groq API key
+              </button>
+              <button
+                type="button"
+                className="pf-gate-btn"
+                onClick={handleContinue}
+                disabled={busy}
+              >
+                Skip for now
+              </button>
+            </div>
+            <p className="pf-gate-fineprint">
+              You can also use the hosted tier (50 enhancements/day)
+              without a key — set up later from Settings whenever
+              you're ready.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );
