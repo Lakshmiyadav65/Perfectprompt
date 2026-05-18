@@ -304,7 +304,11 @@ export function Shell({ initial }: { initial: Route }) {
             <div className="pf-listening-row">
               <span className="pf-listening-dot" />
               <span className="pf-listening-label">
-                {ready ? (enabled ? "Listening" : "Paused") : "Setup"}
+                {ready
+                  ? enabled
+                    ? "Prompt Mode On"
+                    : "Prompt Mode Off"
+                  : "Setup"}
               </span>
               <button
                 type="button"
