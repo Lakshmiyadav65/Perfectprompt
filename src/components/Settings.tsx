@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
+import type { FocusTarget } from "./Shell";
 import "./Settings.css";
 
 const GROQ_KEYS_URL = "https://console.groq.com/keys";
@@ -69,7 +70,16 @@ const QUESTION_MODE_OPTIONS: {
   },
 ];
 
-export function Settings() {
+interface SettingsProps {
+  /// When set, Settings scrolls + focuses the matching section on
+  /// mount. Caller (Shell) is responsible for clearing it via
+  /// onFocusHandled once we've reacted, so the highlight doesn't
+  /// re-fire on subsequent renders.
+  focusTarget?: FocusTarget;
+  onFocusHandled?: () => void;
+}
+
+export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const auth = useAuth();
   const displayName = useDisplayName(auth.user);
   const [nameDraft, setNameDraft] = useState<string>("");
@@ -98,10 +108,35 @@ export function Settings() {
   const [newDevApp, setNewDevApp] = useState("");
   const [newGeneralApp, setNewGeneralApp] = useState("");
   const [appClassMsg, setAppClassMsg] = useState<Msg>(null);
+  const apiKeySectionRef = useRef<HTMLElement>(null);
+  const apiKeyInputRef = useRef<HTMLInputElement>(null);
+  const [apiKeyHighlighted, setApiKeyHighlighted] = useState(false);
 
   useEffect(() => {
     refresh();
   }, []);
+
+  // Cross-screen focus handler. When Shell tells us the user arrived
+  // via an "api-key" CTA (Home setup card, banner, or status tile),
+  // scroll the section into view, pulse a brief highlight ring, and
+  // focus the input so they can paste immediately.
+  useEffect(() => {
+    if (focusTarget !== "api-key") return;
+    // Defer to the next frame so the section has rendered before we
+    // scroll/focus — otherwise scrollIntoView fires against a layout
+    // that hasn't laid out yet on first mount.
+    const id = window.requestAnimationFrame(() => {
+      apiKeySectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      apiKeyInputRef.current?.focus();
+      setApiKeyHighlighted(true);
+      window.setTimeout(() => setApiKeyHighlighted(false), 1600);
+      onFocusHandled?.();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [focusTarget, onFocusHandled]);
 
   // Live quota updates from the Rust pipeline whenever a hosted /enhance
   // call returns. Replaces polling — the Account section reflects the
@@ -413,11 +448,15 @@ export function Settings() {
         </section>
       )}
 
-      <section>
+      <section
+        ref={apiKeySectionRef}
+        className={apiKeyHighlighted ? "pf-section-highlight" : undefined}
+      >
         <h2>Groq API Key</h2>
         <p className="pf-hint">{keyHint}</p>
         <div className="pf-row">
           <input
+            ref={apiKeyInputRef}
             type="password"
             placeholder="gsk_..."
             value={keyInput}

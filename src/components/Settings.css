@@ -59,10 +59,44 @@
   margin-bottom: 32px;
   padding-bottom: 28px;
   border-bottom: 1px solid var(--pf-border);
+  /* Scroll-into-view leaves the section flush at the viewport top
+     by default; nudging it down a touch makes the header readable
+     under the (sometimes overlapping) shell chrome. */
+  scroll-margin-top: 16px;
 }
 
 .pf-settings section:last-child {
   border-bottom: none;
+}
+
+/* Cross-screen focus reveal — applied by Settings.tsx when the user
+   arrives via a "Set up your API" CTA. Pulses a soft accent ring
+   around the section then fades, so the user sees where they
+   landed instead of just an idle scroll. */
+.pf-settings section.pf-section-highlight {
+  animation: pf-section-highlight 1.6s var(--pf-ease) both;
+  border-radius: var(--pf-radius);
+}
+
+@keyframes pf-section-highlight {
+  0% {
+    box-shadow: 0 0 0 0 var(--pf-accent-ring);
+    background: transparent;
+  }
+  20% {
+    box-shadow: 0 0 0 6px var(--pf-accent-ring);
+    background: var(--pf-accent-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    background: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-settings section.pf-section-highlight {
+    animation: none;
+  }
 }
 
 .pf-settings h2 {

@@ -9,6 +9,7 @@ import { useDisplayName } from "../hooks/useDisplayName";
 import "./Shell.css";
 
 type Route = "home" | "projects" | "settings";
+export type FocusTarget = "api-key" | null;
 
 interface ApiKeyStatus {
   from_env: boolean;
@@ -64,6 +65,11 @@ const NAV: { route: Route; label: string; icon: ReactNode }[] = [
 
 export function Shell({ initial }: { initial: Route }) {
   const [route, setRoute] = useState<Route>(initial);
+  // When a deep-link CTA (Home setup card, banner, status tile) sends
+  // the user to Settings, we pass an explicit focus target so Settings
+  // can scroll + focus the right section instead of dumping them at
+  // the page top.
+  const [focusTarget, setFocusTarget] = useState<FocusTarget>(null);
   const [hotkey, setHotkey] = useState<string>("Ctrl+Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
   const [enabled, setEnabled] = useState<boolean>(true);
@@ -131,6 +137,15 @@ export function Shell({ initial }: { initial: Route }) {
       history.replaceState(null, "", desired);
     }
   }, [route]);
+
+  // Cross-screen navigation with an optional focus target. Sidebar
+  // and tray callers pass no target (just route changes); CTA
+  // surfaces like the Home setup card pass "api-key" so Settings
+  // scrolls + focuses the Groq API Key section on arrival.
+  function navigate(next: Route, focus: FocusTarget = null) {
+    if (focus) setFocusTarget(focus);
+    setRoute(next);
+  }
 
   const ready = !!(keyStatus?.from_env || keyStatus?.from_settings);
   // Tauri returns the canonical "CommandOrControl" / "Option" / "Super"
@@ -306,9 +321,14 @@ export function Shell({ initial }: { initial: Route }) {
       </aside>
 
       <main className="pf-main">
-        {route === "home" && <Home onNavigate={setRoute} />}
+        {route === "home" && <Home onNavigate={navigate} />}
         {route === "projects" && <ProjectManager />}
-        {route === "settings" && <Settings />}
+        {route === "settings" && (
+          <Settings
+            focusTarget={focusTarget}
+            onFocusHandled={() => setFocusTarget(null)}
+          />
+        )}
       </main>
     </div>
   );

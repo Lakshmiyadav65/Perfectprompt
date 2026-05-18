@@ -63,7 +63,14 @@ function dayTimeNow(): string {
   return `${weekday}, ${time}`;
 }
 
-export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") => void }) {
+export function Home({
+  onNavigate,
+}: {
+  onNavigate: (
+    r: "projects" | "settings",
+    focus?: "api-key" | null,
+  ) => void;
+}) {
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
   const [hotkey, setHotkey] = useState("Ctrl+Alt+E");
   const [keyStatus, setKeyStatus] = useState<ApiKeyStatus | null>(null);
@@ -173,7 +180,7 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
                 </p>
                 <button
                   className="ph-btn ph-btn-primary ph-setup-cta"
-                  onClick={() => onNavigate("settings")}
+                  onClick={() => onNavigate("settings", "api-key")}
                   type="button"
                 >
                   Set Up Now
@@ -321,7 +328,7 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
 
           <button
             className={`ph-strip-card ${hasKey ? "connected" : "cta empty"}`}
-            onClick={() => onNavigate("settings")}
+            onClick={() => onNavigate("settings", "api-key")}
             type="button"
           >
             <div className="ph-stl">API key</div>
@@ -403,7 +410,10 @@ export function Home({ onNavigate }: { onNavigate: (r: "projects" | "settings") 
               <strong>Add a Groq API key to start.</strong>
               <p>Free at console.groq.com — takes about 30 seconds.</p>
             </div>
-            <button className="ph-btn ph-btn-primary" onClick={() => onNavigate("settings")}>
+            <button
+              className="ph-btn ph-btn-primary"
+              onClick={() => onNavigate("settings", "api-key")}
+            >
               Open Settings
             </button>
           </div>
