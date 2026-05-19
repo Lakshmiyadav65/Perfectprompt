@@ -47,6 +47,38 @@ function resetsInLine(resetsAt: string | null): string {
   return m === 0 ? `Resets in ${h}h` : `Resets in ${h}h ${m}m`;
 }
 
+/// Self-heal hook for missed Razorpay webhooks. Asks the verify-subscription
+/// edge function to fetch the user's current subscription state directly
+/// from Razorpay's API and reconcile our profile row. Cheap one-shot
+/// call (~300ms) that we run before every Upgrade-button click — if
+/// the customer paid but a webhook got lost, this catches it without
+/// any manual SQL intervention.
+///
+/// Returns true if the user is now on a paid plan (pro / unlimited)
+/// after the sync. Caller skips openUrl in that case.
+async function verifyAndSync(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke<{
+      plan_tier: string;
+      subscription_status: string | null;
+      synced: boolean;
+    }>("verify-subscription", { method: "POST" });
+    if (error) {
+      // Function might not be deployed yet, or transient network blip.
+      // Best-effort — fall through to the normal create-subscription path.
+      console.warn("[shell] verify-subscription unavailable:", error);
+      return false;
+    }
+    return data?.plan_tier === "pro" || data?.plan_tier === "unlimited";
+  } catch (e) {
+    console.warn("[shell] verify-subscription threw:", e);
+    return false;
+  }
+}
+
+/// Ask create-subscription for a fresh Razorpay subscription checkout
+/// URL. If the user already has an in-flight subscription, the function
+/// returns the existing portal URL (so "Upgrade" doubles as "Manage").
 async function requestSubscriptionUrl(): Promise<string> {
   try {
     const { data, error } = await supabase.functions.invoke<{
@@ -409,6 +441,17 @@ export function Shell({ initial }: { initial: Route }) {
                   type="button"
                   className="pf-usage-upgrade"
                   onClick={async () => {
+                    // Self-heal first: if the user paid but a webhook
+                    // got lost, verify-subscription syncs the profile
+                    // from Razorpay's authoritative state. Skip the
+                    // checkout flow if they're already paid up — the
+                    // sidebar will refresh on next /enhance call.
+                    const isAlreadyPaid = await verifyAndSync();
+                    if (isAlreadyPaid && usage.status !== "pro_active") {
+                      // They were free_at_limit but actually paid;
+                      // we just synced them to pro. Nothing else to do.
+                      return;
+                    }
                     // For pro users, the function returns their existing
                     // subscription portal URL (so this button doubles
                     // as "Manage"). For free / lapsed users it creates
