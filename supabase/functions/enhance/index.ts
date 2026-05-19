@@ -6,7 +6,10 @@
 // Flow per request:
 //   1. Verify JWT  → 401 if invalid.
 //   2. Validate input (route, length cap).
-//   3. consume_quota(user_id) — atomic increment-if-under-limit.
+//   3. consume_lifetime_quota(user_id) — atomic increment-if-under-cap.
+//      Free users: blocked once lifetime_used >= 10 + extra_granted.
+//      Paid users (plan_tier in 'pro' | 'unlimited'): always allowed,
+//      counter is not ticked.
 //   4. If allowed: call Groq with the route-specific system prompt.
 //   5. Log enhancements row (fire-and-forget; no prompt text stored).
 //   6. Return { enhanced_text, quota }.
@@ -24,10 +27,13 @@ const MAX_INPUT_CHARS  = 8000;
 const LLM_TIMEOUT_MS   = 30_000;
 const ROUTES: readonly Route[] = ["code", "writing", "generic"];
 
+// Shape returned by public.consume_lifetime_quota(uuid). Renamed columns
+// from the old daily-quota RPC: `quota_limit` (was daily_limit) and the
+// semantics shift from per-day to lifetime.
 interface QuotaRow {
   allowed: boolean;
   used: number;
-  daily_limit: number;
+  quota_limit: number;
   plan_tier: string;
 }
 
@@ -87,9 +93,9 @@ Deno.serve(async (req) => {
 
   // ---- Quota ----
   const { data: quotaData, error: quotaErr } = await admin
-    .rpc("consume_quota", { p_user_id: userId });
+    .rpc("consume_lifetime_quota", { p_user_id: userId });
   if (quotaErr) {
-    console.error("consume_quota failed", quotaErr);
+    console.error("consume_lifetime_quota failed", quotaErr);
     return jsonError(500, "quota_error", "Could not check quota");
   }
   const quota = (quotaData?.[0] ?? null) as QuotaRow | null;
@@ -97,13 +103,16 @@ Deno.serve(async (req) => {
     return jsonError(500, "quota_error", "Quota check returned no row");
   }
   if (!quota.allowed) {
-    return jsonError(429, "quota_exhausted", "Daily limit reached", {
+    // Lifetime cap reached. The client's UpgradeModal reads this 429 and
+    // opens the Razorpay payment link. `resets_at` is intentionally null
+    // — there's no daily reset under the lifetime model.
+    return jsonError(429, "quota_exhausted", "Free trial exhausted — upgrade to continue", {
       quota: {
         used:        quota.used,
-        limit:       quota.daily_limit,
+        limit:       quota.quota_limit,
         remaining:   0,
         plan_tier:   quota.plan_tier,
-        resets_at:   nextUtcMidnightIso(),
+        resets_at:   null,
       },
     });
   }
@@ -169,8 +178,8 @@ Deno.serve(async (req) => {
     return jsonError(502, errorKind ?? "enhance_failed", "Upstream LLM failed", {
       quota: {
         used:      quota.used,
-        limit:     quota.daily_limit,
-        remaining: Math.max(0, quota.daily_limit - quota.used),
+        limit:     quota.quota_limit,
+        remaining: Math.max(0, quota.quota_limit - quota.used),
         plan_tier: quota.plan_tier,
       },
     });
@@ -181,10 +190,10 @@ Deno.serve(async (req) => {
     latency_ms:    latencyMs,
     quota: {
       used:        quota.used,
-      limit:       quota.daily_limit,
-      remaining:   Math.max(0, quota.daily_limit - quota.used),
+      limit:       quota.quota_limit,
+      remaining:   Math.max(0, quota.quota_limit - quota.used),
       plan_tier:   quota.plan_tier,
-      resets_at:   nextUtcMidnightIso(),
+      resets_at:   null,
     },
   }), {
     status:  200,
@@ -223,13 +232,3 @@ function mustEnv(name: string): string {
   return v;
 }
 
-function nextUtcMidnightIso(): string {
-  const now  = new Date();
-  const next = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() + 1,
-    0, 0, 0, 0,
-  ));
-  return next.toISOString();
-}
