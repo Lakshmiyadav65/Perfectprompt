@@ -73,7 +73,7 @@ re-reads the quota), or when they restart the app. No client deploy needed.
 
 ---
 
-## Mark a user as paid (after Razorpay confirms ₹200)
+## Mark a user as paid (after Razorpay confirms ₹199)
 
 Razorpay sends you an email when a payment lands. Once you've confirmed
 the payer's app email matches, flip them to the paid tier:

@@ -16,7 +16,7 @@ import "./Shell.css";
 /// link is set, the mailto fallback is no longer reachable.
 const RAZORPAY_LINK =
   (import.meta.env.VITE_RAZORPAY_LINK as string | undefined)?.trim() ||
-  "mailto:enviguide.official@gmail.com?subject=PerfectPrompt%20Upgrade%20%E2%80%94%20%E2%82%B9200";
+  "mailto:enviguide.official@gmail.com?subject=PerfectPrompt%20Upgrade%20%E2%80%94%20%E2%82%B9199";
 
 type Route = "home" | "projects" | "settings";
 export type FocusTarget = "api-key" | null;
@@ -341,7 +341,7 @@ export function Shell({ initial }: { initial: Route }) {
                     );
                   }}
                 >
-                  Upgrade for ₹200
+                  Upgrade for ₹199
                 </button>
               )}
             </div>
