@@ -32,6 +32,7 @@ use crate::project_scan::{self, ProjectSummary};
 use crate::projects::{self, Project};
 use crate::router::{self, RoutingDecision};
 use crate::trace::{self, TraceRecord};
+use crate::usage;
 use crate::validate::{self, ValidationOutcome};
 use crate::AppState;
 
@@ -181,6 +182,27 @@ pub async fn run<R: Runtime>(
     let token = auth::current_token(state.inner());
     let route_str = route_label(&router_out.decision);
 
+    // BYOK daily-limit gate (the hosted path delegates enforcement to
+    // Supabase's consume_quota and returns QuotaExhausted on overage,
+    // so we skip the local check when a JWT is present). Sits between
+    // routing and the LLM call so cache hits and bypasses don't get
+    // refused after-the-fact when the user is right at the ceiling.
+    if token.is_none() && usage::limit_reached(app) {
+        tr.validation_outcome = "fallback_local_quota".into();
+        tr.reject_reason = Some("local_quota_exhausted".into());
+        return Ok(finalize_fallback_with(
+            app,
+            tr,
+            &pi.raw_input,
+            started,
+            format!(
+                "Daily limit reached — {}/{} enhancements used today.",
+                usage::DAILY_LIMIT,
+                usage::DAILY_LIMIT
+            ),
+        ));
+    }
+
     let llm_started = Instant::now();
     tr.llm_called = true;
 
@@ -301,12 +323,16 @@ pub async fn run<R: Runtime>(
     trace::append(app, &tr);
 
     // Persist this run to the user-facing history if it's actually
-    // an enhancement worth showing. Cache hits return earlier (their
-    // record was created on the original enhancement), Decline and
-    // intake-failures take the fallback path, and Bypass returns
-    // earlier inside the routing match — so by the time we're here
-    // and `!used_fallback`, the route is one of code/writing/generic
-    // and the model produced something meaningful.
+    // an enhancement worth showing, and tick the daily usage counter.
+    // Cache hits return earlier (their record was created on the
+    // original enhancement), Decline and intake-failures take the
+    // fallback path, and Bypass returns earlier inside the routing
+    // match — so by the time we're here and `!used_fallback`, the
+    // route is one of code/writing/generic and the model produced
+    // something meaningful. This is the single success point every
+    // entry path (silent hotkey from VS Code/IDEs, clarify popup,
+    // question card, main app) funnels through, so the counter ticks
+    // once per successful enhancement regardless of UI surface.
     if !used_fallback
         && matches!(tr.route.as_str(), "code" | "writing" | "generic")
     {
@@ -318,6 +344,7 @@ pub async fn run<R: Runtime>(
             active_project.as_ref().map(|p| p.id.clone()),
             active_project.as_ref().map(|p| p.name.clone()),
         );
+        usage::increment(app);
     }
 
     Ok(PipelineOutput {

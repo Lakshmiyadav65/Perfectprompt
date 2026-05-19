@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
 /// Daily-usage tracker for the enhancement action.
@@ -7,10 +8,17 @@ import { listen } from "@tauri-apps/api/event";
 ///   1. Server-backed: when the hosted-tier pipeline emits a
 ///      `hosted:quota` event (Rust → JS, fired after every signed-in
 ///      /enhance call), we snapshot the server's count and ignore the
-///      localStorage path. This is authoritative — consume_quota() in
+///      local path. This is authoritative — consume_quota() in
 ///      Postgres is the source of truth.
-///   2. Local fallback: BYOK path or signed-out users keep the legacy
-///      localStorage counter. Resets when the local date rolls over.
+///   2. Local fallback: BYOK path or signed-out users tick a counter
+///      owned by the Rust pipeline. Rust is the source of truth because
+///      it's the single success point every entry path funnels through
+///      (silent hotkey from VS Code/IDEs, clarify popup, question card,
+///      main app) — the JS event-listener approach the hook previously
+///      used could miss enhancements when no webview was awake to
+///      receive the event. localStorage is still mirrored so the
+///      sidebar paints the right number instantly on launch before the
+///      `get_usage_state` round-trip completes.
 
 const STORAGE_KEY = "pf.enhancements.usage";
 const UPDATE_EVENT = "pf-usage-changed";
@@ -25,8 +33,16 @@ interface HostedQuota {
   resets_at?: string | null;
 }
 
+interface UsageSnapshot {
+  date: string; // YYYY-MM-DD (local, per Rust's Local::now())
+  used: number;
+  limit: number;
+  remaining: number;
+  limit_reached: boolean;
+}
+
 interface StoredUsage {
-  date: string; // YYYY-MM-DD (local)
+  date: string;
   count: number;
 }
 
@@ -38,7 +54,7 @@ function todayKey(): string {
   return `${y}-${m}-${day}`;
 }
 
-function loadCount(): number {
+function loadCachedCount(): number {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return 0;
@@ -51,9 +67,9 @@ function loadCount(): number {
   }
 }
 
-function saveCount(count: number) {
+function saveCachedCount(date: string, count: number) {
   try {
-    const data: StoredUsage = { date: todayKey(), count };
+    const data: StoredUsage = { date, count };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   } catch {
     /* localStorage unavailable or quota-exceeded — drop silently */
@@ -61,15 +77,18 @@ function saveCount(count: number) {
 }
 
 export function useEnhancementUsage() {
-  const [used, setUsed] = useState<number>(loadCount);
+  // Seed from the localStorage mirror so the sidebar paints the right
+  // number on first render. The Rust round-trip below overwrites it
+  // with the authoritative value within a tick.
+  const [used, setUsed] = useState<number>(loadCachedCount);
   const [hosted, setHosted] = useState<HostedQuota | null>(null);
 
   useEffect(() => {
-    const refresh = () => setUsed(loadCount());
-    refresh();
+    const refresh = () => setUsed(loadCachedCount());
     window.addEventListener(UPDATE_EVENT, refresh);
     // `storage` fires in other windows when localStorage mutates —
-    // keeps the sidebar count in sync if a popup window increments.
+    // keeps the sidebar count in sync if a popup window's cache
+    // update lands first.
     window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener(UPDATE_EVENT, refresh);
@@ -84,7 +103,22 @@ export function useEnhancementUsage() {
     // mount registers a second active listener for the same event.
     let alive = true;
     let unlistenHosted: (() => void) | undefined;
-    let unlistenHistory: (() => void) | undefined;
+    let unlistenUsage: (() => void) | undefined;
+
+    // Seed from Rust — the canonical count. Survives webview restarts,
+    // applies the daily reset on the user's local date, and covers
+    // enhancements that happened while no webview was open to receive
+    // the live event.
+    void invoke<UsageSnapshot>("get_usage_state")
+      .then((snap) => {
+        if (!alive) return;
+        setUsed(snap.used);
+        saveCachedCount(snap.date, snap.used);
+        window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
+      })
+      .catch((e) => {
+        console.error("[useEnhancementUsage] get_usage_state failed:", e);
+      });
 
     void listen<HostedQuota>("hosted:quota", (event) => {
       if (!alive) return;
@@ -97,53 +131,45 @@ export function useEnhancementUsage() {
       unlistenHosted = u;
     });
 
-    // Single source of truth for the local (BYOK) counter: the same
-    // enhancement-history:new event the dashboard listens to. Fires
-    // from Rust after every successful pipeline run, so the count
-    // ticks regardless of which UI surface (silent hotkey, clarify
-    // popup, question card) triggered the enhancement. The previous
-    // setup relied on UI-side increment() calls, which missed the
-    // silent hotkey path entirely.
-    //
-    // On hosted, the local count quietly drifts forward alongside
-    // hosted.used — `effectiveUsed` still displays hosted.used, so
-    // there's no visible bug; the local value is just a stale
-    // shadow that the UI never reads while hosted is set.
-    void listen<unknown>("enhancement-history:new", () => {
+    // `usage:changed` is emitted by the Rust pipeline after every
+    // successful enhancement (silent hotkey from any IDE/app, clarify
+    // popup, question card, main app). The payload carries the new
+    // count from the canonical Rust state, so multiple windows
+    // listening simultaneously all converge to the same number without
+    // racing or double-incrementing.
+    void listen<UsageSnapshot>("usage:changed", (event) => {
       if (!alive) return;
-      const next = Math.min(loadCount() + 1, DAILY_LIMIT);
-      saveCount(next);
+      const snap = event.payload;
+      setUsed(snap.used);
+      saveCachedCount(snap.date, snap.used);
       window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
-      setUsed(next);
     }).then((u) => {
       if (!alive) {
         u();
         return;
       }
-      unlistenHistory = u;
+      unlistenUsage = u;
     });
 
     return () => {
       alive = false;
       unlistenHosted?.();
-      unlistenHistory?.();
+      unlistenUsage?.();
     };
   }, []);
 
   const increment = useCallback(() => {
-    // Retained for compatibility — call sites that explicitly mark a
-    // successful enhancement still bump the count. The
-    // enhancement-history:new listener above is now the primary
-    // path; this stays as a manual fallback for code that needs to
-    // count an enhancement without going through the Rust pipeline.
-    const next = Math.min(loadCount() + 1, DAILY_LIMIT);
-    saveCount(next);
-    window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
-    setUsed(next);
+    // Retained for compatibility — call sites that previously bumped
+    // the count from the UI now no-op here. The Rust pipeline is the
+    // single source of truth; calling this would have desynchronised
+    // the localStorage mirror from the Rust state. Left as an exported
+    // surface so the hook contract stays stable for any external
+    // caller.
   }, []);
 
   // Server data wins when present — it's authoritative for signed-in
-  // users. Falls back to localStorage for BYOK / signed-out.
+  // users. Falls back to the Rust-owned local counter for BYOK /
+  // signed-out users.
   const effectiveUsed = hosted ? hosted.used : used;
   const effectiveLimit = hosted ? hosted.limit : DAILY_LIMIT;
 
