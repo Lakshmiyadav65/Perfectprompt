@@ -129,10 +129,12 @@ export function QuestionCard() {
 
   const handleSubmit = async () => {
     if (state === "submitting" || state === "loading") return;
-    // Frontend-only daily quota — refuse to submit when the local
-    // counter has hit the limit. Increment happens on success below.
+    // Lifetime free-trial gate — block the submit when the hosted
+    // quota is exhausted so we don't waste an LLM call that the
+    // server would just 429 anyway. Server is authoritative; this
+    // is purely a UX optimisation.
     if (usage.limitReached) {
-      setErrorMsg("Daily enhancement limit reached.");
+      setErrorMsg("Free trial ended. Open the main app to upgrade.");
       setState("error");
       return;
     }
@@ -242,10 +244,10 @@ export function QuestionCard() {
           className="qc-primary"
           onClick={() => void handleSubmit()}
           disabled={state === "loading" || state === "submitting" || usage.limitReached}
-          title={usage.limitReached ? "Daily enhancement limit reached." : undefined}
+          title={usage.limitReached ? "Free trial ended — upgrade in the main app." : undefined}
         >
           {usage.limitReached
-            ? "Daily limit reached"
+            ? "Free trial ended"
             : state === "submitting"
               ? "Enhancing…"
               : state === "error"

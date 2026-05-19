@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
@@ -7,6 +8,15 @@ import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
 import "./Shell.css";
+
+/// Razorpay payment link is configured per-deploy via the build-time env
+/// `VITE_RAZORPAY_LINK`. If unset (dev installs, forks), the upgrade CTA
+/// opens a mailto: to the support address so users still have a path
+/// to upgrade — admin then flips plan_tier='pro' by hand. Once a real
+/// link is set, the mailto fallback is no longer reachable.
+const RAZORPAY_LINK =
+  (import.meta.env.VITE_RAZORPAY_LINK as string | undefined)?.trim() ||
+  "mailto:enviguide.official@gmail.com?subject=PerfectPrompt%20Upgrade%20%E2%80%94%20%E2%82%B9200";
 
 type Route = "home" | "projects" | "settings";
 export type FocusTarget = "api-key" | null;
@@ -275,30 +285,67 @@ export function Shell({ initial }: { initial: Route }) {
         </nav>
 
         <div className="pf-sidebar-bottom">
-          {/* Daily enhancement quota — frontend-only counter persisted
-              in localStorage, resets on the local date change. Sits
-              above the listening card per design. */}
-          <div className={`pf-usage-card ${usage.limitReached ? "limit-reached" : ""}`}>
-            <div className="pf-usage-head">
-              <span className="pf-usage-label">Enhancements</span>
-              <span className="pf-usage-count">
-                <strong>{usage.used}</strong>
-                <span className="pf-usage-sep">/</span>
-                {usage.limit}
-              </span>
+          {/* Free-trial / paid-access card. Source-of-truth is the
+              hosted /enhance quota response (consume_lifetime_quota in
+              Postgres); the hook just snapshots whatever the server
+              told us last. Four states:
+                - free_under_limit  → "N / 10 free used"
+                - special_access    → "N / total used · Special access"
+                - free_at_limit     → "Free trial ended" + Upgrade CTA
+                - paid              → "Paid access active"
+              BYOK / signed-out users render `status === 'byok'` and
+              the whole card is hidden — they pay Groq directly, no
+              app-level paywall applies. */}
+          {usage.status !== "byok" && (
+            <div className={`pf-usage-card ${usage.limitReached ? "limit-reached" : ""}`}>
+              <div className="pf-usage-head">
+                <span className="pf-usage-label">
+                  {usage.status === "paid"
+                    ? "Paid access"
+                    : usage.status === "special_access"
+                    ? "Special access"
+                    : "Free trial"}
+                </span>
+                {usage.status !== "paid" && (
+                  <span className="pf-usage-count">
+                    <strong>{usage.used}</strong>
+                    <span className="pf-usage-sep">/</span>
+                    {usage.limit}
+                  </span>
+                )}
+              </div>
+              {usage.status !== "paid" && (
+                <div className="pf-usage-bar" aria-hidden="true">
+                  <div
+                    className="pf-usage-bar-fill"
+                    style={{ width: `${usagePct}%` }}
+                  />
+                </div>
+              )}
+              <div className="pf-usage-hint">
+                {usage.status === "paid"
+                  ? "Unlimited enhancements"
+                  : usage.status === "free_at_limit"
+                  ? "Upgrade to keep enhancing."
+                  : usage.status === "special_access"
+                  ? "Admin-granted access active"
+                  : "Free enhancements"}
+              </div>
+              {usage.limitReached && (
+                <button
+                  type="button"
+                  className="pf-usage-upgrade"
+                  onClick={() => {
+                    openUrl(RAZORPAY_LINK).catch((e) =>
+                      console.error("[shell] upgrade link open failed", e),
+                    );
+                  }}
+                >
+                  Upgrade for ₹200
+                </button>
+              )}
             </div>
-            <div className="pf-usage-bar" aria-hidden="true">
-              <div
-                className="pf-usage-bar-fill"
-                style={{ width: `${usagePct}%` }}
-              />
-            </div>
-            <div className="pf-usage-hint">
-              {usage.limitReached
-                ? "Daily enhancement limit reached."
-                : "Daily limit"}
-            </div>
-          </div>
+          )}
 
           <div className={`pf-listening-card ${enabled && ready ? "live" : ""}`}>
             <div className="pf-listening-row">

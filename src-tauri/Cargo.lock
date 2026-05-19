@@ -2767,7 +2767,6 @@ name = "perfectprompt"
 version = "0.3.0"
 dependencies = [
  "anyhow",
- "chrono",
  "dotenvy",
  "enigo",
  "lru",

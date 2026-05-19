@@ -1,124 +1,115 @@
-import { useCallback, useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect, useMemo, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 
-/// Daily-usage tracker for the enhancement action.
+/// Lifetime free-trial tracker for the hosted enhancement tier.
 ///
-/// Two sources, in order of precedence:
-///   1. Server-backed: when the hosted-tier pipeline emits a
-///      `hosted:quota` event (Rust → JS, fired after every signed-in
-///      /enhance call), we snapshot the server's count and ignore the
-///      local path. This is authoritative — consume_quota() in
-///      Postgres is the source of truth.
-///   2. Local fallback: BYOK path or signed-out users tick a counter
-///      owned by the Rust pipeline. Rust is the source of truth because
-///      it's the single success point every entry path funnels through
-///      (silent hotkey from VS Code/IDEs, clarify popup, question card,
-///      main app) — the JS event-listener approach the hook previously
-///      used could miss enhancements when no webview was awake to
-///      receive the event. localStorage is still mirrored so the
-///      sidebar paints the right number instantly on launch before the
-///      `get_usage_state` round-trip completes.
+/// Replaces the previous daily-quota model. Every signed-in user starts
+/// with 10 free enhancements; admin grants (extra_granted on the profile
+/// row) bump that ceiling per-user; paid users (plan_tier in 'pro' /
+/// 'unlimited') bypass the cap entirely.
+///
+/// Server is the source of truth — public.consume_lifetime_quota in
+/// Postgres is the only place that decides "allowed / denied". The
+/// hosted /enhance edge function emits the resulting quota object as
+/// `hosted:quota` after every call (success or 429), so this hook just
+/// snapshots whatever the server told us last.
+///
+/// BYOK / signed-out users have no quota at all — they pay Groq directly
+/// out-of-pocket, so the paywall doesn't apply. For them we render
+/// `source: "byok"` and the sidebar suppresses the usage card.
 
-const STORAGE_KEY = "pf.enhancements.usage";
-const UPDATE_EVENT = "pf-usage-changed";
+const FREE_LIFETIME_LIMIT = 10;
 
-export const DAILY_LIMIT = 50;
+type PlanTier = "free_hosted" | "pro" | "unlimited" | string;
 
 interface HostedQuota {
   used: number;
   limit: number;
   remaining: number;
-  plan_tier: string;
+  plan_tier: PlanTier;
+  /// Always null under the lifetime model (no daily reset). Kept on the
+  /// type so the existing emit on the Rust side serialises cleanly.
   resets_at?: string | null;
 }
 
-interface UsageSnapshot {
-  date: string; // YYYY-MM-DD (local, per Rust's Local::now())
+export type UsageStatus =
+  /// Hosted free user, lifetime_used < limit. Can enhance.
+  | "free_under_limit"
+  /// Hosted free user, lifetime_used >= limit (no admin grant or all
+  /// admin-granted units consumed). Pipeline blocked, upgrade CTA shown.
+  | "free_at_limit"
+  /// Hosted free user with extra_granted > 0 (admin manually unlocked
+  /// extra usage). Same enhance-or-block rule as free_under_limit but
+  /// the UI surfaces "Special access".
+  | "special_access"
+  /// plan_tier in {'pro', 'unlimited'} — paid through Razorpay or
+  /// granted permanent access by admin. Bypasses the cap.
+  | "paid"
+  /// Not signed in / no Supabase backend wired. BYOK pays Groq directly;
+  /// no app-level paywall applies.
+  | "byok";
+
+export interface UsageState {
+  status: UsageStatus;
   used: number;
   limit: number;
   remaining: number;
-  limit_reached: boolean;
+  /// True iff a) the user is on a hosted plan with a cap AND b) they've
+  /// hit it. The pipeline / global hotkey is allowed to short-circuit
+  /// when this is true so the LLM call is never made for blocked users.
+  limitReached: boolean;
+  /// True when the user is in `special_access` — i.e. on the free plan
+  /// but with extra_granted > 0. Drives the "Special access" badge in
+  /// the sidebar card.
+  hasAdminGrant: boolean;
+  planTier: PlanTier | null;
 }
 
-interface StoredUsage {
-  date: string;
-  count: number;
-}
-
-function todayKey(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function loadCachedCount(): number {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return 0;
-    const parsed: StoredUsage = JSON.parse(raw);
-    if (parsed.date !== todayKey()) return 0;
-    const n = Number(parsed.count);
-    return Number.isFinite(n) && n > 0 ? n : 0;
-  } catch {
-    return 0;
+function deriveStatus(q: HostedQuota | null): UsageState {
+  if (!q) {
+    return {
+      status: "byok",
+      used: 0,
+      limit: FREE_LIFETIME_LIMIT,
+      remaining: FREE_LIFETIME_LIMIT,
+      limitReached: false,
+      hasAdminGrant: false,
+      planTier: null,
+    };
   }
-}
 
-function saveCachedCount(date: string, count: number) {
-  try {
-    const data: StoredUsage = { date, count };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  } catch {
-    /* localStorage unavailable or quota-exceeded — drop silently */
+  const isPaid = q.plan_tier === "pro" || q.plan_tier === "unlimited";
+  const hasAdminGrant =
+    q.plan_tier === "free_hosted" && q.limit > FREE_LIFETIME_LIMIT;
+
+  let status: UsageStatus;
+  if (isPaid) {
+    status = "paid";
+  } else if (q.remaining <= 0) {
+    status = "free_at_limit";
+  } else if (hasAdminGrant) {
+    status = "special_access";
+  } else {
+    status = "free_under_limit";
   }
+
+  return {
+    status,
+    used: q.used,
+    limit: q.limit,
+    remaining: q.remaining,
+    limitReached: !isPaid && q.remaining <= 0,
+    hasAdminGrant,
+    planTier: q.plan_tier,
+  };
 }
 
-export function useEnhancementUsage() {
-  // Seed from the localStorage mirror so the sidebar paints the right
-  // number on first render. The Rust round-trip below overwrites it
-  // with the authoritative value within a tick.
-  const [used, setUsed] = useState<number>(loadCachedCount);
+export function useEnhancementUsage(): UsageState {
   const [hosted, setHosted] = useState<HostedQuota | null>(null);
 
   useEffect(() => {
-    const refresh = () => setUsed(loadCachedCount());
-    window.addEventListener(UPDATE_EVENT, refresh);
-    // `storage` fires in other windows when localStorage mutates —
-    // keeps the sidebar count in sync if a popup window's cache
-    // update lands first.
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.removeEventListener(UPDATE_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
-
-  useEffect(() => {
-    // `alive` closes the StrictMode listen-race: in dev, effects run
-    // twice on mount, so if the listen() promise resolves AFTER the
-    // simulated unmount, the unlisten function leaks and the next
-    // mount registers a second active listener for the same event.
     let alive = true;
-    let unlistenHosted: (() => void) | undefined;
-    let unlistenUsage: (() => void) | undefined;
-
-    // Seed from Rust — the canonical count. Survives webview restarts,
-    // applies the daily reset on the user's local date, and covers
-    // enhancements that happened while no webview was open to receive
-    // the live event.
-    void invoke<UsageSnapshot>("get_usage_state")
-      .then((snap) => {
-        if (!alive) return;
-        setUsed(snap.used);
-        saveCachedCount(snap.date, snap.used);
-        window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
-      })
-      .catch((e) => {
-        console.error("[useEnhancementUsage] get_usage_state failed:", e);
-      });
+    let unlisten: (() => void) | undefined;
 
     void listen<HostedQuota>("hosted:quota", (event) => {
       if (!alive) return;
@@ -128,57 +119,19 @@ export function useEnhancementUsage() {
         u();
         return;
       }
-      unlistenHosted = u;
-    });
-
-    // `usage:changed` is emitted by the Rust pipeline after every
-    // successful enhancement (silent hotkey from any IDE/app, clarify
-    // popup, question card, main app). The payload carries the new
-    // count from the canonical Rust state, so multiple windows
-    // listening simultaneously all converge to the same number without
-    // racing or double-incrementing.
-    void listen<UsageSnapshot>("usage:changed", (event) => {
-      if (!alive) return;
-      const snap = event.payload;
-      setUsed(snap.used);
-      saveCachedCount(snap.date, snap.used);
-      window.dispatchEvent(new CustomEvent(UPDATE_EVENT));
-    }).then((u) => {
-      if (!alive) {
-        u();
-        return;
-      }
-      unlistenUsage = u;
+      unlisten = u;
     });
 
     return () => {
       alive = false;
-      unlistenHosted?.();
-      unlistenUsage?.();
+      unlisten?.();
     };
   }, []);
 
-  const increment = useCallback(() => {
-    // Retained for compatibility — call sites that previously bumped
-    // the count from the UI now no-op here. The Rust pipeline is the
-    // single source of truth; calling this would have desynchronised
-    // the localStorage mirror from the Rust state. Left as an exported
-    // surface so the hook contract stays stable for any external
-    // caller.
-  }, []);
-
-  // Server data wins when present — it's authoritative for signed-in
-  // users. Falls back to the Rust-owned local counter for BYOK /
-  // signed-out users.
-  const effectiveUsed = hosted ? hosted.used : used;
-  const effectiveLimit = hosted ? hosted.limit : DAILY_LIMIT;
-
-  return {
-    used: effectiveUsed,
-    limit: effectiveLimit,
-    remaining: Math.max(effectiveLimit - effectiveUsed, 0),
-    limitReached: effectiveUsed >= effectiveLimit,
-    source: hosted ? ("hosted" as const) : ("local" as const),
-    increment,
-  };
+  return useMemo(() => deriveStatus(hosted), [hosted]);
 }
+
+export { FREE_LIFETIME_LIMIT };
+// Re-export the daily-limit name the old hook exposed so any straggling
+// callers don't break — same value, same meaning under the new model.
+export const DAILY_LIMIT = FREE_LIFETIME_LIMIT;

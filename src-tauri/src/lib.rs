@@ -28,7 +28,6 @@ mod toast_window;
 mod trace;
 mod tray;
 mod updater;
-pub mod usage;
 pub mod validate;
 
 /// Receiver for the in-flight question-generation LLM call. The hotkey
@@ -72,7 +71,6 @@ pub fn run() {
             cache: cache::EnhancementCache::default(),
             session_token: std::sync::Mutex::new(None),
         })
-        .manage(usage::UsageState::new())
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PerfectPrompt is already running,
         // bring the existing main window to the foreground instead of
@@ -158,7 +156,6 @@ pub fn run() {
             auth::get_auth_status,
             enhancement_history::list_enhancements,
             enhancement_history::delete_enhancement,
-            usage::get_usage_state,
         ])
         .setup(|app| {
             // Register the perfectprompt:// URL scheme at runtime so OAuth

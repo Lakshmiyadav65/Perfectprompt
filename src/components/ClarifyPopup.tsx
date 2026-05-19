@@ -82,9 +82,12 @@ export function ClarifyPopup() {
 
   const handleSubmit = async () => {
     if (enhancing) return;
-    // Frontend-only daily quota gate. Increment fires on success.
+    // Lifetime free-trial gate. Server is authoritative — the hosted
+    // /enhance edge function 429s when consume_lifetime_quota rejects,
+    // but blocking here saves a round-trip and avoids burning the
+    // status pill animation for nothing.
     if (usage.limitReached) {
-      setError("Daily enhancement limit reached.");
+      setError("Free trial ended. Open the main app to upgrade.");
       return;
     }
 
@@ -103,9 +106,9 @@ export function ClarifyPopup() {
         prompt,
         answers: formattedAnswers
       });
-      // Counter ticks automatically via useEnhancementUsage's
-      // enhancement-history:new listener — no manual increment
-      // here would just double-count.
+      // Quota is server-authoritative — consume_lifetime_quota
+      // increments the count, the edge function emits hosted:quota,
+      // useEnhancementUsage's listener picks it up and re-renders.
       // The backend handles hiding the window after pasting
 
       // Reset state for next time
@@ -123,7 +126,7 @@ export function ClarifyPopup() {
   };
 
   // Ensure all questions have an option selected, or if 'Other' is selected, text is provided.
-  // Also disabled when the daily frontend quota is hit.
+  // Also disabled when the free-trial cap is hit.
   const isSubmitDisabled = usage.limitReached || questions.length === 0 || questions.some((q) => {
     const ans = answers[q.id];
     if (!ans || !ans.option) return true;

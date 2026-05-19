@@ -260,6 +260,27 @@ body { overflow: hidden; }
   color: var(--pf-accent);
 }
 
+/* Inline upgrade CTA — only renders when usage.limitReached. Premium-feel
+   but compact; lives inside the sidebar card so the user sees it in the
+   same place they noticed the cap was hit. */
+.pf-usage-upgrade {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(180deg, #ff7a4d 0%, #ea5f30 100%);
+  border: 1px solid rgba(255, 122, 77, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.pf-usage-upgrade:hover { filter: brightness(1.08); }
+.pf-usage-upgrade:active { transform: translateY(1px); }
+
 /* ---------- listening card ---------- */
 
 .pf-listening-card {
