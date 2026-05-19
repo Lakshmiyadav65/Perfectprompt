@@ -138,18 +138,15 @@ function deriveStatus(q: HostedQuota | null, extras: {
   };
 }
 
-/// Mount-time profile read → HostedQuota. Math mirrors what
-/// consume_daily_quota does server-side, EXCEPT the daily counter
-/// (lifetime_used is no longer the field; daily_usage is a separate
-/// table the hook doesn't try to read). For free users we don't know
-/// "used today" until the first /enhance call, so we surface 0 used
-/// and the server's authoritative count overwrites it on the next
-/// hosted:quota event.
+/// Mount-time profile + daily_usage read → HostedQuota. Math mirrors
+/// what consume_daily_quota does server-side. Two reads instead of one
+/// so the sidebar paints the right "N / 10" before the user makes any
+/// /enhance call this session.
 function quotaFromProfile(row: {
   extra_granted: number | null;
   plan_tier: string | null;
   current_period_end: string | null;
-}): HostedQuota {
+}, dailyCount: number): HostedQuota {
   const tier = (row.plan_tier ?? "free_hosted") as PlanTier;
   const isUnlimited = tier === "unlimited";
   const periodEnd = row.current_period_end ? new Date(row.current_period_end) : null;
@@ -168,13 +165,27 @@ function quotaFromProfile(row: {
 
   const dailyLimit = DAILY_FREE_LIMIT + (row.extra_granted ?? 0);
   return {
-    used: 0, // unknown until /enhance call returns the real count
+    used: dailyCount,
     limit: dailyLimit,
-    remaining: dailyLimit,
+    remaining: Math.max(0, dailyLimit - dailyCount),
     plan_tier: tier,
     subscription_active: false,
     resets_at: null,
   };
+}
+
+/// IST date as "YYYY-MM-DD" for the daily_usage row lookup. Mirrors the
+/// `(now() at time zone 'Asia/Kolkata')::date` expression in
+/// consume_daily_quota so client and server agree on "today".
+function istDateKey(): string {
+  const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+  const istNow = new Date(Date.now() + IST_OFFSET_MS);
+  // Use UTC getters on the shifted Date so timezone of the local
+  // browser doesn't matter — we want pure IST calendar math.
+  const y = istNow.getUTCFullYear();
+  const m = String(istNow.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(istNow.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export function useEnhancementUsage(): UsageState {
@@ -197,25 +208,47 @@ export function useEnhancementUsage(): UsageState {
         return;
       }
       const userId = userResp.user.id;
-      const { data: profile, error: profileErr } = await supabase
-        .from("profiles")
-        .select("plan_tier, extra_granted, current_period_end, subscription_short_url")
-        .eq("user_id", userId)
-        .maybeSingle();
+
+      // Parallel fetch: profile (plan_tier, period_end, extra_granted)
+      // AND daily_usage row for today's IST date. RLS gates both to the
+      // user's own rows. Profile drives tier; daily_usage drives the
+      // "N / 10" count for free users on launch.
+      const today = istDateKey();
+      const [profileResp, usageResp] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("plan_tier, extra_granted, current_period_end, subscription_short_url")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("daily_usage")
+          .select("count")
+          .eq("user_id", userId)
+          .eq("usage_date", today)
+          .maybeSingle(),
+      ]);
       if (!alive) return;
-      if (profileErr) {
-        console.error("[useEnhancementUsage] profile fetch failed:", profileErr);
+
+      if (profileResp.error) {
+        console.error("[useEnhancementUsage] profile fetch failed:", profileResp.error);
         return;
       }
-      if (!profile) {
-        setHosted(quotaFromProfile({
-          extra_granted: 0,
-          plan_tier: "free_hosted",
-          current_period_end: null,
-        }));
-        return;
+      if (usageResp.error) {
+        // Non-fatal — fall back to 0 used and let the next /enhance
+        // overwrite. RLS or schema drift could cause this; don't break
+        // the whole hook over a daily_usage glitch.
+        console.warn("[useEnhancementUsage] daily_usage fetch failed:", usageResp.error);
       }
-      setHosted(quotaFromProfile(profile));
+
+      const dailyCount = usageResp.data?.count ?? 0;
+      const profile = profileResp.data ?? {
+        plan_tier: "free_hosted",
+        extra_granted: 0,
+        current_period_end: null,
+        subscription_short_url: null,
+      };
+
+      setHosted(quotaFromProfile(profile, dailyCount));
       setCurrentPeriodEnd(profile.current_period_end ?? null);
       setSubscriptionShortUrl(profile.subscription_short_url ?? null);
     };
