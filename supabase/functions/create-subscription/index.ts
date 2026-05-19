@@ -170,7 +170,11 @@ function corsHeaders(): Record<string, string> {
   return {
     "Access-Control-Allow-Origin":  "*",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    // supabase-js sends `apikey` and `x-client-info` alongside the
+    // standard auth headers on every functions.invoke() call. Browser
+    // CORS preflight blocks the request unless we allowlist them here.
+    "Access-Control-Allow-Headers":
+      "authorization, content-type, apikey, x-client-info",
   };
 }
 
