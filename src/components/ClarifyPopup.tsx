@@ -87,7 +87,7 @@ export function ClarifyPopup() {
     // but blocking here saves a round-trip and avoids burning the
     // status pill animation for nothing.
     if (usage.limitReached) {
-      setError("Free trial ended. Open the main app to upgrade.");
+      setError("Daily limit reached. Open the main app to upgrade or wait for midnight IST.");
       return;
     }
 

@@ -710,8 +710,9 @@ pub(crate) fn classify_hosted_error(err: &HostedError) -> (String, String, Strin
             "fallback_quota".into(),
             "hosted_quota_exhausted".into(),
             format!(
-                "Free trial ended ({}/{}) — open PerfectPrompt to upgrade.",
-                q.used, q.limit
+                "Daily limit reached ({}/{}) — open PerfectPrompt to upgrade or wait for midnight IST.",
+                q.used,
+                q.limit.unwrap_or(0),
             ),
         ),
         HostedError::Network(_) => (

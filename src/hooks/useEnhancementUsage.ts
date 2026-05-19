@@ -3,152 +3,186 @@ import { listen } from "@tauri-apps/api/event";
 
 import { isSupabaseConfigured, supabase } from "../lib/supabase";
 
-/// Lifetime free-trial tracker for the hosted enhancement tier.
+/// Daily-free + monthly-pro tracker.
 ///
-/// Replaces the previous daily-quota model. Every signed-in user starts
-/// with 10 free enhancements; admin grants (extra_granted on the profile
-/// row) bump that ceiling per-user; paid users (plan_tier in 'pro' /
-/// 'unlimited') bypass the cap entirely.
+/// Replaces the brief lifetime-trial model. Tiers:
+///   - free_hosted: 10 enhancements per IST day (+ extra_granted bonus)
+///   - pro: unlimited while current_period_end > now() (active Razorpay subscription)
+///   - unlimited: admin-grandfathered, always bypass
 ///
-/// Two state sources, merged into one snapshot:
-///   1. Initial read on mount — direct SELECT against public.profiles
-///      using the signed-in user's JWT. Lets the sidebar render an
-///      accurate "N / 10" before the user has triggered any enhancement
-///      this session. RLS gates the row to the user themselves.
-///   2. Live updates — every `/enhance` call emits `hosted:quota` from
-///      the Rust pipeline (Stage D). The listener overwrites the
-///      initial-read snapshot with the freshest server-authoritative
-///      numbers.
+/// Sources merged into one snapshot:
+///   1. Mount-time SELECT from public.profiles (so the sidebar paints
+///      correct state before the first enhancement).
+///   2. Live `hosted:quota` events from the Rust pipeline (Stage D)
+///      after every /enhance call — the server is authoritative.
 ///
-/// BYOK / signed-out users have no quota at all — they pay Groq directly
-/// out-of-pocket. The hook returns `status: "byok"` and the sidebar
-/// suppresses the usage card entirely.
+/// BYOK / signed-out users render `status: "byok"` and the sidebar
+/// suppresses the usage card.
 
-const FREE_LIFETIME_LIMIT = 10;
-const PAID_TIERS: ReadonlyArray<string> = ["pro", "unlimited"];
+const DAILY_FREE_LIMIT = 10;
 
 type PlanTier = "free_hosted" | "pro" | "unlimited" | string;
 
+/// Wire shape emitted on `hosted:quota` after every /enhance call.
+/// Mirror of the new consume_daily_quota response. `limit`/`remaining`
+/// are nullable because pro/unlimited tiers don't have a meaningful
+/// numeric ceiling.
 interface HostedQuota {
   used: number;
-  limit: number;
-  remaining: number;
+  limit: number | null;
+  remaining: number | null;
   plan_tier: PlanTier;
-  /// Always null under the lifetime model (no daily reset). Kept on the
-  /// type so the existing emit on the Rust side serialises cleanly.
+  subscription_active?: boolean;
+  /// Next midnight Asia/Kolkata as ISO. Null for pro/unlimited (no reset).
   resets_at?: string | null;
 }
 
 export type UsageStatus =
-  /// Hosted free user, lifetime_used < limit. Can enhance.
+  /// Free tier, under today's cap. Can enhance.
   | "free_under_limit"
-  /// Hosted free user, lifetime_used >= limit (no admin grant or all
-  /// admin-granted units consumed). Pipeline blocked, upgrade CTA shown.
-  | "free_at_limit"
-  /// Hosted free user with extra_granted > 0 (admin manually unlocked
-  /// extra usage). Same enhance-or-block rule as free_under_limit but
-  /// the UI surfaces "Special access".
+  /// Free tier with extra_granted > 0 — same as free_under_limit but
+  /// the UI surfaces "Special access" so the user understands why
+  /// their cap is higher than the default 10.
   | "special_access"
-  /// plan_tier in {'pro', 'unlimited'} — paid through Razorpay or
-  /// granted permanent access by admin. Bypasses the cap.
-  | "paid"
-  /// Not signed in / no Supabase backend wired. BYOK pays Groq directly;
-  /// no app-level paywall applies.
+  /// Free tier, today's cap is hit. Pipeline blocked until midnight IST
+  /// or until they subscribe.
+  | "free_at_limit"
+  /// Pro tier with an active subscription — unlimited until period ends.
+  | "pro_active"
+  /// Pro tier whose subscription expired and hasn't been renewed.
+  /// Equivalent to free_hosted for quota purposes but the UI shows
+  /// "Subscription lapsed — resubscribe" rather than the cleaner
+  /// free-tier copy.
+  | "pro_lapsed"
+  /// Admin-grandfathered: always bypass (Lakshmi after Phase 0).
+  | "unlimited"
+  /// Not signed in / no Supabase backend.
   | "byok";
 
 export interface UsageState {
   status: UsageStatus;
+  /// How many enhancements consumed in the current IST day. Always 0
+  /// for pro/unlimited (their counter doesn't tick).
   used: number;
-  limit: number;
-  remaining: number;
-  /// True iff a) the user is on a hosted plan with a cap AND b) they've
-  /// hit it. The pipeline / global hotkey is allowed to short-circuit
-  /// when this is true so the LLM call is never made for blocked users.
+  /// Daily ceiling for free users (10 + extra_granted). null for
+  /// pro/unlimited where the concept doesn't apply.
+  limit: number | null;
+  /// Daily remaining for free users. null for pro/unlimited.
+  remaining: number | null;
+  /// True if the user is currently blocked. False for pro/unlimited
+  /// regardless of `used`. Pipeline / hotkey gate on this.
   limitReached: boolean;
-  /// True when the user is in `special_access` — i.e. on the free plan
-  /// but with extra_granted > 0. Drives the "Special access" badge in
-  /// the sidebar card.
+  /// True iff free_hosted user has extra_granted > 0.
   hasAdminGrant: boolean;
+  /// Active Razorpay subscription? True for pro_active.
+  subscriptionActive: boolean;
+  /// When the subscription's current paid period ends. ISO timestamp.
+  /// Null when no subscription or expired.
+  currentPeriodEnd: string | null;
+  /// Razorpay subscription short_url so the user can revisit / cancel.
+  /// Null when no subscription created yet.
+  subscriptionShortUrl: string | null;
+  /// Next midnight IST (ISO) for free users. Used to render
+  /// "resets in N hours" countdown. Null for pro/unlimited.
+  resetsAt: string | null;
   planTier: PlanTier | null;
 }
 
-function deriveStatus(q: HostedQuota | null): UsageState {
+function deriveStatus(q: HostedQuota | null, extras: {
+  currentPeriodEnd: string | null;
+  subscriptionShortUrl: string | null;
+}): UsageState {
   if (!q) {
     return {
       status: "byok",
       used: 0,
-      limit: FREE_LIFETIME_LIMIT,
-      remaining: FREE_LIFETIME_LIMIT,
+      limit: DAILY_FREE_LIMIT,
+      remaining: DAILY_FREE_LIMIT,
       limitReached: false,
       hasAdminGrant: false,
+      subscriptionActive: false,
+      currentPeriodEnd: null,
+      subscriptionShortUrl: null,
+      resetsAt: null,
       planTier: null,
     };
   }
 
-  const isPaid = PAID_TIERS.includes(q.plan_tier);
+  const isUnlimited = q.plan_tier === "unlimited";
+  const isProActive = q.plan_tier === "pro" && (q.subscription_active === true);
+  const isProLapsed = q.plan_tier === "pro" && (q.subscription_active !== true);
   const hasAdminGrant =
-    q.plan_tier === "free_hosted" && q.limit > FREE_LIFETIME_LIMIT;
+    q.plan_tier === "free_hosted" && (q.limit ?? 0) > DAILY_FREE_LIMIT;
+  const remainingNum = q.remaining ?? 0;
 
   let status: UsageStatus;
-  if (isPaid) {
-    status = "paid";
-  } else if (q.remaining <= 0) {
-    status = "free_at_limit";
-  } else if (hasAdminGrant) {
-    status = "special_access";
-  } else {
-    status = "free_under_limit";
-  }
+  if (isUnlimited) status = "unlimited";
+  else if (isProActive) status = "pro_active";
+  else if (isProLapsed) status = "pro_lapsed";
+  else if (q.plan_tier === "free_hosted" && remainingNum <= 0) status = "free_at_limit";
+  else if (hasAdminGrant) status = "special_access";
+  else status = "free_under_limit";
 
   return {
     status,
     used: q.used,
     limit: q.limit,
     remaining: q.remaining,
-    limitReached: !isPaid && q.remaining <= 0,
+    limitReached: status === "free_at_limit" || status === "pro_lapsed",
     hasAdminGrant,
+    subscriptionActive: isProActive,
+    currentPeriodEnd: extras.currentPeriodEnd,
+    subscriptionShortUrl: extras.subscriptionShortUrl,
+    resetsAt: q.resets_at ?? null,
     planTier: q.plan_tier,
   };
 }
 
-/// Build a HostedQuota from a raw profiles row. Mirrors the math
-/// consume_lifetime_quota does server-side: paid tiers report INT_MAX as
-/// the cap and `used` stays at lifetime_used for display; free tier's
-/// cap is 10 + extra_granted.
+/// Mount-time profile read → HostedQuota. Math mirrors what
+/// consume_daily_quota does server-side, EXCEPT the daily counter
+/// (lifetime_used is no longer the field; daily_usage is a separate
+/// table the hook doesn't try to read). For free users we don't know
+/// "used today" until the first /enhance call, so we surface 0 used
+/// and the server's authoritative count overwrites it on the next
+/// hosted:quota event.
 function quotaFromProfile(row: {
-  lifetime_used: number | null;
   extra_granted: number | null;
   plan_tier: string | null;
+  current_period_end: string | null;
 }): HostedQuota {
   const tier = (row.plan_tier ?? "free_hosted") as PlanTier;
-  const used = row.lifetime_used ?? 0;
-  const isPaid = PAID_TIERS.includes(tier);
-  if (isPaid) {
+  const isUnlimited = tier === "unlimited";
+  const periodEnd = row.current_period_end ? new Date(row.current_period_end) : null;
+  const isProActive = tier === "pro" && periodEnd !== null && periodEnd.getTime() > Date.now();
+
+  if (isUnlimited || isProActive) {
     return {
-      used,
-      limit: 2_147_483_647,
-      remaining: 2_147_483_647,
+      used: 0,
+      limit: null,
+      remaining: null,
       plan_tier: tier,
+      subscription_active: isProActive || isUnlimited,
       resets_at: null,
     };
   }
-  const limit = FREE_LIFETIME_LIMIT + (row.extra_granted ?? 0);
+
+  const dailyLimit = DAILY_FREE_LIMIT + (row.extra_granted ?? 0);
   return {
-    used,
-    limit,
-    remaining: Math.max(0, limit - used),
+    used: 0, // unknown until /enhance call returns the real count
+    limit: dailyLimit,
+    remaining: dailyLimit,
     plan_tier: tier,
+    subscription_active: false,
     resets_at: null,
   };
 }
 
 export function useEnhancementUsage(): UsageState {
   const [hosted, setHosted] = useState<HostedQuota | null>(null);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState<string | null>(null);
+  const [subscriptionShortUrl, setSubscriptionShortUrl] = useState<string | null>(null);
 
-  // Initial read on mount — snapshots the user's current quota so the
-  // sidebar renders an accurate state before any enhancement this
-  // session. Re-fires when auth state changes so signing in / out
-  // updates the card without a full app reload.
+  // Initial profile read so sidebar paints on launch.
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     let alive = true;
@@ -157,14 +191,15 @@ export function useEnhancementUsage(): UsageState {
       const { data: userResp, error: userErr } = await supabase.auth.getUser();
       if (!alive) return;
       if (userErr || !userResp?.user) {
-        // Signed-out → BYOK. Clear any stale hosted snapshot.
         setHosted(null);
+        setCurrentPeriodEnd(null);
+        setSubscriptionShortUrl(null);
         return;
       }
       const userId = userResp.user.id;
       const { data: profile, error: profileErr } = await supabase
         .from("profiles")
-        .select("lifetime_used, extra_granted, plan_tier")
+        .select("plan_tier, extra_granted, current_period_end, subscription_short_url")
         .eq("user_id", userId)
         .maybeSingle();
       if (!alive) return;
@@ -173,24 +208,20 @@ export function useEnhancementUsage(): UsageState {
         return;
       }
       if (!profile) {
-        // The on_auth_user_created trigger should have populated this;
-        // treat a missing row as a fresh user at 0/10.
-        setHosted(
-          quotaFromProfile({
-            lifetime_used: 0,
-            extra_granted: 0,
-            plan_tier: "free_hosted",
-          }),
-        );
+        setHosted(quotaFromProfile({
+          extra_granted: 0,
+          plan_tier: "free_hosted",
+          current_period_end: null,
+        }));
         return;
       }
       setHosted(quotaFromProfile(profile));
+      setCurrentPeriodEnd(profile.current_period_end ?? null);
+      setSubscriptionShortUrl(profile.subscription_short_url ?? null);
     };
 
     void fetchProfile();
 
-    // React to auth changes — sign-in flips byok → free_under_limit;
-    // sign-out flips back.
     const { data: sub } = supabase.auth.onAuthStateChange(() => {
       void fetchProfile();
     });
@@ -201,8 +232,7 @@ export function useEnhancementUsage(): UsageState {
     };
   }, []);
 
-  // Live updates from the hosted /enhance pipeline. Authoritative —
-  // overwrites the initial snapshot once a real call has been made.
+  // Live hosted:quota events from Rust after each /enhance call.
   useEffect(() => {
     let alive = true;
     let unlisten: (() => void) | undefined;
@@ -224,10 +254,12 @@ export function useEnhancementUsage(): UsageState {
     };
   }, []);
 
-  return useMemo(() => deriveStatus(hosted), [hosted]);
+  return useMemo(
+    () => deriveStatus(hosted, { currentPeriodEnd, subscriptionShortUrl }),
+    [hosted, currentPeriodEnd, subscriptionShortUrl],
+  );
 }
 
-export { FREE_LIFETIME_LIMIT };
-// Re-export the daily-limit name the old hook exposed so any straggling
-// callers don't break — same value, same meaning under the new model.
-export const DAILY_LIMIT = FREE_LIFETIME_LIMIT;
+export { DAILY_FREE_LIMIT };
+// Back-compat alias for older callers still importing DAILY_LIMIT.
+export const DAILY_LIMIT = DAILY_FREE_LIMIT;

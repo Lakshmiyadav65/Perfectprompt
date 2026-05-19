@@ -134,7 +134,7 @@ export function QuestionCard() {
     // server would just 429 anyway. Server is authoritative; this
     // is purely a UX optimisation.
     if (usage.limitReached) {
-      setErrorMsg("Free trial ended. Open the main app to upgrade.");
+      setErrorMsg("Daily limit reached. Open the main app to upgrade or wait for midnight IST.");
       setState("error");
       return;
     }
@@ -244,10 +244,10 @@ export function QuestionCard() {
           className="qc-primary"
           onClick={() => void handleSubmit()}
           disabled={state === "loading" || state === "submitting" || usage.limitReached}
-          title={usage.limitReached ? "Free trial ended — upgrade in the main app." : undefined}
+          title={usage.limitReached ? "Daily limit reached — upgrade in the main app or wait for midnight IST." : undefined}
         >
           {usage.limitReached
-            ? "Free trial ended"
+            ? "Daily limit reached"
             : state === "submitting"
               ? "Enhancing…"
               : state === "error"

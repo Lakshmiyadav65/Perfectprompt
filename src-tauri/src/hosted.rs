@@ -27,12 +27,23 @@ use serde::{Deserialize, Serialize};
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
 /// Mirrors the edge function's `quota` payload.
+///
+/// `limit` and `remaining` are nullable because pro / unlimited tiers
+/// don't have a meaningful numeric ceiling under the daily-free +
+/// monthly-pro model. The edge function emits `null` for those tiers;
+/// metered (free_hosted) responses still carry real numbers. Display
+/// code (the React hook) decides what to render based on plan_tier
+/// and the presence of the numbers.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HostedQuota {
     pub used: u32,
-    pub limit: u32,
-    pub remaining: u32,
+    #[serde(default)]
+    pub limit: Option<u32>,
+    #[serde(default)]
+    pub remaining: Option<u32>,
     pub plan_tier: String,
+    #[serde(default)]
+    pub subscription_active: Option<bool>,
     #[serde(default)]
     pub resets_at: Option<String>,
 }
@@ -60,7 +71,16 @@ impl std::fmt::Display for HostedError {
         match self {
             HostedError::Unauthorized => write!(f, "hosted: token rejected (401)"),
             HostedError::QuotaExhausted(q) => {
-                write!(f, "hosted: quota exhausted ({} / {})", q.used, q.limit)
+                // QuotaExhausted only fires on the 429 path which is
+                // always a metered (free_hosted) response, so `limit`
+                // is always present — fall back to 0 just to satisfy
+                // the formatter rather than panic on the unreachable.
+                write!(
+                    f,
+                    "hosted: quota exhausted ({} / {})",
+                    q.used,
+                    q.limit.unwrap_or(0),
+                )
             }
             HostedError::Network(e) => write!(f, "hosted network error: {e}"),
             HostedError::InvalidResponse(e) => write!(f, "hosted invalid response: {e}"),

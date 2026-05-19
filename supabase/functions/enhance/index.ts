@@ -6,10 +6,10 @@
 // Flow per request:
 //   1. Verify JWT  → 401 if invalid.
 //   2. Validate input (route, length cap).
-//   3. consume_lifetime_quota(user_id) — atomic increment-if-under-cap.
-//      Free users: blocked once lifetime_used >= 10 + extra_granted.
-//      Paid users (plan_tier in 'pro' | 'unlimited'): always allowed,
-//      counter is not ticked.
+//   3. consume_daily_quota(user_id) — atomic increment-if-under-cap.
+//      Daily limit is 10 + extra_granted, IST-bucketed.
+//      Pro users (plan_tier='pro' with current_period_end > now()): bypass.
+//      Unlimited users (admin grandfathered, plan_tier='unlimited'): bypass.
 //   4. If allowed: call Groq with the route-specific system prompt.
 //   5. Log enhancements row (fire-and-forget; no prompt text stored).
 //   6. Return { enhanced_text, quota }.
@@ -27,14 +27,15 @@ const MAX_INPUT_CHARS  = 8000;
 const LLM_TIMEOUT_MS   = 30_000;
 const ROUTES: readonly Route[] = ["code", "writing", "generic"];
 
-// Shape returned by public.consume_lifetime_quota(uuid). Renamed columns
-// from the old daily-quota RPC: `quota_limit` (was daily_limit) and the
-// semantics shift from per-day to lifetime.
+// Shape returned by public.consume_daily_quota(uuid). Adds
+// subscription_active so the client can render "Pro · renews in N days"
+// distinctly from "Free 8/10 today".
 interface QuotaRow {
   allowed: boolean;
   used: number;
   quota_limit: number;
   plan_tier: string;
+  subscription_active: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -93,9 +94,9 @@ Deno.serve(async (req) => {
 
   // ---- Quota ----
   const { data: quotaData, error: quotaErr } = await admin
-    .rpc("consume_lifetime_quota", { p_user_id: userId });
+    .rpc("consume_daily_quota", { p_user_id: userId });
   if (quotaErr) {
-    console.error("consume_lifetime_quota failed", quotaErr);
+    console.error("consume_daily_quota failed", quotaErr);
     return jsonError(500, "quota_error", "Could not check quota");
   }
   const quota = (quotaData?.[0] ?? null) as QuotaRow | null;
@@ -103,16 +104,19 @@ Deno.serve(async (req) => {
     return jsonError(500, "quota_error", "Quota check returned no row");
   }
   if (!quota.allowed) {
-    // Lifetime cap reached. The client's UpgradeModal reads this 429 and
-    // opens the Razorpay payment link. `resets_at` is intentionally null
-    // — there's no daily reset under the lifetime model.
-    return jsonError(429, "quota_exhausted", "Free trial exhausted — upgrade to continue", {
+    // Daily cap reached (free tier or lapsed pro). The client renders
+    // this as "Upgrade for ₹99/mo" and opens the Razorpay subscription
+    // checkout. resets_at is the next midnight IST so the UI can show
+    // "resets in N hours" for free users who'd rather wait than pay.
+    return jsonError(429, "quota_exhausted",
+      "Daily limit reached — upgrade for unlimited or wait until midnight IST", {
       quota: {
-        used:        quota.used,
-        limit:       quota.quota_limit,
-        remaining:   0,
-        plan_tier:   quota.plan_tier,
-        resets_at:   null,
+        used:                quota.used,
+        limit:               quota.quota_limit,
+        remaining:           0,
+        plan_tier:           quota.plan_tier,
+        subscription_active: quota.subscription_active,
+        resets_at:           nextIstMidnightIso(),
       },
     });
   }
@@ -174,27 +178,29 @@ Deno.serve(async (req) => {
     if (error) console.error("enhancements insert failed", error);
   });
 
+  // Pro / unlimited users have quota_limit = INT_MAX from the RPC, which
+  // would render absurdly as "0 / 2147483647" on the client. Treat those
+  // as null so the client knows to render "Pro · renews ..." instead.
+  const isMetered = quota.plan_tier === "free_hosted";
+  const quotaPayload = {
+    used:                isMetered ? quota.used : 0,
+    limit:               isMetered ? quota.quota_limit : null,
+    remaining:           isMetered ? Math.max(0, quota.quota_limit - quota.used) : null,
+    plan_tier:           quota.plan_tier,
+    subscription_active: quota.subscription_active,
+    resets_at:           isMetered ? nextIstMidnightIso() : null,
+  };
+
   if (!success) {
     return jsonError(502, errorKind ?? "enhance_failed", "Upstream LLM failed", {
-      quota: {
-        used:      quota.used,
-        limit:     quota.quota_limit,
-        remaining: Math.max(0, quota.quota_limit - quota.used),
-        plan_tier: quota.plan_tier,
-      },
+      quota: quotaPayload,
     });
   }
 
   return new Response(JSON.stringify({
     enhanced_text: enhanced,
     latency_ms:    latencyMs,
-    quota: {
-      used:        quota.used,
-      limit:       quota.quota_limit,
-      remaining:   Math.max(0, quota.quota_limit - quota.used),
-      plan_tier:   quota.plan_tier,
-      resets_at:   null,
-    },
+    quota:         quotaPayload,
   }), {
     status:  200,
     headers: { ...corsHeaders(), "Content-Type": "application/json" },
@@ -230,5 +236,22 @@ function mustEnv(name: string): string {
   const v = Deno.env.get(name);
   if (!v) throw new Error(`Missing required env: ${name}`);
   return v;
+}
+
+/// ISO timestamp of the next midnight in Asia/Kolkata (IST, UTC+05:30).
+/// The new consume_daily_quota RPC buckets usage by IST date, so the
+/// client's "resets in N hours" countdown should target the same
+/// boundary. Avoids dragging in a TZ library by doing the offset math
+/// directly: IST is exactly UTC+5:30, no DST.
+function nextIstMidnightIso(): string {
+  const IST_OFFSET_MS = (5 * 60 + 30) * 60 * 1000;
+  const nowUtcMs = Date.now();
+  const nowIstMs = nowUtcMs + IST_OFFSET_MS;
+  // Day boundary in IST = midnight in IST = (IST_ms rounded down to day) + 1 day
+  const dayMs = 24 * 60 * 60 * 1000;
+  const nextIstMidnightIstMs = Math.floor(nowIstMs / dayMs) * dayMs + dayMs;
+  // Translate back to UTC
+  const nextIstMidnightUtcMs = nextIstMidnightIstMs - IST_OFFSET_MS;
+  return new Date(nextIstMidnightUtcMs).toISOString();
 }
 

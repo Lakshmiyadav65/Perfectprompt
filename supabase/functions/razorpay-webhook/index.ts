@@ -1,28 +1,30 @@
 // PerfectPrompt razorpay-webhook edge function.
 //
-// Razorpay POSTs `payment_link.paid` (and other) events to this URL
-// whenever one of our created payment links is completed. The function:
+// Razorpay POSTs subscription lifecycle events to this URL whenever one
+// of our created subscriptions transitions state. The function:
 //   1. Verifies the HMAC-SHA256 signature in `X-Razorpay-Signature`
 //      against the raw request body using RAZORPAY_WEBHOOK_SECRET.
-//      Any mismatch → 401 (someone forging a webhook).
-//   2. Filters down to `payment_link.paid` events. Other event types
-//      (payment.authorized, etc.) are 200-OK no-ops so Razorpay
-//      doesn't keep retrying them.
-//   3. Extracts `notes.user_id` from the payment_link entity — that's
-//      the Supabase auth.users uuid the create-payment-link function
-//      stashed there at link creation time.
-//   4. Flips public.profiles.plan_tier = 'pro' and paid_at = now() for
-//      that user. Idempotent — running it twice for the same user is
-//      a no-op (already pro), so Razorpay's at-least-once delivery is
-//      safe.
+//   2. Routes the event by its top-level `event` field.
+//   3. Reads notes.user_id from the subscription entity to know which
+//      profile row to update (set at create-subscription time).
+//   4. Updates plan_tier / subscription_status / current_period_end on
+//      the profile. The new consume_daily_quota RPC reads these to
+//      decide pro-bypass vs free-daily-quota at enhance time.
 //
-// The webhook URL Razorpay will POST to is:
-//   https://<your-project>.supabase.co/functions/v1/razorpay-webhook
+// Events handled:
+//   - subscription.activated → first charge succeeded; set plan_tier='pro'
+//   - subscription.charged   → recurring monthly charge; extend period end
+//   - subscription.cancelled → user cancelled; keep pro until period ends
+//   - subscription.completed → total_count reached; same handling as cancelled
+//   - subscription.halted    → payment failed too many times; downgrade now
+//   - subscription.paused    → user paused; treat as cancelled-but-keep-period
+//   - subscription.resumed   → reverse a previous pause
 //
-// Set RAZORPAY_WEBHOOK_SECRET as a Supabase function secret (NOT in
-// the edge function code, NOT in a .env file checked into git). The
-// secret is generated when you create the webhook in Razorpay's
-// dashboard — copy it the one time it's shown to you.
+// Other event types get a clean 200 OK no-op so Razorpay doesn't retry.
+//
+// Idempotency: every UPDATE is keyed on user_id + the event's data is
+// effectively a snapshot of current state, so receiving the same event
+// twice is safe (just overwrites with identical values).
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
@@ -42,8 +44,7 @@ Deno.serve(async (req) => {
     return jsonError(500, "config_error", "Webhook not configured");
   }
 
-  // Read the raw body BEFORE parsing — HMAC must run over bytes-exact
-  // input, and json() would re-encode whitespace etc.
+  // Raw body BEFORE parsing — HMAC must match bytes-exact input.
   const rawBody = await req.text();
   const signature = req.headers.get("X-Razorpay-Signature") ?? "";
   if (!signature) {
@@ -64,64 +65,148 @@ Deno.serve(async (req) => {
   }
 
   const event = payload?.event as string | undefined;
-  // Only act on payment_link.paid. The webhook is configured to
-  // subscribe only to that event in the Razorpay dashboard, but we
-  // double-check defensively so noise events get a clean 200 OK.
-  if (event !== "payment_link.paid") {
-    console.log(`[razorpay-webhook] ignoring event=${event}`);
-    return new Response(JSON.stringify({ ignored: event ?? "unknown" }), {
-      status: 200,
-      headers: { ...corsHeaders(), "Content-Type": "application/json" },
-    });
+  if (!event) {
+    return jsonError(400, "missing_event", "Payload had no event field");
   }
 
-  const link = payload?.payload?.payment_link?.entity;
-  const userId = link?.notes?.user_id as string | undefined;
-  const paymentLinkId = link?.id as string | undefined;
+  // Only subscription.* events touch profiles. Anything else (orders,
+  // refunds, legacy payment_link events) returns 200 OK so Razorpay
+  // stops retrying.
+  if (!event.startsWith("subscription.")) {
+    console.log(`[razorpay-webhook] ignoring non-subscription event=${event}`);
+    return ok({ ignored: event });
+  }
+
+  const sub = payload?.payload?.subscription?.entity;
+  if (!sub) {
+    console.error(`[razorpay-webhook] ${event} missing subscription.entity`);
+    return jsonError(422, "missing_subscription", "Payload missing subscription entity");
+  }
+
+  const subscriptionId = sub.id as string;
+  const userId = sub.notes?.user_id as string | undefined;
   if (!userId) {
     console.error(
-      "[razorpay-webhook] payment_link.paid missing notes.user_id",
-      paymentLinkId,
+      `[razorpay-webhook] ${event} (sub=${subscriptionId}) has no notes.user_id`,
     );
-    return jsonError(422, "missing_user_id", "Webhook payload had no user_id");
+    return jsonError(422, "missing_user_id", "Subscription has no user_id in notes");
   }
 
-  // ---- Flip the profile ----
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
 
-  const { error: updateErr } = await admin
-    .from("profiles")
-    .update({
-      plan_tier:  "pro",
-      paid_at:    new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
+  // Razorpay's `current_end` is the unix timestamp at which the current
+  // billing period ends. Convert to ISO for Postgres. Some events
+  // (cancelled with cancel_at_cycle_end=false) carry it as null.
+  const currentEnd = sub.current_end
+    ? new Date((sub.current_end as number) * 1000).toISOString()
+    : null;
 
-  if (updateErr) {
-    console.error("[razorpay-webhook] update profile failed", updateErr);
-    // Return non-2xx so Razorpay retries — transient DB blips will
-    // self-heal on the next attempt.
-    return jsonError(500, "update_failed", "Could not update profile");
+  switch (event) {
+    case "subscription.activated":
+    case "subscription.charged":
+    case "subscription.resumed": {
+      // First-charge or recurring-charge success: grant pro until
+      // current_end. Idempotent — receiving the same event twice writes
+      // the same values.
+      const { error } = await admin
+        .from("profiles")
+        .update({
+          plan_tier:           "pro",
+          subscription_status: "active",
+          current_period_end:  currentEnd,
+          paid_at:             new Date().toISOString(),
+          updated_at:          new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      if (error) {
+        console.error(`[razorpay-webhook] ${event} update failed`, error);
+        return jsonError(500, "update_failed", "Could not update profile");
+      }
+      console.log(
+        `[razorpay-webhook] ${event} → user=${userId} pro until ${currentEnd}`,
+      );
+      break;
+    }
+
+    case "subscription.cancelled":
+    case "subscription.completed":
+    case "subscription.paused": {
+      // Customer cancelled, plan ran out of cycles, or paused. KEEP them
+      // on pro until current_period_end passes — they paid for that
+      // window, they should get to use it. The consume_daily_quota RPC
+      // lazily downgrades them when the date arrives.
+      const { error } = await admin
+        .from("profiles")
+        .update({
+          subscription_status: sub.status ?? event.split(".")[1],
+          current_period_end:  currentEnd,
+          updated_at:          new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      if (error) {
+        console.error(`[razorpay-webhook] ${event} update failed`, error);
+        return jsonError(500, "update_failed", "Could not update profile");
+      }
+      console.log(
+        `[razorpay-webhook] ${event} → user=${userId} keep pro until ${currentEnd}`,
+      );
+      break;
+    }
+
+    case "subscription.halted": {
+      // Razorpay halted the subscription after repeated payment failures.
+      // Different from a clean cancel: there's no further period the
+      // customer paid for. Downgrade immediately so they don't get free
+      // pro days while their card is broken.
+      const { error } = await admin
+        .from("profiles")
+        .update({
+          plan_tier:           "free_hosted",
+          subscription_status: "halted",
+          current_period_end:  null,
+          updated_at:          new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      if (error) {
+        console.error(`[razorpay-webhook] ${event} update failed`, error);
+        return jsonError(500, "update_failed", "Could not update profile");
+      }
+      console.log(`[razorpay-webhook] ${event} → user=${userId} downgraded`);
+      break;
+    }
+
+    default: {
+      // subscription.authenticated, subscription.pending, etc. — useful
+      // for telemetry but no state change.
+      console.log(`[razorpay-webhook] noted ${event} user=${userId}`);
+      const { error } = await admin
+        .from("profiles")
+        .update({
+          subscription_status: sub.status ?? null,
+          updated_at:          new Date().toISOString(),
+        })
+        .eq("user_id", userId);
+      if (error) {
+        console.error(`[razorpay-webhook] ${event} status sync failed`, error);
+      }
+      break;
+    }
   }
 
-  console.log(
-    `[razorpay-webhook] flipped user=${userId} to pro (payment_link=${paymentLinkId})`,
-  );
-
-  return new Response(JSON.stringify({ ok: true, user_id: userId }), {
-    status: 200,
-    headers: { ...corsHeaders(), "Content-Type": "application/json" },
-  });
+  return ok({ ok: true, user_id: userId, event });
 });
 
 // ---------- helpers ----------
 
-/// HMAC-SHA256 of `body` keyed with `secret`, compared in constant
-/// time to `expected` (hex). Razorpay's webhook signature is hex-
-/// encoded, lowercase, no prefix.
+function ok(body: Record<string, unknown>): Response {
+  return new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders(), "Content-Type": "application/json" },
+  });
+}
+
 async function verifyHmac(
   body: string,
   expected: string,
@@ -142,8 +227,6 @@ async function verifyHmac(
   return constantTimeEqual(computed, expected);
 }
 
-/// Constant-time string compare so a side-channel timing attack can't
-/// recover the secret one byte at a time.
 function constantTimeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
   let diff = 0;
