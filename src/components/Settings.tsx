@@ -17,6 +17,15 @@ type UpdateInfo = {
   release_url: string;
   release_notes: string | null;
 };
+// Discriminated union for the Updates section so each render state owns
+// exactly the data it needs. Beats a (info | msg | busy) triple because
+// you can't accidentally show "no update" and an error at the same time.
+type UpdateState =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "no-update"; current: string }
+  | { kind: "available"; info: UpdateInfo }
+  | { kind: "error" };
 type Msg = { ok: boolean; text: string } | null;
 
 type QuestionMode = "adaptive" | "always_ask" | "silent";
@@ -76,8 +85,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [hotkeyMsg, setHotkeyMsg] = useState<Msg>(null);
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
-  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
-  const [updateMsg, setUpdateMsg] = useState<Msg>(null);
+  const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
   const [engineMode, setEngineMode] = useState<QuestionMode>("adaptive");
   const [engineThreshold, setEngineThreshold] = useState<number>(DEFAULT_QUESTION_THRESHOLD);
   const [engineMsg, setEngineMsg] = useState<Msg>(null);
@@ -207,16 +215,21 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   // the checklist plus the unrelated sections (hotkey, engine, etc.).
 
   async function checkForUpdates() {
-    setBusy("update");
-    setUpdateMsg(null);
-    setUpdateInfo(null);
+    setUpdateState({ kind: "checking" });
     try {
       const info = await invoke<UpdateInfo>("check_for_updates");
-      setUpdateInfo(info);
+      if (info.update_available) {
+        setUpdateState({ kind: "available", info });
+      } else {
+        setUpdateState({ kind: "no-update", current: info.current_version });
+      }
     } catch (e) {
-      setUpdateMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(null);
+      // Log the raw error for debugging but show the user a clean
+      // "couldn't check" message — GitHub rate-limits, DNS failures,
+      // and prerelease-only repos all produce technical strings the
+      // user can't act on.
+      console.error("check_for_updates failed:", e);
+      setUpdateState({ kind: "error" });
     }
   }
 
@@ -571,40 +584,120 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
 
       <section>
         <h2>Updates</h2>
-        <p className="pf-hint">Check GitHub for a newer release.</p>
-        <div className="pf-row">
-          <button onClick={checkForUpdates} disabled={busy === "update"}>
-            {busy === "update" ? "Checking…" : "Check for updates"}
-          </button>
-        </div>
-        {updateMsg && (
-          <p className={updateMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
-            {updateMsg.text}
-          </p>
-        )}
-        {updateInfo && (
-          <div className="pf-msg" style={{ marginTop: 8 }}>
-            {updateInfo.update_available ? (
-              <span className="pf-ok">
-                Update available — v{updateInfo.latest_version} (you have v
-                {updateInfo.current_version}).{" "}
-                <a
-                  href="#"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    openUrl(updateInfo.release_url).catch(console.error);
+        <p className="pf-hint">
+          Check GitHub for a newer release of Perfect Prompts.
+        </p>
+
+        <div className="pf-update-card">
+          {updateState.kind === "idle" && (
+            <div className="pf-update-body">
+              <p className="pf-update-sub">
+                Click below to check for the latest release.
+              </p>
+              <div className="pf-update-actions">
+                <button
+                  className="pf-update-primary"
+                  onClick={checkForUpdates}
+                >
+                  Check for updates
+                </button>
+              </div>
+            </div>
+          )}
+
+          {updateState.kind === "checking" && (
+            <div className="pf-update-body pf-update-checking">
+              <span className="pf-update-spinner" aria-hidden="true" />
+              <span>Checking for updates…</span>
+            </div>
+          )}
+
+          {updateState.kind === "no-update" && (
+            <div className="pf-update-body">
+              <p className="pf-update-title">No updates available.</p>
+              <p className="pf-update-sub">
+                You're using the latest version (v{updateState.current}).
+              </p>
+              <div className="pf-update-actions">
+                <button
+                  className="pf-update-secondary"
+                  onClick={checkForUpdates}
+                >
+                  Check again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {updateState.kind === "available" && (
+            <div className="pf-update-body">
+              <p className="pf-update-title pf-update-title-accent">
+                Update available
+              </p>
+              <div className="pf-update-versions">
+                <div className="pf-update-version">
+                  <span className="pf-update-vlabel">Current</span>
+                  <span className="pf-update-vnum">
+                    v{updateState.info.current_version}
+                  </span>
+                </div>
+                <span className="pf-update-arrow" aria-hidden="true">
+                  →
+                </span>
+                <div className="pf-update-version pf-update-version-new">
+                  <span className="pf-update-vlabel">Latest</span>
+                  <span className="pf-update-vnum">
+                    v{updateState.info.latest_version}
+                  </span>
+                </div>
+              </div>
+              {updateState.info.release_notes &&
+                updateState.info.release_notes.trim() && (
+                  <div className="pf-update-notes">
+                    <p className="pf-update-notes-label">Release notes</p>
+                    <pre className="pf-update-notes-body">
+                      {updateState.info.release_notes.trim()}
+                    </pre>
+                  </div>
+                )}
+              <div className="pf-update-actions">
+                <button
+                  className="pf-update-primary"
+                  onClick={() => {
+                    openUrl(updateState.info.release_url).catch(
+                      console.error,
+                    );
                   }}
                 >
-                  Open release page →
-                </a>
-              </span>
-            ) : (
-              <span style={{ color: "#aaa" }}>
-                You're on the latest version (v{updateInfo.current_version}).
-              </span>
-            )}
-          </div>
-        )}
+                  Update now
+                </button>
+                <button
+                  className="pf-update-secondary"
+                  onClick={checkForUpdates}
+                >
+                  Check again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {updateState.kind === "error" && (
+            <div className="pf-update-body">
+              <p className="pf-update-title pf-update-title-error">
+                Couldn't check for updates.
+              </p>
+              <p className="pf-update-sub">Please try again.</p>
+              <div className="pf-update-actions">
+                <button
+                  className="pf-update-secondary"
+                  onClick={checkForUpdates}
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );
