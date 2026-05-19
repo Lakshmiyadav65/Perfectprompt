@@ -73,13 +73,29 @@ Deno.serve(async (req) => {
     return jsonError(409, "already_unlimited",
       "Account is already on unlimited access — no subscription needed");
   }
-  if (profile?.subscription_status === "active" && profile.subscription_short_url) {
-    // Active subscription — bounce them back to the existing portal URL
-    // so they can manage / view / cancel without us starting a duplicate.
+  // Any subscription that's still in-flight on Razorpay's side — even if
+  // payment hasn't completed yet — gets returned as-is so the user can
+  // finish or cancel it from Razorpay's hosted portal. Without this
+  // guard, repeated Upgrade clicks would create a new sub each time and
+  // overwrite the profile's razorpay_subscription_id, orphaning the
+  // earlier ones from our matchback logic (root cause of the
+  // 2026-05-19 multi-orphan incident).
+  //
+  // Terminal statuses (cancelled, completed, expired, halted) are NOT
+  // blocked — a churned user should be able to resubscribe.
+  const IN_FLIGHT_STATUSES = [
+    "active", "created", "authenticated", "pending", "paused",
+  ];
+  if (
+    profile?.subscription_status
+    && IN_FLIGHT_STATUSES.includes(profile.subscription_status)
+    && profile.subscription_short_url
+  ) {
     return new Response(
       JSON.stringify({
         url: profile.subscription_short_url,
         existing: true,
+        status: profile.subscription_status,
       }),
       {
         status: 200,
