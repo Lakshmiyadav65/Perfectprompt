@@ -25,6 +25,21 @@ port = 54323
 # JWT verification stays ON — the enhance endpoint requires an authenticated user.
 verify_jwt = true
 
+[functions.create-payment-link]
+# JWT verification stays ON — only signed-in users can request an upgrade
+# link, and the function reads user_id from the JWT to stamp it into the
+# Razorpay payment link's notes for the webhook matchback.
+verify_jwt = true
+
+[functions.razorpay-webhook]
+# JWT verification OFF — Razorpay's servers POST here when a payment
+# completes and can't include a Supabase JWT. The function authenticates
+# the request itself by HMAC-verifying the X-Razorpay-Signature header
+# against the raw body using RAZORPAY_WEBHOOK_SECRET. Never flip this to
+# true unless you also change Razorpay's webhook config to send a JWT
+# (which they don't support).
+verify_jwt = false
+
 [auth]
 # These are local-only defaults; the cloud project's auth settings are managed via the dashboard.
 enable_signup = true
