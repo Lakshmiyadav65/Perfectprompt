@@ -24,6 +24,19 @@
 -- The client ships the user's JWT in the Authorization header.
 
 -- ────────────────────────────────────────────────────────────
+-- 0. Pre-flight (only needed if a previous run failed midway)
+-- ────────────────────────────────────────────────────────────
+-- If you previously ran an older / partial version of this file
+-- and ended up with an `enhancements` table that's missing
+-- columns (e.g. "column \"rough\" does not exist" when the
+-- unique index runs), uncomment the line below ONCE to drop the
+-- broken shell so the CREATE TABLE below can build a fresh one.
+-- DO NOT leave this uncommented on subsequent runs — it will
+-- wipe any data already synced from the client.
+--
+-- drop table if exists public.enhancements cascade;
+
+-- ────────────────────────────────────────────────────────────
 -- 1. Table
 -- ────────────────────────────────────────────────────────────
 
@@ -75,11 +88,17 @@ create index if not exists enhancements_user_created_idx
 -- (user_id, rough, enhanced) within a single session are almost
 -- certainly the result of an accidental double-fire — block them
 -- at the database level.
+--
+-- The expression columns are wrapped in explicit parens so the
+-- CREATE INDEX parser unambiguously treats them as expressions
+-- rather than column references — Postgres usually accepts the
+-- bare function-call form, but the explicit version side-steps
+-- any version-specific edge case.
 create unique index if not exists enhancements_user_content_idx
   on public.enhancements (
     user_id,
-    md5(trim(rough)),
-    md5(trim(enhanced))
+    (md5(trim(rough))),
+    (md5(trim(enhanced)))
   );
 
 -- ────────────────────────────────────────────────────────────
