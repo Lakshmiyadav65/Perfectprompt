@@ -39,4 +39,4 @@ export const supabase: SupabaseClient = createClient(
 /// MUST be added to Supabase's "Redirect URLs" allowlist in the
 /// Auth → URL Configuration dashboard, otherwise OAuth will refuse
 /// to redirect here and fall back to a 403.
-export const REDIRECT_URL = "https://lakshmiyadav65.github.io/Perfectprompt/auth-success.html";
+export const REDIRECT_URL = "https://perfectprompt-beta.vercel.app/auth-success.html";
