@@ -277,9 +277,14 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
                 <button
                   className="pf-update-primary"
                   onClick={() => {
-                    openUrl(updateState.info.release_url).catch(
-                      console.error,
-                    );
+                    // Direct .msi download via Vercel redirect.
+                    // Previously opened the GitHub release page,
+                    // which forced the user to scroll + click the
+                    // .msi asset themselves. /download 308s straight
+                    // to the latest installer.
+                    openUrl(
+                      "https://perfectprompt-beta.vercel.app/download",
+                    ).catch(console.error);
                   }}
                 >
                   Update now

@@ -1,23 +1,30 @@
 import { openUrl } from "@tauri-apps/plugin-opener";
 import "./UpdateBanner.css";
 
+/// Direct .msi download URL. Goes through Vercel's /download redirect
+/// which itself 308s to github.com/.../releases/latest/download/<file>,
+/// so the browser immediately starts downloading the .msi without
+/// dropping the user on the GitHub release page first. The redirect
+/// is in docs/vercel.json and is updated every release.
+const DOWNLOAD_URL = "https://perfectprompt-beta.vercel.app/download";
+
 interface Props {
-  /// The latest released version (e.g. "0.4.6"). Shown in the
+  /// The latest released version (e.g. "0.4.8"). Shown in the
   /// banner copy.
   version: string;
-  /// GitHub release page URL the "Update now" CTA opens. Auto-update
-  /// (in-place download + install) isn't wired yet, so we link the
-  /// user to the manual download instead.
+  /// GitHub release page URL — unused at click-time (we go direct
+  /// to the .msi via Vercel) but kept on the prop in case future UI
+  /// wants to expose a "See release notes" affordance.
   releaseUrl: string;
   /// Hide the banner for this version. Also fired when the user
-  /// clicks Update now — once they've opened the release page,
+  /// clicks Update now — once they've triggered the download,
   /// pinging them about the same version again would be noise.
   onDismiss: () => void;
 }
 
-export function UpdateBanner({ version, releaseUrl, onDismiss }: Props) {
+export function UpdateBanner({ version, releaseUrl: _releaseUrl, onDismiss }: Props) {
   const handleUpdate = () => {
-    openUrl(releaseUrl).catch((e) =>
+    openUrl(DOWNLOAD_URL).catch((e) =>
       console.error("[update-banner] openUrl failed:", e),
     );
     onDismiss();
