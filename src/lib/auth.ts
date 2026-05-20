@@ -207,8 +207,10 @@ async function handleCallbackUrl(rawUrl: string): Promise<void> {
     const { data, error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) throw error;
     const token = data.session?.access_token;
+    const userId = data.session?.user?.id;
     if (!token) throw new Error("exchangeCodeForSession returned no access_token");
-    await invoke("set_session_token", { token });
+    if (!userId) throw new Error("exchangeCodeForSession returned no user id");
+    await invoke("set_session_token", { token, userId });
 
     if (isRecovery) {
       window.dispatchEvent(new CustomEvent("pf-recovery-mode"));
@@ -222,16 +224,21 @@ async function handleCallbackUrl(rawUrl: string): Promise<void> {
   }
 }
 
-/// Push the current access token (if any) into the Rust AppState.
-/// Called on app startup so an existing persisted session is honoured
-/// without re-doing the OAuth dance, and again on every auth state
-/// change emitted by supabase-js (refresh, sign-out, etc.).
+/// Push the current access token AND user id (if any) into the Rust
+/// AppState. Called on app startup so an existing persisted session is
+/// honoured without re-doing the OAuth dance, and again on every auth
+/// state change emitted by supabase-js (refresh, sign-out, etc.).
+///
+/// `user_id` is the Supabase auth.users.id (uuid string). Rust uses it
+/// to scope API key storage per account so signing in as user B never
+/// exposes user A's BYOK Groq key.
 export async function syncSessionToRust(): Promise<void> {
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
-  if (token) {
+  const userId = data.session?.user?.id;
+  if (token && userId) {
     try {
-      await invoke("set_session_token", { token });
+      await invoke("set_session_token", { token, userId });
     } catch (e) {
       console.error("[auth] set_session_token failed:", e);
     }

@@ -9,7 +9,7 @@ use tauri::{AppHandle, Emitter, Manager, Runtime};
 use std::collections::HashMap;
 
 use crate::app_classifier::AppClassification;
-use crate::{enhance, hotkey};
+use crate::{auth, enhance, hotkey, AppState};
 
 const SETTINGS_FILE: &str = "settings.json";
 const ENV_VAR: &str = "GROQ_API_KEY";
@@ -41,8 +41,21 @@ fn default_enabled() -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub hotkey: String,
+    /// **DEPRECATED — DO NOT READ.** Legacy single-user API key from
+    /// before per-user scoping landed (v0.4.1 and earlier). Kept on the
+    /// struct so existing settings.json files still deserialise, but no
+    /// code path reads from it anymore. New code reads
+    /// `api_keys[current_user_id]` via `api_key_for_current_user`. A
+    /// future migration can drop the field once we're confident no
+    /// user has an old settings.json left over.
     #[serde(default)]
     pub api_key: Option<String>,
+    /// Per-user Groq API keys, keyed by Supabase user uuid. Populated by
+    /// the `save_api_key` command; read by `api_key_for_current_user`.
+    /// Multiple users can sign in on the same machine and each have
+    /// their own key without leaking across accounts.
+    #[serde(default)]
+    pub api_keys: HashMap<String, String>,
     #[serde(default = "default_question_threshold")]
     pub question_threshold: f32,
     #[serde(default)]
@@ -59,13 +72,15 @@ pub struct UserSettings {
     /// pipeline is dormant. Persisted across launches.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    /// Last `test_connection` outcome. Drives the API-key setup
-    /// checklist's step 3 across app restarts — without this the step
-    /// would reset to pending every launch, forcing the user to
-    /// re-test a key that's known to work. Cleared whenever the key
-    /// itself changes (save or clear).
+    /// **DEPRECATED — DO NOT READ.** Legacy single-user test result;
+    /// replaced by per-user `api_key_test_passed` map.
     #[serde(default)]
     pub last_test_passed: bool,
+    /// Per-user "did the test_connection call succeed?" flag, keyed by
+    /// Supabase user uuid. Drives the API-key checklist's step 3 across
+    /// app restarts on a per-account basis.
+    #[serde(default)]
+    pub api_key_test_passed: HashMap<String, bool>,
 }
 
 impl Default for UserSettings {
@@ -73,12 +88,14 @@ impl Default for UserSettings {
         Self {
             hotkey: hotkey::DEFAULT_HOTKEY.to_string(),
             api_key: None,
+            api_keys: HashMap::new(),
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
             question_mode: QuestionMode::default(),
             remembered_contexts: HashMap::new(),
             app_classification: AppClassificationSettings::default(),
             enabled: default_enabled(),
             last_test_passed: false,
+            api_key_test_passed: HashMap::new(),
         }
     }
 }
@@ -163,23 +180,57 @@ pub struct ApiKeyStatus {
     pub last_test_passed: bool,
 }
 
+/// Look up the API key for the currently-signed-in user. Returns the
+/// raw key string when present, `None` when:
+///   - no user is signed in (signed-out / dev mode), OR
+///   - the signed-in user hasn't added a key yet
+/// Public for `enhance::load_api_key` (BYOK path).
+pub(crate) fn api_key_for_current_user<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    let state = app.state::<AppState>();
+    let user_id = auth::current_user_id(state.inner())?;
+    let settings = load(app);
+    settings
+        .api_keys
+        .get(&user_id)
+        .map(|k| k.trim().to_string())
+        .filter(|k| !k.is_empty())
+}
+
 #[tauri::command]
 pub fn api_key_status<R: Runtime>(app: AppHandle<R>) -> ApiKeyStatus {
     let from_env = std::env::var(ENV_VAR)
         .map(|v| !v.trim().is_empty())
         .unwrap_or(false);
 
+    // Per-user lookup: from_settings is true only when the *current*
+    // user has a key. Signed-out users (or dev mode with no Supabase)
+    // see from_settings = false and last_test_passed = false, which
+    // means the UI shows the "Set up your API key" prompt. A previous
+    // user's key on disk is invisible until they sign back in.
+    let state = app.state::<AppState>();
+    let user_id = auth::current_user_id(state.inner());
     let settings = load(&app);
-    let from_settings = settings
-        .api_key
-        .as_ref()
-        .map(|k| !k.trim().is_empty())
-        .unwrap_or(false);
+    let (from_settings, last_test_passed) = match user_id.as_deref() {
+        Some(uid) => {
+            let has_key = settings
+                .api_keys
+                .get(uid)
+                .map(|k| !k.trim().is_empty())
+                .unwrap_or(false);
+            let test_ok = settings
+                .api_key_test_passed
+                .get(uid)
+                .copied()
+                .unwrap_or(false);
+            (has_key, test_ok)
+        }
+        None => (false, false),
+    };
 
     ApiKeyStatus {
         from_env,
         from_settings,
-        last_test_passed: settings.last_test_passed,
+        last_test_passed,
     }
 }
 
@@ -192,11 +243,17 @@ pub fn save_api_key<R: Runtime>(
     if trimmed.is_empty() {
         return Err("API key cannot be empty".into());
     }
+    let state = app.state::<AppState>();
+    let user_id = auth::current_user_id(state.inner())
+        .ok_or_else(|| "Sign in before saving an API key.".to_string())?;
+
     let mut settings = load(&app);
-    settings.api_key = Some(trimmed.to_string());
+    settings
+        .api_keys
+        .insert(user_id.clone(), trimmed.to_string());
     // A fresh key invalidates the previous test result — the user
     // must re-verify with the new credential.
-    settings.last_test_passed = false;
+    settings.api_key_test_passed.remove(&user_id);
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
     emit_key_changed(&app);
     Ok(())
@@ -204,9 +261,13 @@ pub fn save_api_key<R: Runtime>(
 
 #[tauri::command]
 pub fn clear_api_key<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), String> {
+    let state = app.state::<AppState>();
+    let user_id = auth::current_user_id(state.inner())
+        .ok_or_else(|| "Sign in before clearing the API key.".to_string())?;
+
     let mut settings = load(&app);
-    settings.api_key = None;
-    settings.last_test_passed = false;
+    settings.api_keys.remove(&user_id);
+    settings.api_key_test_passed.remove(&user_id);
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
     emit_key_changed(&app);
     Ok(())
@@ -214,8 +275,10 @@ pub fn clear_api_key<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), S
 
 /// Broadcast a key-state change so frontend windows can refresh
 /// immediately instead of waiting on a polling cycle. Failure to emit
-/// is non-fatal — frontends still re-fetch on their next poll.
-fn emit_key_changed<R: Runtime>(app: &AppHandle<R>) {
+/// is non-fatal — frontends still re-fetch on their next poll. Public
+/// (within the crate) so `auth::set_session_token` / `clear_session_token`
+/// can trigger a refetch when the signed-in user changes.
+pub(crate) fn emit_key_changed<R: Runtime>(app: &AppHandle<R>) {
     let payload = api_key_status(app.clone());
     if let Err(e) = app.emit("settings:key-changed", &payload) {
         eprintln!("[settings] emit settings:key-changed failed: {e}");
@@ -326,17 +389,28 @@ pub async fn test_connection<R: Runtime>(app: AppHandle<R>) -> ConnectionTest {
     }
 }
 
-/// Write the new test outcome to settings.json and broadcast
-/// settings:key-changed so the frontend re-fetches api_key_status.
+/// Write the new test outcome to settings.json under the current
+/// user's uuid and broadcast settings:key-changed so the frontend
+/// re-fetches api_key_status. No-op when no user is signed in (test
+/// results without an account context aren't meaningful).
 /// Persistence failure is logged but non-fatal — at worst the user
 /// re-tests next launch.
 fn persist_test_result<R: Runtime>(app: &AppHandle<R>, passed: bool) {
+    let state = app.state::<AppState>();
+    let Some(user_id) = auth::current_user_id(state.inner()) else {
+        return;
+    };
     let mut settings = load(app);
-    if settings.last_test_passed == passed {
+    let prior = settings
+        .api_key_test_passed
+        .get(&user_id)
+        .copied()
+        .unwrap_or(false);
+    if prior == passed {
         // No-op write — skip the disk hit and the broadcast.
         return;
     }
-    settings.last_test_passed = passed;
+    settings.api_key_test_passed.insert(user_id, passed);
     if let Err(e) = save(app, &settings) {
         eprintln!("[settings] persist test result failed: {e:#}");
         return;

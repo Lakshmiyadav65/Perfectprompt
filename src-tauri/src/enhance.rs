@@ -369,16 +369,19 @@ pub(crate) fn load_api_key<R: Runtime>(app: &AppHandle<R>) -> Result<String> {
         }
     }
 
-    // 2) Fall back to the API key saved in settings.json by the Settings window.
-    if let Some(key) = settings::load(app).api_key {
-        let trimmed = key.trim();
-        if !trimmed.is_empty() {
-            return Ok(trimmed.to_string());
+    // 2) Per-user key for the currently-signed-in Supabase account.
+    //    Returns None when no user is signed in (signed-out dev mode)
+    //    or when the user hasn't saved a key yet. Replaces the legacy
+    //    global settings.api_key read so user A's key never leaks to
+    //    user B after a sign-out / sign-in.
+    if let Some(key) = settings::api_key_for_current_user(app) {
+        if !key.is_empty() {
+            return Ok(key);
         }
     }
 
     Err(anyhow!(
-        "API key not found. Set {ENV_VAR} in .env, or paste a key in Settings."
+        "API key not found. Set {ENV_VAR} in .env, or sign in and paste a key in Settings."
     ))
 }
 

@@ -55,6 +55,15 @@ pub struct AppState {
     /// instead of calling Groq directly. JS owns the OAuth dance and
     /// refreshes the token on its side.
     pub session_token: std::sync::Mutex<Option<String>>,
+    /// Supabase user uuid (auth.users.id) for the currently signed-in
+    /// user. Set alongside session_token by `set_session_token`; cleared
+    /// by `clear_session_token`. Drives per-user API key scoping in
+    /// settings.rs — the same `settings.json` file can hold keys for
+    /// multiple Supabase accounts that have ever signed in on this
+    /// machine, but only the current user's key is readable / writable
+    /// at any given moment. Without this scoping, user A's BYOK key
+    /// would leak to user B after a sign-out / sign-in.
+    pub current_user_id: std::sync::Mutex<Option<String>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -70,6 +79,7 @@ pub fn run() {
             remembered_answers: std::sync::Mutex::new(HashMap::new()),
             cache: cache::EnhancementCache::default(),
             session_token: std::sync::Mutex::new(None),
+            current_user_id: std::sync::Mutex::new(None),
         })
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PerfectPrompt is already running,
