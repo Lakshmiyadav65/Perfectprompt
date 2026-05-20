@@ -259,9 +259,20 @@ export function useEnhancementUsage(): UsageState {
       void fetchProfile();
     });
 
+    // External components (e.g. Shell's Upgrade button after a
+    // successful verify-subscription poll) can dispatch this event to
+    // ask the hook to re-fetch. Without it, a webhook that lands while
+    // the user is staring at the sidebar leaves the UI stuck on the
+    // pre-payment state until the next /enhance call.
+    const onExternalRefresh = () => {
+      void fetchProfile();
+    };
+    window.addEventListener("pf-quota-refresh", onExternalRefresh);
+
     return () => {
       alive = false;
       sub.subscription.unsubscribe();
+      window.removeEventListener("pf-quota-refresh", onExternalRefresh);
     };
   }, []);
 

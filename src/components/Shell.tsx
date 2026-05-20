@@ -50,12 +50,15 @@ function resetsInLine(resetsAt: string | null): string {
 /// Self-heal hook for missed Razorpay webhooks. Asks the verify-subscription
 /// edge function to fetch the user's current subscription state directly
 /// from Razorpay's API and reconcile our profile row. Cheap one-shot
-/// call (~300ms) that we run before every Upgrade-button click — if
-/// the customer paid but a webhook got lost, this catches it without
-/// any manual SQL intervention.
+/// call (~300ms) that we run before every Upgrade-button click AND
+/// periodically after the Razorpay tab opens — if the customer paid but
+/// a webhook got lost, this catches it without any manual SQL.
 ///
 /// Returns true if the user is now on a paid plan (pro / unlimited)
-/// after the sync. Caller skips openUrl in that case.
+/// after the sync. Dispatches a `pf-quota-refresh` event on success so
+/// the sidebar refreshes immediately — without that, an at-cap free
+/// user who just paid would stay stuck on "Daily limit reached" until
+/// their next /enhance call.
 async function verifyAndSync(): Promise<boolean> {
   try {
     const { data, error } = await supabase.functions.invoke<{
@@ -69,7 +72,14 @@ async function verifyAndSync(): Promise<boolean> {
       console.warn("[shell] verify-subscription unavailable:", error);
       return false;
     }
-    return data?.plan_tier === "pro" || data?.plan_tier === "unlimited";
+    const isPaid =
+      data?.plan_tier === "pro" || data?.plan_tier === "unlimited";
+    if (isPaid) {
+      // Tell useEnhancementUsage to re-read profile + daily_usage. The
+      // hook converts that into the new sidebar state ("Pro · Renews ...").
+      window.dispatchEvent(new CustomEvent("pf-quota-refresh"));
+    }
+    return isPaid;
   } catch (e) {
     console.warn("[shell] verify-subscription threw:", e);
     return false;
@@ -79,6 +89,39 @@ async function verifyAndSync(): Promise<boolean> {
 /// Ask create-subscription for a fresh Razorpay subscription checkout
 /// URL. If the user already has an in-flight subscription, the function
 /// returns the existing portal URL (so "Upgrade" doubles as "Manage").
+/// After the Razorpay checkout tab opens, poll verify-subscription
+/// every 5 seconds for up to 3 minutes. Catches the case where the
+/// customer pays, Razorpay's webhook never reaches us, and the
+/// customer returns to the app expecting Pro access. Each poll is a
+/// single Razorpay GET + a conditional DB update; cheap.
+///
+/// Stops on:
+///   - first poll where the user is detected as paid (success)
+///   - 3-minute timeout (give up; user can click Upgrade again to retry)
+///   - explicit cancel (e.g., AbortController triggered by component unmount)
+async function pollForPaidStatus(signal: AbortSignal): Promise<void> {
+  const POLL_INTERVAL_MS = 5_000;
+  const POLL_DEADLINE_MS = 3 * 60 * 1000;
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < POLL_DEADLINE_MS) {
+    if (signal.aborted) return;
+    await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    if (signal.aborted) return;
+    try {
+      const isPaid = await verifyAndSync();
+      if (isPaid) {
+        // verifyAndSync already dispatched pf-quota-refresh; done.
+        return;
+      }
+    } catch (e) {
+      // Don't break the loop on a single transient failure — Razorpay
+      // or Supabase can blip; the next tick will retry.
+      console.warn("[shell] poll iteration failed:", e);
+    }
+  }
+}
+
 async function requestSubscriptionUrl(): Promise<string> {
   try {
     const { data, error } = await supabase.functions.invoke<{
@@ -194,6 +237,16 @@ export function Shell({ initial }: { initial: Route }) {
   const [enabled, setEnabled] = useState<boolean>(true);
   const [toggling, setToggling] = useState(false);
   const [store, setStore] = useState<ProjectStore>({ active_project_id: null, projects: [] });
+  /// AbortController for the post-payment polling loop. Tracked at the
+  /// Shell level (not inside the click handler) so the polling can be
+  /// cancelled when the user navigates away or signs out before the
+  /// 3-minute deadline elapses.
+  const pollAbortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => {
+      pollAbortRef.current?.abort();
+    };
+  }, []);
   const usage = useEnhancementUsage();
   // Progress bar only renders for metered (free / lapsed) states where
   // both used + limit are real numbers. Pro / unlimited render without
@@ -441,15 +494,14 @@ export function Shell({ initial }: { initial: Route }) {
                   type="button"
                   className="pf-usage-upgrade"
                   onClick={async () => {
-                    // Self-heal first: if the user paid but a webhook
-                    // got lost, verify-subscription syncs the profile
-                    // from Razorpay's authoritative state. Skip the
-                    // checkout flow if they're already paid up — the
-                    // sidebar will refresh on next /enhance call.
+                    // Self-heal first: if the user paid earlier but a
+                    // webhook got lost, verify-subscription syncs the
+                    // profile from Razorpay's authoritative state.
+                    // Skip the checkout flow if they're already paid.
+                    // verifyAndSync dispatches pf-quota-refresh on
+                    // success so the sidebar updates immediately.
                     const isAlreadyPaid = await verifyAndSync();
                     if (isAlreadyPaid && usage.status !== "pro_active") {
-                      // They were free_at_limit but actually paid;
-                      // we just synced them to pro. Nothing else to do.
                       return;
                     }
                     // For pro users, the function returns their existing
@@ -460,6 +512,18 @@ export function Shell({ initial }: { initial: Route }) {
                     openUrl(url).catch((e) =>
                       console.error("[shell] subscription link open failed", e),
                     );
+                    // After the Razorpay tab opens, start polling for
+                    // payment completion. Catches the case where the
+                    // customer pays but Razorpay's subscription.activated
+                    // webhook never reaches our function. Cancel any
+                    // previous poll first — clicking Upgrade twice
+                    // shouldn't run two concurrent loops.
+                    if (usage.status !== "pro_active") {
+                      pollAbortRef.current?.abort();
+                      const controller = new AbortController();
+                      pollAbortRef.current = controller;
+                      void pollForPaidStatus(controller.signal);
+                    }
                   }}
                 >
                   {usage.status === "pro_active"
