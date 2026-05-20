@@ -312,7 +312,50 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
           )}
         </div>
       </section>
+
+      <section>
+        <h2>Need help?</h2>
+        <p className="pf-hint">
+          Paid for Pro but the app still shows Free? Or anything else not
+          working as expected? Email us with a screenshot of the issue and
+          your Razorpay payment ID — we usually respond within a few hours.
+        </p>
+        <div className="pf-support-card">
+          <div className="pf-support-row">
+            <span className="pf-support-label">Support email</span>
+            <span className="pf-support-email">{SUPPORT_EMAIL}</span>
+          </div>
+          <button
+            type="button"
+            className="pf-support-button"
+            onClick={() => {
+              const subject = encodeURIComponent(
+                "PerfectPrompt support",
+              );
+              const body = encodeURIComponent(
+                "Hi,\n\n" +
+                  "Please attach a screenshot of the issue and fill in the details below:\n\n" +
+                  "Account email (the Google/GitHub email you sign in with): \n" +
+                  "Razorpay payment ID (if this is about a payment): \n" +
+                  "What's happening: \n\n" +
+                  "Thanks!",
+              );
+              openUrl(
+                `mailto:${SUPPORT_EMAIL}?subject=${subject}&body=${body}`,
+              ).catch(console.error);
+            }}
+          >
+            Email support
+          </button>
+        </div>
+      </section>
     </div>
   );
 }
+
+/// Support inbox for paid-but-stuck-on-free, refund requests, bug
+/// reports, etc. Kept as a module-level constant so the same address
+/// is reused by the mailto URL and the visible "Support email" row —
+/// changing it once updates both.
+const SUPPORT_EMAIL = "lakshmibeenhere@gmail.com";
 
