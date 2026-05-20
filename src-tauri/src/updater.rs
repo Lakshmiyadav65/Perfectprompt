@@ -3,8 +3,17 @@ use std::time::Duration;
 use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 
+/// GitHub API endpoint for the "latest published release" of the
+/// canonical repo. Returns the most recent non-draft, non-prerelease
+/// release; `do_check` filters those out defensively anyway.
+///
+/// History: this used to point at a stale `PromptEnhancer` repo name
+/// (a prior rename target that never received the actual releases).
+/// Every "Check for updates" click before v0.4.4 hit 404 silently —
+/// users couldn't discover any of the v0.4.x releases through the
+/// in-app updater, only through the landing-page download.
 const RELEASES_API_URL: &str =
-    "https://api.github.com/repos/Lakshmiyadav65/PromptEnhancer/releases/latest";
+    "https://api.github.com/repos/Lakshmiyadav65/Perfectprompt/releases/latest";
 const USER_AGENT: &str = "PerfectPrompt-UpdateCheck";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
