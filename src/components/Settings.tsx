@@ -28,12 +28,6 @@ type UpdateState =
   | { kind: "error" };
 type Msg = { ok: boolean; text: string } | null;
 
-type QuestionMode = "adaptive" | "always_ask" | "silent";
-type QuestionEngineSettings = {
-  question_threshold: number;
-  question_mode: QuestionMode;
-};
-
 type AppClassification = "developer" | "general";
 type AppClassificationSettings = {
   developer_apps: string[];
@@ -45,30 +39,6 @@ type DefaultClassificationLists = {
   developer_apps: string[];
   general_apps: string[];
 };
-
-const DEFAULT_QUESTION_THRESHOLD = 0.6;
-
-const QUESTION_MODE_OPTIONS: {
-  value: QuestionMode;
-  label: string;
-  description: string;
-}[] = [
-  {
-    value: "adaptive",
-    label: "Adaptive",
-    description: "Card appears only when the input looks ambiguous (score ≥ threshold).",
-  },
-  {
-    value: "always_ask",
-    label: "Always ask",
-    description: "Card appears on every hotkey press, even for already-specific prompts.",
-  },
-  {
-    value: "silent",
-    label: "Silent",
-    description: "Skip the card entirely. Hotkey runs enhance + paste directly.",
-  },
-];
 
 interface SettingsProps {
   /// When set, Settings scrolls + focuses the matching section on
@@ -86,9 +56,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [recording, setRecording] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
-  const [engineMode, setEngineMode] = useState<QuestionMode>("adaptive");
-  const [engineThreshold, setEngineThreshold] = useState<number>(DEFAULT_QUESTION_THRESHOLD);
-  const [engineMsg, setEngineMsg] = useState<Msg>(null);
   const [appClass, setAppClass] = useState<AppClassificationSettings>({
     developer_apps: [],
     general_apps: [],
@@ -136,11 +103,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       setKeyStatus(status);
       const hk = await invoke<string>("get_hotkey");
       setHotkey(hk);
-      const engine = await invoke<QuestionEngineSettings>(
-        "get_question_engine_settings",
-      );
-      setEngineMode(engine.question_mode);
-      setEngineThreshold(engine.question_threshold);
       const ac = await invoke<AppClassificationSettings>(
         "get_app_classification_settings",
       );
@@ -188,25 +150,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       ...appClass,
       [list]: appClass[list].filter((s) => s !== entry),
     });
-  }
-
-  async function saveQuestionEngine(next: Partial<QuestionEngineSettings>) {
-    const payload: QuestionEngineSettings = {
-      question_mode: next.question_mode ?? engineMode,
-      question_threshold: next.question_threshold ?? engineThreshold,
-    };
-    setBusy("engine");
-    setEngineMsg(null);
-    try {
-      await invoke("save_question_engine_settings", { payload });
-      setEngineMode(payload.question_mode);
-      setEngineThreshold(payload.question_threshold);
-      setEngineMsg({ ok: true, text: "Saved." });
-    } catch (e) {
-      setEngineMsg({ ok: false, text: String(e) });
-    } finally {
-      setBusy(null);
-    }
   }
 
   // saveKey / clearKey / testConnection used to live here. They were
@@ -315,86 +258,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         {hotkeyMsg && (
           <p className={hotkeyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
             {hotkeyMsg.text}
-          </p>
-        )}
-      </section>
-
-      <section>
-        <h2>Smart Question Engine</h2>
-        <p className="pf-hint">
-          Decides whether the question card appears after the hotkey, and how
-          ambiguous an input has to be before it does. Hold{" "}
-          <kbd>Shift</kbd> while pressing the hotkey to skip the card for a
-          single invocation, regardless of this setting.
-        </p>
-
-        <div className="pf-segmented" role="radiogroup" aria-label="Question mode">
-          {QUESTION_MODE_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              role="radio"
-              aria-checked={engineMode === opt.value}
-              className={`pf-segment ${engineMode === opt.value ? "selected" : ""}`}
-              disabled={busy === "engine"}
-              onClick={() => void saveQuestionEngine({ question_mode: opt.value })}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
-        <p className="pf-hint pf-mode-desc">
-          {QUESTION_MODE_OPTIONS.find((o) => o.value === engineMode)?.description}
-        </p>
-
-        {engineMode === "adaptive" && (
-          <div className="pf-threshold">
-            <label className="pf-threshold-label">
-              <span>Ambiguity threshold</span>
-              <span className="pf-threshold-value">{engineThreshold.toFixed(2)}</span>
-            </label>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={engineThreshold}
-              disabled={busy === "engine"}
-              onChange={(e) => setEngineThreshold(parseFloat(e.target.value))}
-              onMouseUp={() =>
-                void saveQuestionEngine({ question_threshold: engineThreshold })
-              }
-              onKeyUp={() =>
-                void saveQuestionEngine({ question_threshold: engineThreshold })
-              }
-            />
-            <div className="pf-threshold-scale">
-              <span>0.0 · ask everything</span>
-              <span>1.0 · ask nothing</span>
-            </div>
-          </div>
-        )}
-
-        <p className="pf-privacy">
-          Privacy: question text, your answers, and the assembled context block
-          stay in memory only — they're never logged or persisted by
-          PerfectPrompt. They are sent to Groq as part of the LLM call and are
-          subject to{" "}
-          <a
-            href="#"
-            onClick={(e) => {
-              e.preventDefault();
-              openUrl("https://groq.com/privacy-policy").catch(console.error);
-            }}
-          >
-            Groq's data policy
-          </a>
-          .
-        </p>
-
-        {engineMsg && (
-          <p className={engineMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
-            {engineMsg.text}
           </p>
         )}
       </section>
