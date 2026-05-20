@@ -819,6 +819,72 @@
     footer{ margin: 0 12px; padding: 32px 24px; }
   }
 
+  /* Phones (≤ 640px). The 980px breakpoint above already stacks the
+     wide multi-column layouts; this block tightens spacing, scales
+     down chrome, and stacks the remaining horizontal pairs (CTAs,
+     footer columns) for one-thumb scrolling on a 360-420px screen. */
+  @media (max-width: 640px){
+    /* Frame + section padding — the original 130px section padding
+       and 36px horizontal gutters waste half a phone screen on
+       whitespace before any content lands. */
+    .frame{ margin: 0; border-radius: 0; }
+    nav{ padding: 16px 18px; }
+    .logo{ font-size: 17px; }
+    .nav-cta{ padding: 8px 14px; font-size: 12.5px; }
+    section{ padding: 56px 20px; }
+
+    /* Hero — clamp() already shrinks h1 to 40px min, but the
+       40px-on-a-360px-screen ratio still feels heavy. Force a
+       smaller floor for phones and tighten the sub line height. */
+    .hero{ padding: 36px 18px 18px; }
+    h1{ font-size: clamp(30px, 9vw, 44px); line-height: 1.06; }
+    .sub{ font-size: 15px; max-width: none; }
+    .pill{ font-size: 11.5px; padding: 7px 12px; }
+    .hero-meta{ flex-wrap: wrap; justify-content: center; gap: 14px; font-size: 11.5px; }
+    .hero-meta span{ flex: 0 0 auto; }
+
+    /* CTAs — stack the two buttons vertically so each fills the
+       width and is comfortably tappable. 13px-padding from desktop
+       lands at ~44px tall, which is the iOS minimum touch target. */
+    .cta-row{
+      display: flex; flex-direction: column; align-items: stretch;
+      gap: 10px; width: 100%; margin-top: 28px;
+    }
+    .btn-primary, .btn-secondary{
+      width: 100%; justify-content: center; padding: 14px 18px;
+      font-size: 14px;
+    }
+    .btn-primary .kbd{ display: none; }
+
+    /* Live-flow stage — three panes already stack at 980px; reduce
+       per-pane padding so each fits in one screen-height. */
+    .stage-pane{ padding: 18px; }
+    .stage-head{ font-size: 10px; }
+
+    /* "How it works" steps — two columns on tablet, one column on
+       phones. Two side-by-side cards at 360px width are too narrow
+       for the body copy to breathe. */
+    .steps{ grid-template-columns: 1fr; gap: 12px; }
+
+    /* Section h2s — clamp gives 36px min which is loud on phones. */
+    h2{ font-size: clamp(28px, 8.5vw, 40px); line-height: 1.08; }
+    .eyebrow{ font-size: 10.5px; }
+    .section-sub{ font-size: 14.5px; }
+
+    /* Final CTA */
+    .final{ padding: 60px 18px; }
+    .final h2{ max-width: none; }
+
+    /* Footer — stack from 4 horizontal columns to 2x2 grid, then
+       finally to single column under 420px. */
+    footer{
+      margin: 0; padding: 32px 20px 44px;
+      flex-direction: column; align-items: flex-start; gap: 28px;
+    }
+    .footer-brand{ font-size: 24px; }
+    .footer-tag{ max-width: none; }
+  }
+
   /* entry reveals */
   .reveal{ opacity: 0; transform: translateY(14px); animation: reveal .9s cubic-bezier(.2,.7,.2,1) forwards; }
   .r1{ animation-delay: .05s; } .r2{ animation-delay: .15s; } .r3{ animation-delay: .25s; }
