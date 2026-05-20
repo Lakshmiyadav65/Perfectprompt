@@ -201,8 +201,28 @@ pub async fn call(
     }
 }
 
-/// Read `SUPABASE_URL` from the dotenv-loaded env. The hosted path
-/// is only reachable when both this and the session token are set.
+/// Compile-time fallback baked by `build.rs` from `.env` (or the build
+/// env). Lets the installed `.exe` find Supabase even though no `.env`
+/// is shipped alongside it. Empty string when neither the build env
+/// nor the repo .env had the key — same shape `std::env::var` returns
+/// for "unset".
+const BAKED_SUPABASE_URL: &str = env!("SUPABASE_URL");
+
+/// Resolve `SUPABASE_URL`, preferring a runtime env var (so dev workflows
+/// can override the baked value) and falling back to the compile-time
+/// constant. Without the fallback, the deployed binary has no `.env` to
+/// read and the pipeline silently degrades to BYOK — which is why the
+/// sidebar daily-quota counter never moved in production.
 pub fn supabase_url() -> Option<String> {
-    std::env::var("SUPABASE_URL").ok().filter(|s| !s.is_empty())
+    std::env::var("SUPABASE_URL")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            let baked = BAKED_SUPABASE_URL.trim();
+            if baked.is_empty() {
+                None
+            } else {
+                Some(baked.to_string())
+            }
+        })
 }

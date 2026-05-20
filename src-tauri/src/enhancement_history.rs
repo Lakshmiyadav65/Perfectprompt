@@ -224,10 +224,23 @@ fn spawn_remote_sync<R: Runtime>(app: &AppHandle<R>, record: &EnhancementRecord)
     });
 }
 
+/// Compile-time fallback baked by `build.rs` — same rationale as
+/// `hosted::supabase_url`. The anon key is already public (the Vite
+/// bundle ships it), so baking it in is fine.
+const BAKED_SUPABASE_ANON_KEY: &str = env!("SUPABASE_ANON_KEY");
+
 fn supabase_anon_key() -> Option<String> {
     std::env::var("SUPABASE_ANON_KEY")
         .ok()
         .filter(|s| !s.is_empty())
+        .or_else(|| {
+            let baked = BAKED_SUPABASE_ANON_KEY.trim();
+            if baked.is_empty() {
+                None
+            } else {
+                Some(baked.to_string())
+            }
+        })
 }
 
 /// POST a single record to {SUPABASE_URL}/rest/v1/enhancements
