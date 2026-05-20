@@ -4,9 +4,11 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { Home } from "./Home";
 import { Settings } from "./Settings";
 import { ProjectManager } from "./ProjectManager";
+import { UpdateBanner } from "./UpdateBanner";
 import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
+import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { supabase } from "../lib/supabase";
 import "./Shell.css";
 
@@ -248,6 +250,11 @@ export function Shell({ initial }: { initial: Route }) {
     };
   }, []);
   const usage = useEnhancementUsage();
+  // Background update check — runs once on mount + every 6h. Renders
+  // a bottom-right toast when a newer GitHub release exists. Failures
+  // are silent; the manual button in Settings → Updates still works
+  // for users who want explicit control.
+  const update = useUpdateCheck();
   // Progress bar only renders for metered (free / lapsed) states where
   // both used + limit are real numbers. Pro / unlimited render without
   // a bar.
@@ -676,6 +683,19 @@ export function Shell({ initial }: { initial: Route }) {
           />
         )}
       </main>
+
+      {/* Bottom-right toast surfaced by useUpdateCheck whenever a
+          newer GitHub release exists than the locally-installed
+          version. Persists across route changes inside the main
+          window; dismissed banners stay dismissed for that exact
+          version across launches via localStorage. */}
+      {update.showBanner && update.updateInfo && (
+        <UpdateBanner
+          version={update.updateInfo.latest_version}
+          releaseUrl={update.updateInfo.release_url}
+          onDismiss={update.dismiss}
+        />
+      )}
     </div>
   );
 }

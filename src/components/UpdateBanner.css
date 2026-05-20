@@ -1,0 +1,104 @@
+/* Bottom-right toast card. Fixed-positioned over whatever the user
+   is doing — non-modal, dismissible, ignored if not interacted with.
+   Matches the premium dark surface of the sidebar usage card so it
+   feels like part of the app, not a system overlay. */
+
+.pf-update-banner {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 320px;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 122, 77, 0.08), transparent 70%),
+    var(--pf-surface, #18181c);
+  border: 1px solid var(--pf-line, #23232a);
+  border-radius: 12px;
+  padding: 16px 18px;
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 122, 77, 0.08);
+  z-index: 1000;
+  animation: pf-update-slide-in 0.28s ease-out;
+  font-family: 'Inter Tight', system-ui, sans-serif;
+}
+
+@keyframes pf-update-slide-in {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.pf-update-banner-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: transparent;
+  border: none;
+  color: var(--pf-text-subtle, #6b6960);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.pf-update-banner-close:hover {
+  color: var(--pf-text, #f4f1ea);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.pf-update-banner-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pf-text, #f4f1ea);
+  margin-bottom: 4px;
+  padding-right: 24px;
+  letter-spacing: -0.01em;
+}
+
+.pf-update-banner-message {
+  font-size: 12px;
+  color: var(--pf-text-subtle, #b6b1a8);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+.pf-update-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pf-update-banner-primary {
+  flex: 1;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: #fff;
+  background: linear-gradient(180deg, #ff7a4d 0%, #ea5f30 100%);
+  border: 1px solid rgba(255, 122, 77, 0.4);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.05s ease;
+}
+.pf-update-banner-primary:hover  { filter: brightness(1.08); }
+.pf-update-banner-primary:active { transform: translateY(1px); }
+
+.pf-update-banner-secondary {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--pf-text-subtle, #b6b1a8);
+  background: transparent;
+  border: 1px solid var(--pf-line, #23232a);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.pf-update-banner-secondary:hover {
+  color: var(--pf-text, #f4f1ea);
+  border-color: #3a3a40;
+}

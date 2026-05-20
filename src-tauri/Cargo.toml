@@ -1,6 +1,6 @@
 [package]
 name = "perfectprompt"
-version = "0.4.5"
+version = "0.4.6"
 description = "PerfectPrompt — system-tray prompt enhancer"
 authors = ["PerfectPrompt"]
 edition = "2021"
