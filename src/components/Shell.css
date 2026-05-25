@@ -648,3 +648,20 @@ body { overflow: hidden; }
   background: var(--pf-accent-soft);
   color: var(--pf-text);
 }
+
+/* Sidebar installed-version label. Sits at the very bottom of the
+   sidebar under the profile chip. Monospace + muted so it reads as
+   metadata, not as a primary affordance. */
+.pf-app-version {
+  margin-top: 10px;
+  padding: 0 4px;
+  font-family: ui-monospace, "Geist Mono", Menlo, monospace;
+  font-size: 10px;
+  color: var(--pf-text-mute, #6b6960);
+  letter-spacing: 0.04em;
+  text-align: center;
+  user-select: text;
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+.pf-app-version:hover { opacity: 1; }

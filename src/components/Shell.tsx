@@ -10,7 +10,15 @@ import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
 import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { supabase } from "../lib/supabase";
+import pkg from "../../package.json";
 import "./Shell.css";
+
+/// Build-time version pulled from package.json. Vite inlines this at
+/// compile time so the badge always reflects the binary the user is
+/// actually running — no Tauri command roundtrip needed. Bumping the
+/// version in package.json (which we do on every release) makes the
+/// badge update without touching this file.
+const APP_VERSION: string = (pkg as { version: string }).version;
 
 /// Mailto fallback when create-subscription can't be reached (dev install
 /// without Supabase, function not deployed yet, transient network error).
@@ -669,6 +677,15 @@ export function Shell({ initial }: { initial: Route }) {
                 <path d="M9 6l6 6-6 6" />
               </svg>
             </button>
+          </div>
+
+          {/* Installed version label. Pulled from package.json at
+              build time so the displayed string is always the binary
+              the user is actually running. Tiny, monospace, muted —
+              meant to be a glanceable "what version am I on?" tag,
+              not a primary affordance. */}
+          <div className="pf-app-version" aria-label={`Installed version ${APP_VERSION}`}>
+            v{APP_VERSION}
           </div>
         </div>
       </aside>
