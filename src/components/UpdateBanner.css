@@ -102,3 +102,26 @@
   color: var(--pf-text, #f4f1ea);
   border-color: #3a3a40;
 }
+
+/* Linear progress bar shown during the downloading state. Same width
+   as the card body, sits where the action buttons would normally be. */
+.pf-update-banner-progress {
+  height: 4px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+.pf-update-banner-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff7a4d 0%, #ea5f30 100%);
+  border-radius: 2px;
+  transition: width 0.2s ease-out;
+}
+
+/* Disable the close button visually while the update is in flight. */
+.pf-update-banner-close:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}

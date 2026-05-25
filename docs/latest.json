@@ -1,0 +1,11 @@
+{
+  "version": "0.5.0",
+  "notes": "Auto-update arrives. Click Update now in the toast and the app downloads + installs + restarts itself — no installer wizard, no clicks beyond the first one. From v0.5.0 onward, every future release is a one-click silent update.",
+  "pub_date": "2026-05-26T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdVN6d0hrVkh1bGdXcFZmYzFIRWtTY3hQR2xzclpyMEdZY3F5S1JGOXVqTUtaTWp1cEhSSWE2TVVoK1hoOHgvMFdsOEU5TEMyTXozangrZ1RRcENiMEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5NzM0OTU4CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMF94NjQtc2V0dXAuZXhlCmpMU1VDY1I4NUR4cld6YWxSVStaeUZvUjVFRnZBbjkvL1N3RjdLdCttL2xXUUVCczdIUEJxZk10b1NUTTBVVTdrVGY4WUhtaE5GVHdqdzB0MlorREJRPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.0/PerfectPrompt_0.5.0_x64-setup.exe"
+    }
+  }
+}

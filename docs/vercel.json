@@ -5,7 +5,7 @@
   "redirects": [
     {
       "source": "/download",
-      "destination": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/latest/download/PerfectPrompt_0.4.9_x64_en-US.msi",
+      "destination": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/latest/download/PerfectPrompt_0.5.0_x64_en-US.msi",
       "statusCode": 308
     }
   ],

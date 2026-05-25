@@ -1,6 +1,6 @@
 [package]
 name = "perfectprompt"
-version = "0.4.9"
+version = "0.5.0"
 description = "PerfectPrompt — system-tray prompt enhancer"
 authors = ["PerfectPrompt"]
 edition = "2021"
@@ -21,6 +21,8 @@ tauri-plugin-dialog = "2"
 tauri-plugin-single-instance = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-deep-link = "2"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 anyhow = "1"
