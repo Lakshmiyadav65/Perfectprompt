@@ -1,11 +1,11 @@
 {
-  "version": "0.5.2",
-  "notes": "Settings → Update now now uses the same silent-install plugin as the bottom-right toast. Before this, clicking Update now from the Settings page opened a browser Save As dialog instead of the in-place updater. Both surfaces now do the same one-click silent update.",
-  "pub_date": "2026-05-26T02:00:00Z",
+  "version": "0.5.3",
+  "notes": "Profile section: change your display name and upload a profile photo from the new Profile item in the account dropdown (or directly in Settings). Avatar is center-cropped to 256x256 and stored on your device — no backend involved. Sidebar chip shows the photo when set.",
+  "pub_date": "2026-05-26T10:35:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWEzcXNMTVNIWFZ6akhCZ05kbi95bTUzaVllV0RoY3pDZDU1SGwza1ZKd3VueTlORXlPRHp3eWdYd3ZqZjJyNm9LSy9HcTVxZCtmNU1hU1RZSFBWaFFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5Nzg4NDQ4CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMl94NjQtc2V0dXAuZXhlCkNEdUtSeHlucEVFV0RzZDdKTGcvWVpmclJzTzJNcnVjb1k3Nm5pOXZXMlg1aDdQL2x2UGpZVGE1Q0Q4NlRmbFBlMjE4QjEvSWZrN0VCYWlBNmVXbEFnPT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.2/PerfectPrompt_0.5.2_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWN0a0luWVlhSEQ4Y1FSdFBZWjRiNmlRT1ZQMGU0RnBVMGZlOVVSenRLNVJhWW5iaG5LR2pXcGNYcU1VdE1QRExWTmlJY2ltSHJEdzMxNmgraGR4QmdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5NzkxMjA2CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuM194NjQtc2V0dXAuZXhlCmJCWlZGQ0k4NDFXRGY4SEdnT003UFJRSlJEbDFMSGJMKzAyenBoSkh1bGloR2Q1RnNKKzNVVmNsV2FuWFFicWdGdUdQV1dxOUZPV3ZxMTljRk1BWUJ3PT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.3/PerfectPrompt_0.5.3_x64-setup.exe"
     }
   }
 }
