@@ -260,6 +260,33 @@ body { overflow: hidden; }
   color: var(--pf-accent);
 }
 
+/* Perks list shown under the unlimited-tier usage card. Three short
+   benefit lines, each prefixed by a small orange star. Surfaces what
+   unlimited actually gets you so the tier feels concrete rather than
+   a vague "no limits" string. */
+.pf-usage-perks {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--pf-line);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--pf-text-subtle);
+  letter-spacing: 0.01em;
+}
+.pf-usage-perks li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pf-perk-mark {
+  color: var(--pf-accent);
+  font-size: 9px;
+  line-height: 1;
+}
+
 /* Inline upgrade CTA — only renders when usage.limitReached. Premium-feel
    but compact; lives inside the sidebar card so the user sees it in the
    same place they noticed the cap was hit. */

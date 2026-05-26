@@ -500,6 +500,19 @@ export function Shell({ initial }: { initial: Route }) {
                   ? "Admin-granted daily bonus active"
                   : "Free enhancements per day"}
               </div>
+              {/* Perks list for the unlimited tier. Free tier users
+                  see their daily counter; pro users see their renewal
+                  date; unlimited users have neither — without this
+                  list the card felt vague. Surfaces what unlimited
+                  actually gets you in plain language so the tier
+                  feels meaningful instead of just a label. */}
+              {usage.status === "unlimited" && (
+                <ul className="pf-usage-perks" aria-label="Plan benefits">
+                  <li><span className="pf-perk-mark">✦</span> No daily cap</li>
+                  <li><span className="pf-perk-mark">✦</span> No monthly billing</li>
+                  <li><span className="pf-perk-mark">✦</span> Lifetime access</li>
+                </ul>
+              )}
               {/* Upgrade CTA for anyone who can subscribe.
                   - free_at_limit / pro_lapsed: primary upgrade trigger
                   - pro_active: small "manage subscription" affordance

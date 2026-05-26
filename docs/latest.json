@@ -1,11 +1,11 @@
 {
-  "version": "0.5.0",
-  "notes": "Auto-update arrives. Click Update now in the toast and the app downloads + installs + restarts itself — no installer wizard, no clicks beyond the first one. From v0.5.0 onward, every future release is a one-click silent update.",
-  "pub_date": "2026-05-26T00:00:00Z",
+  "version": "0.5.1",
+  "notes": "Enriched UNLIMITED tier card: now shows the perks (no daily cap, no monthly billing, lifetime access) instead of a vague one-liner. First in-place auto-update from v0.5.0 — if you're reading this from the toast, the new mechanism works.",
+  "pub_date": "2026-05-26T01:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdVN6d0hrVkh1bGdXcFZmYzFIRWtTY3hQR2xzclpyMEdZY3F5S1JGOXVqTUtaTWp1cEhSSWE2TVVoK1hoOHgvMFdsOEU5TEMyTXozangrZ1RRcENiMEFrPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5NzM0OTU4CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMF94NjQtc2V0dXAuZXhlCmpMU1VDY1I4NUR4cld6YWxSVStaeUZvUjVFRnZBbjkvL1N3RjdLdCttL2xXUUVCczdIUEJxZk10b1NUTTBVVTdrVGY4WUhtaE5GVHdqdzB0MlorREJRPT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.0/PerfectPrompt_0.5.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWJxOHdQaWJTQVZ4d2FJeXNlV2JhSjJqYldKZkhWcEx5QTdUL2tvQnhwaXdlVzBrR3N1Ykw1S21uQVFaY0lVRFI1cURDNGVhTlRSNDdPQ1ZibXlXM1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5Nzg3NzUwCWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMV94NjQtc2V0dXAuZXhlCkhLR3EyZWFZTE9pNGFWL1IyTzVaWWhWM0d2emkwZ0h0MklEazFSZjdFVmRicEZzZnlid1JGYnE2NEFTRDNpbkNEN1UzSFpuMU1WdFRqUm83UnZaYkNBPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.1/PerfectPrompt_0.5.1_x64-setup.exe"
     }
   }
 }
