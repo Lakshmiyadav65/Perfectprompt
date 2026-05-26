@@ -779,6 +779,18 @@
   .final h2{ margin: 14px auto 16px; max-width: 22ch; }
   .final .section-sub{ margin: 0 auto; }
   .final .cta-row{ margin-top: 32px; }
+  .version-line{
+    margin-top: 14px; font-size: 12.5px; letter-spacing: 0.02em;
+    color: var(--ink-mute); display: inline-flex; align-items: center; gap: 8px;
+  }
+  .version-line .v-dot{
+    width: 6px; height: 6px; border-radius: 50%;
+    background: #2ecc71; box-shadow: 0 0 0 3px rgba(46,204,113,0.15);
+  }
+  .version-line .v-tag{
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    color: var(--ink);
+  }
 
   /* ---------- SmartScreen first-install reassurance ---------- */
   .smartscreen-notice {
@@ -1347,6 +1359,10 @@
     <a class="btn-primary" href="/download">
       Download PerfectPrompt for Windows
     </a>
+  </div>
+  <div class="version-line">
+    <span class="v-dot" aria-hidden="true"></span>
+    Latest release: <span class="v-tag">v0.5.2</span> · Windows 10/11 (64-bit) · ~12 MB
   </div>
   <p class="section-sub" style="margin-top: 22px; font-size: 13px; color: var(--ink-mute);">
     First-run: sign in with Google or GitHub. 10 free enhancements to try it out.
