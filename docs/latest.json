@@ -1,11 +1,11 @@
 {
-  "version": "0.5.1",
-  "notes": "Enriched UNLIMITED tier card: now shows the perks (no daily cap, no monthly billing, lifetime access) instead of a vague one-liner. First in-place auto-update from v0.5.0 — if you're reading this from the toast, the new mechanism works.",
-  "pub_date": "2026-05-26T01:00:00Z",
+  "version": "0.5.2",
+  "notes": "Settings → Update now now uses the same silent-install plugin as the bottom-right toast. Before this, clicking Update now from the Settings page opened a browser Save As dialog instead of the in-place updater. Both surfaces now do the same one-click silent update.",
+  "pub_date": "2026-05-26T02:00:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWJxOHdQaWJTQVZ4d2FJeXNlV2JhSjJqYldKZkhWcEx5QTdUL2tvQnhwaXdlVzBrR3N1Ykw1S21uQVFaY0lVRFI1cURDNGVhTlRSNDdPQ1ZibXlXM1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5Nzg3NzUwCWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMV94NjQtc2V0dXAuZXhlCkhLR3EyZWFZTE9pNGFWL1IyTzVaWWhWM0d2emkwZ0h0MklEazFSZjdFVmRicEZzZnlid1JGYnE2NEFTRDNpbkNEN1UzSFpuMU1WdFRqUm83UnZaYkNBPT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.1/PerfectPrompt_0.5.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWEzcXNMTVNIWFZ6akhCZ05kbi95bTUzaVllV0RoY3pDZDU1SGwza1ZKd3VueTlORXlPRHp3eWdYd3ZqZjJyNm9LSy9HcTVxZCtmNU1hU1RZSFBWaFFZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5Nzg4NDQ4CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuMl94NjQtc2V0dXAuZXhlCkNEdUtSeHlucEVFV0RzZDdKTGcvWVpmclJzTzJNcnVjb1k3Nm5pOXZXMlg1aDdQL2x2UGpZVGE1Q0Q4NlRmbFBlMjE4QjEvSWZrN0VCYWlBNmVXbEFnPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.2/PerfectPrompt_0.5.2_x64-setup.exe"
     }
   }
 }

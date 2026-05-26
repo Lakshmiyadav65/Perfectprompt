@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { check } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
@@ -276,15 +278,28 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
               <div className="pf-update-actions">
                 <button
                   className="pf-update-primary"
-                  onClick={() => {
-                    // Direct .msi download via Vercel redirect.
-                    // Previously opened the GitHub release page,
-                    // which forced the user to scroll + click the
-                    // .msi asset themselves. /download 308s straight
-                    // to the latest installer.
-                    openUrl(
-                      "https://perfectprompt-beta.vercel.app/download",
-                    ).catch(console.error);
+                  onClick={async () => {
+                    // Same plugin-based silent-install flow as the
+                    // bottom-right toast banner. v0.4.8 had this
+                    // button open the browser to /download which
+                    // forced a manual installer-wizard run; v0.5.2
+                    // unifies the two surfaces so clicking Update
+                    // now from either place does the same thing.
+                    try {
+                      const update = await check();
+                      if (!update) return;
+                      await update.downloadAndInstall();
+                      await relaunch();
+                    } catch (e) {
+                      console.error("[settings] update failed:", e);
+                      // Fall back to the browser download so the
+                      // user has a path forward if the plugin can't
+                      // reach the manifest (network, transient
+                      // Vercel hiccup, etc.).
+                      openUrl(
+                        "https://perfectprompt-beta.vercel.app/download",
+                      ).catch(console.error);
+                    }
                   }}
                 >
                   Update now
