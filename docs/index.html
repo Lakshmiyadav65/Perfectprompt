@@ -780,6 +780,59 @@
   .final .section-sub{ margin: 0 auto; }
   .final .cta-row{ margin-top: 32px; }
 
+  /* ---------- SmartScreen first-install reassurance ---------- */
+  .smartscreen-notice {
+    position: relative; z-index: 1;
+    max-width: 720px; margin: 28px auto 0; padding: 0 28px;
+  }
+  .ss-card {
+    display: flex; gap: 16px; align-items: flex-start;
+    background:
+      radial-gradient(120% 80% at 0% 0%, rgba(255,122,77,0.05), transparent 60%),
+      rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 14px;
+    padding: 18px 20px;
+  }
+  .ss-icon{
+    flex: 0 0 auto; color: var(--flame);
+    width: 32px; height: 32px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px;
+    background: rgba(255,122,77,0.1);
+    border: 1px solid rgba(255,122,77,0.2);
+  }
+  .ss-body{ flex: 1; min-width: 0; }
+  .ss-body h3{
+    font-family: var(--sans);
+    font-size: 14.5px; font-weight: 500;
+    letter-spacing: -0.005em;
+    margin: 2px 0 8px;
+    color: var(--ink);
+  }
+  .ss-body p{
+    margin: 0 0 8px;
+    font-size: 13px; color: var(--ink-dim); line-height: 1.55;
+  }
+  .ss-body p strong{ color: var(--ink); font-weight: 500; }
+  .ss-body p em{ font-style: normal; color: var(--ink); font-weight: 500; }
+  .ss-steps{
+    margin: 4px 0 8px 18px; padding: 0;
+    font-size: 13px; color: var(--ink-dim); line-height: 1.7;
+  }
+  .ss-steps li{ padding-left: 4px; }
+  .ss-steps strong{
+    color: var(--ink); font-weight: 500;
+    background: rgba(255,255,255,0.05);
+    padding: 1px 6px; border-radius: 4px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .ss-footer-line{
+    font-size: 12px; color: var(--ink-mute);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding-top: 10px; margin-top: 12px !important;
+  }
+
   /* ---------- footer ---------- */
   footer{
     position: relative; z-index: 1;
@@ -883,6 +936,14 @@
     }
     .footer-brand{ font-size: 24px; }
     .footer-tag{ max-width: none; }
+
+    /* SmartScreen notice — full-width on phone, tighter padding,
+       smaller icon so the body copy can breathe at 360px. */
+    .smartscreen-notice{ margin: 20px 0 0; padding: 0 16px; }
+    .ss-card{ padding: 14px 14px; gap: 12px; }
+    .ss-icon{ width: 26px; height: 26px; }
+    .ss-body h3{ font-size: 13.5px; }
+    .ss-body p, .ss-steps{ font-size: 12.5px; }
   }
 
   /* entry reveals */
@@ -1292,6 +1353,41 @@
     Hit the limit? Upgrade once for ₹199 — lifetime access, no subscription.
   </p>
 </div>
+
+<!-- ===================== 5b. SMARTSCREEN NOTICE ===================== -->
+<!-- Calm reassurance about the Windows first-install warning. New
+     apps trigger SmartScreen until they're either code-signed (paid)
+     or have built reputation through enough installs. This card sets
+     the right expectation BEFORE the user clicks Download, so the
+     warning lands as "expected step" instead of "this might be
+     malware". -->
+<section class="smartscreen-notice" aria-labelledby="ss-title">
+  <div class="ss-card">
+    <div class="ss-icon" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="9"/>
+        <path d="M12 8v4M12 16h.01"/>
+      </svg>
+    </div>
+    <div class="ss-body">
+      <h3 id="ss-title">First-install note · Windows security prompt</h3>
+      <p>
+        The first time you run the installer, Windows may show a
+        <strong>"Windows protected your PC"</strong> screen. This is a
+        normal SmartScreen check for any new app that hasn't yet built
+        a reputation with Microsoft — it does <em>not</em> mean
+        PerfectPrompt is unsafe.
+      </p>
+      <ol class="ss-steps">
+        <li>Click <strong>More info</strong> on the warning dialog.</li>
+        <li>Click <strong>Run anyway</strong> that appears below.</li>
+      </ol>
+      <p class="ss-footer-line">
+        From that install onward, future updates install silently in the background — no prompts.
+      </p>
+    </div>
+  </div>
+</section>
 
 <!-- ===================== 6. FOOTER ===================== -->
 <footer>
