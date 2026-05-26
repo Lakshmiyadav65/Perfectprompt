@@ -478,6 +478,16 @@ body { overflow: hidden; }
   font-size: 14px;
   font-weight: 500;
   letter-spacing: -0.01em;
+  overflow: hidden;
+}
+.pf-profile-avatar-image {
+  background: transparent;
+}
+.pf-profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .pf-profile-text {

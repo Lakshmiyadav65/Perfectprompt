@@ -8,6 +8,7 @@ import { UpdateBanner } from "./UpdateBanner";
 import { useEnhancementUsage } from "../hooks/useEnhancementUsage";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
+import { useAvatar } from "../hooks/useAvatar";
 import { useUpdateCheck } from "../hooks/useUpdateCheck";
 import { supabase } from "../lib/supabase";
 import pkg from "../../package.json";
@@ -155,7 +156,7 @@ async function requestSubscriptionUrl(): Promise<string> {
 }
 
 type Route = "home" | "projects" | "settings";
-export type FocusTarget = "api-key" | null;
+export type FocusTarget = "api-key" | "profile" | null;
 
 interface ApiKeyStatus {
   from_env: boolean;
@@ -271,6 +272,7 @@ export function Shell({ initial }: { initial: Route }) {
     : 0;
   const auth = useAuth();
   const displayName = useDisplayName(auth.user);
+  const avatar = useAvatar();
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileChipRef = useRef<HTMLButtonElement>(null);
   const profileMenuRef = useRef<HTMLDivElement>(null);
@@ -624,6 +626,17 @@ export function Shell({ initial }: { initial: Route }) {
                   className="pf-profile-menu-item"
                   onClick={() => {
                     setProfileMenuOpen(false);
+                    navigate("settings", "profile");
+                  }}
+                >
+                  Profile
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="pf-profile-menu-item"
+                  onClick={() => {
+                    setProfileMenuOpen(false);
                     setRoute("settings");
                   }}
                 >
@@ -649,8 +662,17 @@ export function Shell({ initial }: { initial: Route }) {
               aria-expanded={profileMenuOpen}
               aria-label={`${displayName.name} — account menu`}
             >
-              <span className="pf-profile-avatar" aria-hidden="true">
-                {displayName.name.charAt(0).toUpperCase()}
+              <span
+                className={`pf-profile-avatar ${
+                  avatar.dataUrl ? "pf-profile-avatar-image" : ""
+                }`}
+                aria-hidden="true"
+              >
+                {avatar.dataUrl ? (
+                  <img src={avatar.dataUrl} alt="" />
+                ) : (
+                  displayName.name.charAt(0).toUpperCase()
+                )}
               </span>
               <span className="pf-profile-text">
                 <span className="pf-profile-name-row">

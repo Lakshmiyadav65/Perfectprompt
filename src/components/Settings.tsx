@@ -4,6 +4,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
+import { useAuth } from "../hooks/useAuth";
+import { useDisplayName } from "../hooks/useDisplayName";
+import { useAvatar, fileToResizedDataUrl } from "../hooks/useAvatar";
 import type { FocusTarget } from "./Shell";
 import "./Settings.css";
 
@@ -50,6 +53,28 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const apiKeyInputRef = useRef<HTMLInputElement>(null);
   const [apiKeyHighlighted, setApiKeyHighlighted] = useState(false);
 
+  // --- Profile section state ---
+  const auth = useAuth();
+  const displayName = useDisplayName(auth.user);
+  const avatar = useAvatar();
+  // Local-only draft for the name input so users can type freely
+  // without the chip flickering on every keystroke. We commit to the
+  // override only on Save.
+  const [nameDraft, setNameDraft] = useState<string>(displayName.override);
+  const [profileMsg, setProfileMsg] = useState<Msg>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const profileSectionRef = useRef<HTMLElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const avatarFileInputRef = useRef<HTMLInputElement>(null);
+  const [profileHighlighted, setProfileHighlighted] = useState(false);
+
+  // Sync draft when the override changes from elsewhere (another
+  // window, or after a save) — but only if the user isn't actively
+  // editing, to avoid stomping mid-keystroke.
+  useEffect(() => {
+    setNameDraft(displayName.override);
+  }, [displayName.override]);
+
   useEffect(() => {
     refresh();
   }, []);
@@ -76,6 +101,22 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     return () => window.cancelAnimationFrame(id);
   }, [focusTarget, onFocusHandled]);
 
+  // Same scroll/focus/highlight dance for the Profile dropdown entry.
+  useEffect(() => {
+    if (focusTarget !== "profile") return;
+    const id = window.requestAnimationFrame(() => {
+      profileSectionRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      nameInputRef.current?.focus();
+      setProfileHighlighted(true);
+      window.setTimeout(() => setProfileHighlighted(false), 1600);
+      onFocusHandled?.();
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [focusTarget, onFocusHandled]);
+
   async function refresh() {
     try {
       const status = await invoke<ApiKeyStatus>("api_key_status");
@@ -91,6 +132,55 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   // moved into ApiKeySetupChecklist so the checklist is the single
   // source of truth for API-key state. Settings.tsx now just hosts
   // the checklist plus the unrelated sections (hotkey, updates).
+
+  function saveProfileName() {
+    const trimmed = nameDraft.trim();
+    // Empty input = clear the override (fall back to Google name).
+    displayName.setOverride(trimmed);
+    setProfileMsg({
+      ok: true,
+      text: trimmed
+        ? `Saved. You'll show up as "${trimmed}".`
+        : `Cleared. Showing your account name instead.`,
+    });
+    window.setTimeout(() => setProfileMsg(null), 2400);
+  }
+
+  async function onAvatarFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Reset the input so picking the same file twice still fires onChange.
+    if (e.target) e.target.value = "";
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setProfileMsg({ ok: false, text: "That doesn't look like an image file." });
+      return;
+    }
+    // ~8MB pre-resize ceiling so we don't try to decode something
+    // absurd. Post-resize the stored payload is ~25-40KB regardless.
+    if (file.size > 8 * 1024 * 1024) {
+      setProfileMsg({ ok: false, text: "Image is too large. Try one under 8MB." });
+      return;
+    }
+    setAvatarBusy(true);
+    setProfileMsg(null);
+    try {
+      const dataUrl = await fileToResizedDataUrl(file);
+      avatar.setAvatar(dataUrl);
+      setProfileMsg({ ok: true, text: "Profile photo updated." });
+      window.setTimeout(() => setProfileMsg(null), 2400);
+    } catch (err) {
+      console.error("avatar upload failed:", err);
+      setProfileMsg({ ok: false, text: "Couldn't process that image." });
+    } finally {
+      setAvatarBusy(false);
+    }
+  }
+
+  function clearAvatar() {
+    avatar.clearAvatar();
+    setProfileMsg({ ok: true, text: "Profile photo removed." });
+    window.setTimeout(() => setProfileMsg(null), 2400);
+  }
 
   async function checkForUpdates() {
     setUpdateState({ kind: "checking" });
@@ -169,7 +259,93 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         highlightClass={apiKeyHighlighted ? "pf-section-highlight" : ""}
       />
 
+      <section
+        ref={profileSectionRef}
+        className={profileHighlighted ? "pf-section-highlight" : ""}
+      >
+        <h2>Profile</h2>
+        <p className="pf-hint">
+          How you appear in the sidebar. Stored on this device only — your
+          account email and sign-in identity don't change.
+        </p>
 
+        <div className="pf-profile-edit">
+          <div className="pf-profile-edit-avatar">
+            <div className="pf-profile-edit-preview" aria-hidden="true">
+              {avatar.dataUrl ? (
+                <img src={avatar.dataUrl} alt="" />
+              ) : (
+                <span className="pf-profile-edit-initial">
+                  {displayName.name.charAt(0).toUpperCase() || "?"}
+                </span>
+              )}
+            </div>
+            <div className="pf-profile-edit-avatar-actions">
+              <input
+                ref={avatarFileInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={onAvatarFile}
+                style={{ display: "none" }}
+              />
+              <button
+                type="button"
+                onClick={() => avatarFileInputRef.current?.click()}
+                disabled={avatarBusy}
+              >
+                {avatarBusy
+                  ? "Processing…"
+                  : avatar.dataUrl
+                  ? "Change photo"
+                  : "Upload photo"}
+              </button>
+              {avatar.dataUrl && (
+                <button
+                  type="button"
+                  className="pf-profile-edit-remove"
+                  onClick={clearAvatar}
+                  disabled={avatarBusy}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="pf-profile-edit-name">
+            <label htmlFor="pf-profile-name-input">Display name</label>
+            <div className="pf-row">
+              <input
+                id="pf-profile-name-input"
+                ref={nameInputRef}
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                placeholder={displayName.defaultName}
+                maxLength={48}
+              />
+              <button
+                onClick={saveProfileName}
+                disabled={nameDraft.trim() === displayName.override}
+              >
+                Save
+              </button>
+            </div>
+            <p className="pf-hint pf-profile-default-hint">
+              Leave empty to use your account name
+              {displayName.defaultName !== "You" && (
+                <> — currently <strong>{displayName.defaultName}</strong></>
+              )}
+              .
+            </p>
+          </div>
+        </div>
+
+        {profileMsg && (
+          <p className={profileMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
+            {profileMsg.text}
+          </p>
+        )}
+      </section>
 
       <section>
         <h2>Global Hotkey</h2>
