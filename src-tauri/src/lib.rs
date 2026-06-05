@@ -18,9 +18,11 @@ mod hosted;
 mod hotkey;
 pub mod intake;
 pub mod pipeline;
-mod project_scan;
+pub mod project_scan;
+pub mod project_summary;
 pub mod projects;
 mod question_bank;
+pub mod repo_digest;
 pub mod router;
 mod settings;
 mod status_window;
@@ -156,6 +158,11 @@ pub fn run() {
             projects::refresh_project_context,
             projects::get_cached_context_timestamp,
             projects::read_file_content,
+            projects::digest_local_project,
+            projects::digest_github_project,
+            projects::clear_project_digest,
+            projects::update_project_summary,
+            projects::regenerate_project_summary,
             clarify::fetch_question_card_session,
             clarify::submit_question_card_answers,
             clarify::open_question_card,

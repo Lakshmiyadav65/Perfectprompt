@@ -25,7 +25,24 @@ const GROQ_URL         = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL       = "llama-3.3-70b-versatile";
 const MAX_INPUT_CHARS  = 8000;
 const LLM_TIMEOUT_MS   = 30_000;
-const ROUTES: readonly Route[] = ["code", "writing", "generic", "polish"];
+// Project Knowledge revamp (Layer 4) — accept a client-built <context>
+// block so signed-in (hosted) users get the same project-aware enhance
+// experience as BYOK users. The cap is set above DIGEST_MAX_BYTES
+// (120 KB on the client) to leave room for the short-facts block and
+// any future expansion. Rejects oversized payloads with HTTP 413.
+const MAX_CONTEXT_BLOCK_CHARS = 150_000;
+const ROUTES: readonly Route[] = [
+  "code",
+  "writing",
+  "generic",
+  "polish",
+  // Project Knowledge rethink — the hosted path for the one-shot
+  // PROJECT.md generator. The Tauri client fires this once when
+  // a digest is built (or refreshed), then injects the resulting
+  // 2 KB markdown on every subsequent enhance instead of the
+  // full digest.
+  "project_summary",
+];
 
 // Shape returned by public.consume_daily_quota(uuid). Adds
 // subscription_active so the client can render "Pro · renews in N days"
@@ -71,7 +88,13 @@ Deno.serve(async (req) => {
   const userId = userData.user.id;
 
   // ---- Body validation ----
-  let body: { input_text?: string; route?: string };
+  // Project Knowledge revamp (Layer 4): `context_block` is the client-
+  // built <context>...</context> wrapper (including the repository
+  // digest when present). The server treats it as OPAQUE — no parsing,
+  // no validation of the inner XML. We just prepend it to the user
+  // message before the <input> tag. The client owns budget enforcement
+  // via DIGEST_MAX_BYTES; we only enforce a generous safety cap.
+  let body: { input_text?: string; route?: string; context_block?: string };
   try {
     body = await req.json();
   } catch {
@@ -84,6 +107,15 @@ Deno.serve(async (req) => {
   }
   if (input.length > MAX_INPUT_CHARS) {
     return jsonError(413, "too_long", `Input exceeds ${MAX_INPUT_CHARS} chars`);
+  }
+
+  const contextBlock = (body.context_block ?? "").trim();
+  if (contextBlock.length > MAX_CONTEXT_BLOCK_CHARS) {
+    return jsonError(
+      413,
+      "context_too_large",
+      `Context block exceeds ${MAX_CONTEXT_BLOCK_CHARS} chars`,
+    );
   }
 
   const route = (body.route ?? "generic").toLowerCase() as Route;
@@ -144,7 +176,17 @@ Deno.serve(async (req) => {
         max_tokens:  2048,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user",   content: `<input>${input}</input>` },
+          {
+            role: "user",
+            // Layer 4: prepend the client-built context block when
+            // present. The block already includes its own
+            // <context>...</context> wrapper and the
+            // <repository_digest>...</repository_digest> payload, so
+            // we splice it verbatim before <input>.
+            content: contextBlock
+              ? `${contextBlock}\n\n<input>${input}</input>`
+              : `<input>${input}</input>`,
+          },
         ],
       }),
     });

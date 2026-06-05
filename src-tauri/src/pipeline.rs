@@ -29,6 +29,7 @@ use crate::github_analyze::{self, CachedRepo};
 use crate::hosted::{self, HostedError};
 use crate::intake::{self, IntakeResult};
 use crate::project_scan::{self, ProjectSummary};
+use crate::project_summary;
 use crate::projects::{self, Project};
 use crate::router::{self, RoutingDecision};
 use crate::trace::{self, TraceRecord};
@@ -140,7 +141,7 @@ pub async fn run<R: Runtime>(
     // `DECLINE_THRESHOLD` here; Step 8 promotes it to 85 inside the
     // router when context is present.
     let active_project = projects::active_project_for(app);
-    let context_block = build_context_block(app, active_project.as_ref());
+    let context_block = build_context_block(app, active_project.as_ref(), "enhance");
     let context_present = context_block
         .as_deref()
         .map(|s| !s.trim().is_empty())
@@ -199,7 +200,9 @@ pub async fn run<R: Runtime>(
         // Hosted path. Skips context_block in v1 — see hosted.rs
         // module docs for why. The frontend still sees the right
         // quota count via emitted event.
-        let hosted_result = hosted::call(&supabase_url, &jwt, &normalized, route_str).await;
+        let hosted_result =
+            hosted::call(&supabase_url, &jwt, &normalized, route_str, context_block.as_deref())
+                .await;
         tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
         match hosted_result {
             Ok(success) => {
@@ -423,7 +426,7 @@ pub async fn run_polish<R: Runtime>(
     // that voice rules dominate — context only provides vocabulary,
     // never a licence to rewrite into a different register.
     let active_project = projects::active_project_for(app);
-    let context_block = build_context_block(app, active_project.as_ref());
+    let context_block = build_context_block(app, active_project.as_ref(), "polish");
     let context_present = context_block
         .as_deref()
         .map(|s| !s.trim().is_empty())
@@ -464,7 +467,14 @@ pub async fn run_polish<R: Runtime>(
         // (the prompt treats it as guidance, and Stage 4 catches any
         // drift).
         let hosted_input = format!("{voice_block}\n\n{normalized}");
-        let hosted_result = hosted::call(&supabase_url, &jwt, &hosted_input, "polish").await;
+        let hosted_result = hosted::call(
+            &supabase_url,
+            &jwt,
+            &hosted_input,
+            "polish",
+            context_block.as_deref(),
+        )
+        .await;
         tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
         match hosted_result {
             Ok(success) => {
@@ -746,7 +756,30 @@ const MIN_TRUNCATED_SECTION: usize = 30;
 pub(crate) fn build_context_block<R: Runtime>(
     app: &AppHandle<R>,
     project: Option<&Project>,
+    route_hint: &str,
 ) -> Option<String> {
+    // Observability — context probe. Fires on EVERY call. summary_present
+    // is the new authoritative signal; fallback flips true ONLY when we
+    // had to fall back to the legacy full-digest injection (an existing-
+    // user upgrade where the digest exists but PROJECT.md wasn't
+    // generated yet).
+    let summary_present = project
+        .and_then(|p| p.project_summary.as_ref())
+        .is_some();
+    let digest_present = project.and_then(|p| p.digest.as_ref()).is_some();
+    let fallback = project
+        .map(|p| p.project_summary.is_none() && p.digest.is_some())
+        .unwrap_or(false);
+    eprintln!(
+        "[context-probe] route={} active_project={:?} summary_present={} \
+         file_index_present={} fallback={} call_path={}",
+        route_hint,
+        project.map(|p| p.name.as_str()),
+        summary_present,
+        digest_present,
+        fallback,
+        if cfg!(test) { "test" } else { "runtime" },
+    );
     let project = project?;
 
     let scan = project
@@ -759,7 +792,126 @@ pub(crate) fn build_context_block<R: Runtime>(
         .ok()
         .and_then(|dir| github_analyze::cached_repo(&dir, &project.id));
 
-    assemble_context_block(Some(project), scan.as_ref(), cached.as_ref())
+    let base = assemble_context_block(Some(project), scan.as_ref(), cached.as_ref());
+
+    // Project Knowledge rethink: the per-call context block now contains
+    // the curated PROJECT.md plus the digest's <directory_structure> as a
+    // file_index. The full digest_text (file contents) is NOT injected
+    // per-call — it would exceed the LLM's reliable reading-comprehension
+    // window. FALLBACK rules (for projects.json files predating
+    // project_summary):
+    //   - digest + summary present: inject summary + file_index (intended).
+    //   - digest present, summary absent (upgrade): inject a COMPACT
+    //     digest so this single call still has something to work with.
+    //   - digest absent: project_scan facts only.
+    let summary = project.project_summary.as_ref();
+    let digest = project.digest.as_ref();
+    let file_index = digest.and_then(|d| extract_directory_structure(&d.digest_text));
+
+    match (base, summary, digest) {
+        // Intended path: short facts + summary + file_index.
+        (Some(text), Some(sum), _) => Some(splice_summary_and_index(
+            &text,
+            &sum.markdown,
+            file_index.as_deref(),
+        )),
+        // Fallback: summary missing but digest exists. Inject a COMPACT
+        // view (api_surface + dir_structure + manifest + README, ~10 KB)
+        // rather than the full text (often 100-160 KB), which would
+        // exceed Groq free-tier 30k TPM in a single call.
+        (Some(text), None, Some(d)) => Some(splice_digest(
+            &text,
+            &project_summary::build_compact_digest_for_generator(&d.digest_text),
+        )),
+        // Short facts only — no digest, no summary.
+        (Some(text), None, None) => Some(text),
+        // No project_scan facts (rare) but a summary exists.
+        (None, Some(sum), _) => Some(format!(
+            "{CONTEXT_OPEN}Project: {}\n\n{}{CONTEXT_CLOSE}",
+            project.name,
+            assemble_summary_and_index(&sum.markdown, file_index.as_deref()),
+        )),
+        // No facts, no summary, but a digest exists — same compact
+        // injection rationale as the fallback above.
+        (None, None, Some(d)) => Some(format!(
+            "{CONTEXT_OPEN}Project: {}\n\n{}{CONTEXT_CLOSE}",
+            project.name,
+            project_summary::build_compact_digest_for_generator(&d.digest_text)
+        )),
+        (None, None, None) => None,
+    }
+}
+
+/// Pull the `<directory_structure>...</directory_structure>` slice out
+/// of a digest's full text. Returns `None` when the markers aren't
+/// present. The returned string includes the opening AND closing tags.
+pub(crate) fn extract_directory_structure(digest_text: &str) -> Option<String> {
+    let start = digest_text.find("<directory_structure>")?;
+    let end = digest_text.find("</directory_structure>")?;
+    if end < start {
+        return None;
+    }
+    let end_with_tag = end + "</directory_structure>".len();
+    Some(digest_text[start..end_with_tag].to_string())
+}
+
+/// Build the `<project_summary>` + `<file_index>` body block (without
+/// the outer `<context>` wrapper). Used in both the existing-short-facts
+/// and no-short-facts code paths.
+fn assemble_summary_and_index(markdown: &str, file_index: Option<&str>) -> String {
+    let mut out = String::with_capacity(markdown.len() + 512);
+    out.push_str("<project_summary>\n");
+    out.push_str(markdown);
+    if !markdown.ends_with('\n') {
+        out.push('\n');
+    }
+    out.push_str("</project_summary>");
+    if let Some(idx) = file_index.filter(|s| !s.trim().is_empty()) {
+        out.push_str("\n\n<file_index>\n");
+        out.push_str(idx);
+        out.push_str("\n</file_index>");
+    }
+    out
+}
+
+/// Splice the curated summary + file_index into an already-assembled
+/// `<context>...</context>` short-facts block. The summary goes after
+/// the existing facts and before the closing tag.
+fn splice_summary_and_index(
+    context_text: &str,
+    markdown: &str,
+    file_index: Option<&str>,
+) -> String {
+    let inserted = assemble_summary_and_index(markdown, file_index);
+    if let Some(idx) = context_text.rfind(CONTEXT_CLOSE) {
+        let mut out = String::with_capacity(context_text.len() + inserted.len() + 4);
+        out.push_str(&context_text[..idx]);
+        out.push_str("\n\n");
+        out.push_str(&inserted);
+        out.push_str(&context_text[idx..]);
+        out
+    } else {
+        // Defensive — shouldn't hit unless assemble_context_block emitted
+        // something malformed.
+        format!("{context_text}\n\n{inserted}")
+    }
+}
+
+/// Splice the FULL legacy digest into an already-assembled
+/// `<context>...</context>` string. Used only by the upgrade-fallback
+/// path (project has a digest but no PROJECT.md yet).
+fn splice_digest(context_text: &str, digest_text: &str) -> String {
+    if let Some(idx) = context_text.rfind(CONTEXT_CLOSE) {
+        let mut out =
+            String::with_capacity(context_text.len() + digest_text.len() + 4);
+        out.push_str(&context_text[..idx]);
+        out.push_str("\n\n");
+        out.push_str(digest_text);
+        out.push_str(&context_text[idx..]);
+        out
+    } else {
+        context_text.to_string()
+    }
 }
 
 /// Pure context-bundle assembler. All sources are explicit arguments,
@@ -1280,6 +1432,8 @@ mod tests {
             description: desc.to_string(),
             links: vec![],
             path: None,
+            digest: None,
+            project_summary: None,
             created_at: "0s".into(),
             updated_at: "0s".into(),
         }

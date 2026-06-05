@@ -150,7 +150,8 @@
       "../prompts/writing-enhancer.md": "prompts/writing-enhancer.md",
       "../prompts/generic-enhancer.md": "prompts/generic-enhancer.md",
       "../prompts/questions-system-prompt.md": "prompts/questions-system-prompt.md",
-      "../prompts/polish-enhancer.md": "prompts/polish-enhancer.md"
+      "../prompts/polish-enhancer.md": "prompts/polish-enhancer.md",
+      "../prompts/project-summary-generator.md": "prompts/project-summary-generator.md"
     },
     "icon": [
       "icons/32x32.png",

@@ -3,12 +3,43 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import "./ProjectManager.css";
 
+/// Project Knowledge digest — mirrors the Rust `RepoDigest` struct.
+/// The `source` discriminator is `tag = "kind"` on the Rust side, so
+/// the TS shape uses the same `{ kind, value }` envelope.
+interface RepoDigest {
+  digest_text: string;
+  token_count_estimate: number;
+  file_count: number;
+  elided_count: number;
+  source:
+    | { kind: "local"; value: { path: string } }
+    | {
+        kind: "github";
+        value: { owner: string; repo: string; branch: string; html_url: string };
+      };
+  fetched_at: string;
+  sha256: string;
+}
+
+/// Project Knowledge rethink — the curated PROJECT.md attached to a
+/// project. Generated once at digest-build time, editable by the
+/// user. The shape mirrors the Rust `ProjectSummary` struct in
+/// `src-tauri/src/project_summary.rs` exactly.
+interface ProjectSummary {
+  markdown: string;
+  generated_at: string;
+  user_edited: boolean;
+  generator_model: string;
+}
+
 interface Project {
   id: string;
   name: string;
   description: string;
   links: string[];
   path: string | null;
+  digest?: RepoDigest | null;
+  project_summary?: ProjectSummary | null;
   created_at: string;
   updated_at: string;
 }
@@ -38,6 +69,24 @@ export function ProjectManager() {
   /// exists. Phase 2 Step 9.
   const [lastFetched, setLastFetched] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  // Project Knowledge — repository digest state. Lives on the project
+  // object itself once saved, but we mirror it locally during the edit
+  // session so the panel re-renders the moment a digest is added /
+  // refreshed / cleared without waiting for the next refresh().
+  const [digestState, setDigestState] = useState<RepoDigest | null>(null);
+  const [digestBusy, setDigestBusy] = useState(false);
+  const [digestError, setDigestError] = useState<string | null>(null);
+  // Layer 1 observability — when set, render the DigestViewerModal over
+  // the edit form. Holds the SAME object reference as digestState so any
+  // refresh that mutates digestState also updates the modal's view.
+  const [digestViewerOpen, setDigestViewerOpen] = useState(false);
+  // Project Knowledge rethink — curated PROJECT.md state. Mirrors the
+  // backend ProjectSummary so the panel re-renders the moment Add /
+  // Refresh / Regenerate / Save completes.
+  const [summaryState, setSummaryState] = useState<ProjectSummary | null>(null);
+  const [summaryEditorOpen, setSummaryEditorOpen] = useState(false);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   useEffect(() => {
     refresh();
@@ -62,7 +111,85 @@ export function ProjectManager() {
     setUploadedFiles([]);
     setLastFetched(null);
     setMsg(null);
+    setDigestState(null);
+    setDigestError(null);
+    setDigestBusy(false);
+    setSummaryState(null);
+    setSummaryError(null);
+    setSummaryBusy(false);
+    setSummaryEditorOpen(false);
     setFormMode({ type: "add" });
+  }
+
+  // ── Project Knowledge rethink — PROJECT.md handlers ─────────────
+  //
+  // The backend produces a six-section PROJECT.md once when a digest
+  // is built (or when the user clicks Regenerate). The frontend
+  // surfaces three actions:
+  //   - View / Edit summary: opens the modal editor (read + edit)
+  //   - Regenerate: re-runs the LLM generator against the current
+  //                 digest, warns first if user_edited is true
+  //   - Save (inside the modal): persists user edits
+
+  async function handleRegenerateSummary() {
+    if (formMode.type !== "edit") return;
+    if (summaryState?.user_edited) {
+      const ok = confirm(
+        "This summary has been edited by you. Regenerating will overwrite your edits. Continue?",
+      );
+      if (!ok) return;
+    }
+    setSummaryError(null);
+    setSummaryBusy(true);
+    try {
+      const next = await invoke<ProjectSummary>("regenerate_project_summary", {
+        projectId: formMode.project.id,
+      });
+      setSummaryState(next);
+      await refresh();
+    } catch (e) {
+      console.error("[project-summary] regenerate failed:", e);
+      setSummaryError(String(e));
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
+
+  async function handleSaveSummary(markdown: string) {
+    if (formMode.type !== "edit") return;
+    setSummaryError(null);
+    setSummaryBusy(true);
+    try {
+      await invoke("update_project_summary", {
+        projectId: formMode.project.id,
+        markdown,
+      });
+      const updated: ProjectSummary = {
+        markdown,
+        generated_at: new Date().toISOString(),
+        user_edited: true,
+        generator_model: "user-edit",
+      };
+      setSummaryState(updated);
+      setSummaryEditorOpen(false);
+      await refresh();
+    } catch (e) {
+      console.error("[project-summary] save failed:", e);
+      setSummaryError(String(e));
+    } finally {
+      setSummaryBusy(false);
+    }
+  }
+
+  function formatSummaryFetchedAt(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
   }
 
   function openEditForm(project: Project) {
@@ -80,6 +207,18 @@ export function ProjectManager() {
     setUploadedFiles([]);
     setLastFetched(null);
     setMsg(null);
+    // Mirror the saved digest into local state so the Project Context
+    // panel renders immediately on open.
+    setDigestState(project.digest ?? null);
+    setDigestError(null);
+    setDigestBusy(false);
+    // Same for the curated PROJECT.md — local state lets the editor
+    // surface manual edits without waiting for refresh() to round-trip
+    // through projects.json.
+    setSummaryState(project.project_summary ?? null);
+    setSummaryError(null);
+    setSummaryBusy(false);
+    setSummaryEditorOpen(false);
     setFormMode({ type: "edit", project });
     // Load the cached GitHub fetch timestamp (if any) for this project
     // so the "Last fetched:" line renders without a refresh round-trip.
@@ -162,6 +301,169 @@ export function ProjectManager() {
     } catch (e) {
       console.error("Directory picker failed:", e);
     }
+  }
+
+  // ── Project Knowledge: digest handlers ──────────────────────────
+  //
+  // All four mutate the saved Project on disk via the matching Tauri
+  // command, then mirror the result into local state so the panel
+  // re-renders immediately. `refresh()` after each so the project
+  // list / active-banner pick up the new updated_at.
+
+  async function handleAddLocalDigest() {
+    if (formMode.type !== "edit") return;
+    setDigestError(null);
+    let folderPath: string | string[] | null;
+    try {
+      folderPath = await open({
+        directory: true,
+        multiple: false,
+        title: "Pick the project folder to digest",
+      });
+    } catch (e) {
+      console.error("Folder picker failed:", e);
+      setDigestError(`Folder picker failed: ${e}`);
+      return;
+    }
+    if (!folderPath || typeof folderPath !== "string") return;
+
+    setDigestBusy(true);
+    try {
+      const digest = await invoke<RepoDigest>("digest_local_project", {
+        projectId: formMode.project.id,
+        folderPath,
+      });
+      setDigestState(digest);
+      await refresh();
+      // The backend also generates a PROJECT.md after the digest
+      // finishes (best-effort — failures are logged, not thrown).
+      // Pull whatever it produced from the freshly-refreshed store
+      // so the summary status row updates immediately.
+      await syncSummaryFromStore(formMode.project.id);
+    } catch (e) {
+      setDigestError(String(e));
+    } finally {
+      setDigestBusy(false);
+    }
+  }
+
+  /// Look up the named project in the freshly-fetched store and copy
+  /// its `project_summary` into local state. Idempotent — safe to call
+  /// after any backend mutation that might have touched the summary.
+  async function syncSummaryFromStore(projectId: string) {
+    try {
+      const data = await invoke<ProjectStore>("list_projects");
+      const p = data.projects.find((x) => x.id === projectId);
+      setSummaryState(p?.project_summary ?? null);
+    } catch (e) {
+      console.error("[project-summary] store sync failed:", e);
+    }
+  }
+
+  async function handleAddGithubDigest() {
+    if (formMode.type !== "edit") return;
+    const url = formRepoUrl.trim();
+    if (!url) {
+      setDigestError("Paste a GitHub URL in the Repo URL field first.");
+      return;
+    }
+    setDigestError(null);
+    setDigestBusy(true);
+    console.info(
+      "[digest-github] starting project_id=%s url=%s",
+      formMode.project.id,
+      url,
+    );
+    try {
+      const digest = await invoke<RepoDigest>("digest_github_project", {
+        projectId: formMode.project.id,
+        githubUrl: url,
+      });
+      console.info(
+        "[digest-github] done project_id=%s files=%d elided=%d tokens=%d",
+        formMode.project.id,
+        digest.file_count,
+        digest.elided_count,
+        digest.token_count_estimate,
+      );
+      setDigestState(digest);
+      await refresh();
+      // Project Knowledge rethink — the digest_github_project step=7
+      // generates PROJECT.md after the digest. Pull whatever landed.
+      await syncSummaryFromStore(formMode.project.id);
+    } catch (e) {
+      // Log AND surface — previous symptom (UI "did nothing") was an
+      // unhandled rejection being swallowed. The eprintln chain in
+      // projects.rs::digest_github_project tags the exact failing step;
+      // this log preserves the same message in the browser devtools so
+      // a Windows user without an attached terminal still sees it.
+      console.error("[digest-github] failed:", e);
+      setDigestError(String(e));
+    } finally {
+      setDigestBusy(false);
+    }
+  }
+
+  async function handleRefreshDigest() {
+    if (formMode.type !== "edit" || !digestState) return;
+    setDigestError(null);
+    setDigestBusy(true);
+    try {
+      const projectId = formMode.project.id;
+      const digest =
+        digestState.source.kind === "local"
+          ? await invoke<RepoDigest>("digest_local_project", {
+              projectId,
+              folderPath: digestState.source.value.path,
+            })
+          : await invoke<RepoDigest>("digest_github_project", {
+              projectId,
+              githubUrl: digestState.source.value.html_url,
+            });
+      setDigestState(digest);
+      await refresh();
+      await syncSummaryFromStore(projectId);
+    } catch (e) {
+      console.error("[digest-refresh] failed:", e);
+      setDigestError(String(e));
+    } finally {
+      setDigestBusy(false);
+    }
+  }
+
+  async function handleClearDigest() {
+    if (formMode.type !== "edit") return;
+    setDigestError(null);
+    setDigestBusy(true);
+    try {
+      await invoke("clear_project_digest", { projectId: formMode.project.id });
+      setDigestState(null);
+      await refresh();
+    } catch (e) {
+      setDigestError(String(e));
+    } finally {
+      setDigestBusy(false);
+    }
+  }
+
+  /// Format an ISO-8601 timestamp as a short relative-ish string for
+  /// the "Last refreshed" line. Falls back to the raw string if the
+  /// date doesn't parse.
+  function formatDigestFetchedAt(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso;
+    return d.toLocaleString(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }
+
+  function describeDigestSource(d: RepoDigest): string {
+    return d.source.kind === "local"
+      ? d.source.value.path
+      : `${d.source.value.owner}/${d.source.value.repo}@${d.source.value.branch}`;
   }
 
   function closeForm() {
@@ -363,6 +665,24 @@ export function ProjectManager() {
                   🔗 {p.links.length} link{p.links.length > 1 ? "s" : ""} attached
                 </div>
               )}
+              {/* Project Knowledge digest indicator — surfaces at-a-glance
+                  whether the project has a real source-of-truth digest
+                  attached vs just lightweight metadata. Clicking through
+                  to Edit reveals the actual Add / Refresh controls. */}
+              {p.digest ? (
+                <div className="pm-card-digest pm-card-digest-on">
+                  📚 {p.digest.file_count} files indexed
+                  {p.digest.elided_count > 0
+                    ? ` (${p.digest.elided_count} elided)`
+                    : ""}
+                  {" · "}~{p.digest.token_count_estimate.toLocaleString()} tokens
+                </div>
+              ) : (
+                <div className="pm-card-digest pm-card-digest-off">
+                  No project knowledge attached — open Edit → Project
+                  Knowledge to add a local folder or GitHub repo.
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -438,6 +758,160 @@ export function ProjectManager() {
                 >
                   {refreshing ? "Refreshing…" : "Refresh project context"}
                 </button>
+              </div>
+            )}
+
+            {/* ── Project Knowledge — repository digest panel ──
+                Edit mode only because the backend commands need a
+                stored project_id to attach the digest to. */}
+            {formMode.type === "edit" && (
+              <div className="pm-context-section">
+                <div className="pm-context-header">
+                  <span className="pm-context-title">Project Knowledge</span>
+                  <span className="pm-context-sub">
+                    Full README + manifests + key source files,
+                    injected into every enhance/polish call.
+                  </span>
+                </div>
+
+                {digestState ? (
+                  <div className="pm-context-status">
+                    <div className="pm-context-status-row">
+                      <span className="pm-context-status-key">Source</span>
+                      <span className="pm-context-source-label">
+                        {describeDigestSource(digestState)}
+                      </span>
+                    </div>
+                    <div className="pm-context-status-row">
+                      <span className="pm-context-status-key">Indexed</span>
+                      <span>
+                        {digestState.file_count} files
+                        {digestState.elided_count > 0
+                          ? ` (${digestState.elided_count} elided)`
+                          : ""}
+                      </span>
+                    </div>
+                    <div className="pm-context-status-row">
+                      <span className="pm-context-status-key">Size</span>
+                      <span>
+                        ~{digestState.token_count_estimate.toLocaleString()} tokens
+                      </span>
+                    </div>
+                    <div className="pm-context-status-row">
+                      <span className="pm-context-status-key">Last refreshed</span>
+                      <span>{formatDigestFetchedAt(digestState.fetched_at)}</span>
+                    </div>
+
+                    {/* Project Knowledge rethink — PROJECT.md status.
+                        Two states: still being generated (digest
+                        present, summary absent) vs ready (summary
+                        present). */}
+                    {summaryState ? (
+                      <div className="pm-summary-status">
+                        <div className="pm-context-status-row">
+                          <span className="pm-context-status-key">Summary</span>
+                          <span>
+                            {summaryState.user_edited ? "edited by you" : "auto-generated"}
+                            {" · "}
+                            {summaryState.markdown.length.toLocaleString()} chars
+                            {" · "}
+                            generated {formatSummaryFetchedAt(summaryState.generated_at)}
+                          </span>
+                        </div>
+                        <div className="pm-summary-actions">
+                          <button
+                            type="button"
+                            className="pm-link-add-btn"
+                            disabled={summaryBusy || digestBusy}
+                            onClick={() => setSummaryEditorOpen(true)}
+                          >
+                            View / Edit summary
+                          </button>
+                          <button
+                            type="button"
+                            className="pm-link-add-btn"
+                            disabled={summaryBusy || digestBusy}
+                            onClick={() => void handleRegenerateSummary()}
+                          >
+                            {summaryBusy ? "Regenerating…" : "Regenerate"}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="pm-summary-banner-warning">
+                        ⚠ Project summary is being generated — enhanced
+                        prompts use a fallback path until it's ready.
+                        If this persists, click Refresh to retry.
+                      </div>
+                    )}
+
+                    {summaryError && (
+                      <div className="pm-context-error" role="alert">
+                        {summaryError}
+                      </div>
+                    )}
+
+                    <div className="pm-context-actions">
+                      <button
+                        type="button"
+                        className="pm-link-add-btn"
+                        disabled={digestBusy}
+                        onClick={() => void handleRefreshDigest()}
+                      >
+                        {digestBusy ? "Working…" : "Refresh"}
+                      </button>
+                      <button
+                        type="button"
+                        className="pm-link-add-btn"
+                        disabled={digestBusy}
+                        onClick={() => setDigestViewerOpen(true)}
+                        title="See exactly what's being sent to the LLM"
+                      >
+                        View digest
+                      </button>
+                      <button
+                        type="button"
+                        className="pm-btn-cancel"
+                        disabled={digestBusy}
+                        onClick={() => void handleClearDigest()}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pm-context-empty">
+                    <div className="pm-context-actions">
+                      <button
+                        type="button"
+                        className="pm-link-add-btn"
+                        disabled={digestBusy}
+                        onClick={() => void handleAddLocalDigest()}
+                      >
+                        {digestBusy ? "Working…" : "Add local folder"}
+                      </button>
+                      <button
+                        type="button"
+                        className="pm-link-add-btn"
+                        disabled={digestBusy || !formRepoUrl.trim()}
+                        title={
+                          formRepoUrl.trim()
+                            ? "Download + digest the GitHub repo from the Repo URL field above"
+                            : "Paste a GitHub URL in the Repo URL field above first"
+                        }
+                        onClick={() => void handleAddGithubDigest()}
+                      >
+                        {digestBusy ? "Working…" : "Add GitHub repo"}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {digestError && (
+                  <div className="pm-context-error" role="alert">
+                    {digestError}
+                  </div>
+                )}
               </div>
             )}
 
@@ -552,6 +1026,368 @@ export function ProjectManager() {
           </div>
         </div>
       )}
+
+      {/* Project Knowledge revamp — Layer 1 observability surface.
+          Shows the user EXACTLY what's being sent to the LLM. If
+          lib/option.js (or whatever file they're debugging against)
+          isn't in this textarea, no amount of prompt tuning will help
+          — the digest itself is wrong, and the prioritization layer
+          needs further tuning. */}
+      {digestViewerOpen && digestState && (
+        <DigestViewerModal
+          digest={digestState}
+          onClose={() => setDigestViewerOpen(false)}
+        />
+      )}
+
+      {/* Project Knowledge rethink — PROJECT.md editor. Surfaces the
+          six-section structured editor over the form. Only mounted
+          when both the edit form is open AND a summary exists,
+          because there's nothing to edit otherwise. */}
+      {summaryEditorOpen && summaryState && formMode.type === "edit" && (
+        <ProjectSummaryEditor
+          projectName={formMode.project.name}
+          summary={summaryState}
+          busy={summaryBusy}
+          onSave={(md) => void handleSaveSummary(md)}
+          onRegenerate={() => void handleRegenerateSummary()}
+          onClose={() => setSummaryEditorOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// DigestViewerModal — Layer 1 observability
+// ─────────────────────────────────────────────────────────────────────
+
+interface DigestViewerModalProps {
+  digest: RepoDigest;
+  onClose: () => void;
+}
+
+function DigestViewerModal({ digest, onClose }: DigestViewerModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  // Esc-to-close. The edit form's overlay-click-to-close pattern is
+  // less appropriate here because the digest text in the textarea is
+  // selectable — an accidental click in the textarea margin shouldn't
+  // dismiss the modal.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(digest.digest_text);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch (e) {
+      console.error("[digest-viewer] clipboard write failed:", e);
+    }
+  }
+
+  const sourceLabel =
+    digest.source.kind === "local"
+      ? digest.source.value.path
+      : `${digest.source.value.owner}/${digest.source.value.repo}@${digest.source.value.branch}`;
+
+  const fetchedAt = (() => {
+    const d = new Date(digest.fetched_at);
+    return Number.isNaN(d.getTime()) ? digest.fetched_at : d.toLocaleString();
+  })();
+
+  return (
+    <div className="pm-digest-viewer-overlay" onClick={onClose}>
+      <div
+        className="pm-digest-viewer"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="View repository digest"
+      >
+        <header className="pm-digest-viewer-head">
+          <h3 className="pm-digest-viewer-title">Repository digest</h3>
+          <button
+            type="button"
+            className="pm-digest-viewer-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="pm-digest-viewer-meta">
+          <div className="pm-digest-viewer-meta-row">
+            <span className="pm-digest-viewer-meta-key">Source</span>
+            <span className="pm-context-source-label">{sourceLabel}</span>
+          </div>
+          <div className="pm-digest-viewer-meta-row">
+            <span className="pm-digest-viewer-meta-key">Fetched</span>
+            <span>{fetchedAt}</span>
+          </div>
+          <div className="pm-digest-viewer-meta-row">
+            <span className="pm-digest-viewer-meta-key">Files indexed</span>
+            <span>
+              {digest.file_count}
+              {digest.elided_count > 0
+                ? ` (${digest.elided_count} elided)`
+                : ""}
+            </span>
+          </div>
+          <div className="pm-digest-viewer-meta-row">
+            <span className="pm-digest-viewer-meta-key">Token estimate</span>
+            <span>~{digest.token_count_estimate.toLocaleString()}</span>
+          </div>
+          <div className="pm-digest-viewer-meta-row">
+            <span className="pm-digest-viewer-meta-key">Size on the wire</span>
+            <span>{digest.digest_text.length.toLocaleString()} bytes</span>
+          </div>
+        </div>
+
+        <div className="pm-digest-viewer-actions">
+          <button
+            type="button"
+            className="pm-link-add-btn"
+            onClick={() => void handleCopy()}
+          >
+            {copied ? "Copied" : "Copy to clipboard"}
+          </button>
+          <span className="pm-digest-viewer-hint">
+            This is the literal text that gets injected into the LLM's
+            context block on every enhance/polish call.
+          </span>
+        </div>
+
+        <textarea
+          className="pm-digest-viewer-text"
+          value={digest.digest_text}
+          readOnly
+          spellCheck={false}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// ProjectSummaryEditor — Project Knowledge rethink (Step 16)
+// ─────────────────────────────────────────────────────────────────────
+//
+// Structured editor for the six-section PROJECT.md. The schema is
+// fixed: the user can edit the body of each section but never the
+// section headers themselves. This guarantees the rejoined markdown
+// passes the backend's `validate_project_md` check.
+
+const SUMMARY_SECTIONS: readonly string[] = [
+  "## What this is",
+  "## Stack",
+  "## Architecture",
+  "## Existing capabilities",
+  "## Conventions",
+  "## Gotchas",
+] as const;
+
+const SUMMARY_MAX_BYTES = 4_000;
+const SUMMARY_WARN_BYTES = 3_500;
+
+interface ParsedSummary {
+  /// The `# Project Name` line (H1). We render it as a read-only
+  /// title; the user can't edit project name through this modal.
+  h1: string;
+  /// Body text per section header, in declared order. Missing
+  /// sections come back as empty strings; the schema validator
+  /// rejects empty rejoined output, so the UI never lets the user
+  /// save a summary with zero body content.
+  bodies: Record<string, string>;
+}
+
+/// Split the markdown into the H1 title plus a body-per-section
+/// map. Tolerates blank lines / extra whitespace between sections.
+function parseSummaryMarkdown(md: string): ParsedSummary {
+  const lines = md.split(/\r?\n/);
+  const bodies: Record<string, string> = {};
+  for (const header of SUMMARY_SECTIONS) bodies[header] = "";
+  let h1 = "";
+  let currentHeader: string | null = null;
+  let currentLines: string[] = [];
+
+  const flush = () => {
+    if (currentHeader) {
+      bodies[currentHeader] = currentLines.join("\n").trim();
+    }
+    currentLines = [];
+  };
+
+  for (const line of lines) {
+    if (line.startsWith("# ") && !h1) {
+      h1 = line.trim();
+      continue;
+    }
+    const matched = SUMMARY_SECTIONS.find((h) => line.trim() === h);
+    if (matched) {
+      flush();
+      currentHeader = matched;
+      continue;
+    }
+    if (currentHeader) {
+      currentLines.push(line);
+    }
+  }
+  flush();
+  return { h1, bodies };
+}
+
+/// Re-join an edited ParsedSummary back into a single markdown
+/// document. The output always emits headers in the canonical order,
+/// so even if the user-supplied input had a slightly different order
+/// the saved file is well-formed.
+function rejoinSummaryMarkdown(parsed: ParsedSummary): string {
+  const h1 = parsed.h1.trim().length > 0 ? parsed.h1 : "# Project";
+  const parts: string[] = [h1];
+  for (const header of SUMMARY_SECTIONS) {
+    const body = (parsed.bodies[header] ?? "").trim();
+    parts.push(`${header}\n${body}`);
+  }
+  return parts.join("\n\n");
+}
+
+interface ProjectSummaryEditorProps {
+  projectName: string;
+  summary: ProjectSummary;
+  busy: boolean;
+  onSave: (markdown: string) => void;
+  onRegenerate: () => void;
+  onClose: () => void;
+}
+
+function ProjectSummaryEditor({
+  projectName,
+  summary,
+  busy,
+  onSave,
+  onRegenerate,
+  onClose,
+}: ProjectSummaryEditorProps) {
+  const initial = parseSummaryMarkdown(summary.markdown);
+  // Each section has its own piece of state so a textarea change
+  // doesn't re-parse and reflow the other five. Headers stay fixed.
+  const [h1, setH1] = useState(initial.h1);
+  const [bodies, setBodies] = useState<Record<string, string>>(initial.bodies);
+
+  // Esc to close.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const rejoined = rejoinSummaryMarkdown({ h1, bodies });
+  const totalChars = rejoined.length;
+  const overBudget = totalChars > SUMMARY_MAX_BYTES;
+  const warn = totalChars > SUMMARY_WARN_BYTES && !overBudget;
+
+  function updateBody(header: string, next: string) {
+    setBodies((prev) => ({ ...prev, [header]: next }));
+  }
+
+  return (
+    <div className="pm-summary-editor-overlay" onClick={onClose}>
+      <div
+        className="pm-summary-editor"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit project summary"
+      >
+        <header className="pm-summary-editor-head">
+          <h3 className="pm-summary-editor-title">
+            {projectName} — Project Summary
+          </h3>
+          <button
+            type="button"
+            className="pm-digest-viewer-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </header>
+
+        <div className="pm-summary-editor-meta">
+          {summary.user_edited
+            ? "Edited by you. Saving overwrites the auto-generated version."
+            : `Auto-generated by ${summary.generator_model}. Edit any section below.`}
+        </div>
+
+        <input
+          className="pm-summary-h1"
+          value={h1}
+          onChange={(e) => setH1(e.target.value)}
+          placeholder="# Project Name"
+          disabled={busy}
+        />
+
+        {SUMMARY_SECTIONS.map((header) => (
+          <div key={header} className="pm-summary-section">
+            <div className="pm-summary-section-header">{header}</div>
+            <textarea
+              className="pm-summary-section-textarea"
+              value={bodies[header] ?? ""}
+              onChange={(e) => updateBody(header, e.target.value)}
+              disabled={busy}
+              spellCheck={false}
+              rows={header === "## What this is" || header === "## Stack" ? 3 : 6}
+            />
+          </div>
+        ))}
+
+        <div className="pm-summary-editor-footer">
+          <span
+            className={`pm-summary-char-count ${
+              overBudget ? "error" : warn ? "warn" : ""
+            }`}
+          >
+            {totalChars.toLocaleString()} / {SUMMARY_MAX_BYTES.toLocaleString()} chars
+            {overBudget && " — over hard limit, will be truncated server-side"}
+          </span>
+          <div className="pm-summary-editor-actions">
+            <button
+              type="button"
+              className="pm-btn-cancel"
+              onClick={onClose}
+              disabled={busy}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="pm-link-add-btn"
+              onClick={onRegenerate}
+              disabled={busy}
+              title="Re-run the LLM generator against the current digest"
+            >
+              Reset to auto-generated
+            </button>
+            <button
+              type="button"
+              className="pm-btn-save"
+              onClick={() => onSave(rejoined)}
+              disabled={busy || overBudget}
+            >
+              {busy ? "Saving…" : "Save"}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

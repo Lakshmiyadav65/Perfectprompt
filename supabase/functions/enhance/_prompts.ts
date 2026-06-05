@@ -5,11 +5,22 @@
 
 import promptData from "./_prompts.json" with { type: "json" };
 
-export type Route = "code" | "writing" | "generic" | "polish";
+export type Route =
+  | "code"
+  | "writing"
+  | "generic"
+  | "polish"
+  | "project_summary";
 
 export const SYSTEM_PROMPTS: Record<Route, string> = {
-  code:    promptData.code,
-  writing: promptData.writing,
-  generic: promptData.generic,
-  polish:  promptData.polish,
+  code:            promptData.code,
+  writing:         promptData.writing,
+  generic:         promptData.generic,
+  polish:          promptData.polish,
+  // New route for the Project Knowledge rethink — runs ONCE per
+  // project on Add/Refresh to generate the curated 2 KB PROJECT.md
+  // from the full digest. Per-call enhances no longer ship the
+  // full digest, so this is the only path the heavy-context-read
+  // logic lives on now.
+  project_summary: promptData.project_summary_generator,
 };

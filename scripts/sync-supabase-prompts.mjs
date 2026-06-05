@@ -13,10 +13,11 @@ import { fileURLToPath } from "node:url";
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const sources = {
-  code:    resolve(ROOT, "prompts/code-enhancer.md"),
-  writing: resolve(ROOT, "prompts/writing-enhancer.md"),
-  generic: resolve(ROOT, "prompts/generic-enhancer.md"),
-  polish:  resolve(ROOT, "prompts/polish-enhancer.md"),
+  code:                      resolve(ROOT, "prompts/code-enhancer.md"),
+  writing:                   resolve(ROOT, "prompts/writing-enhancer.md"),
+  generic:                   resolve(ROOT, "prompts/generic-enhancer.md"),
+  polish:                    resolve(ROOT, "prompts/polish-enhancer.md"),
+  project_summary_generator: resolve(ROOT, "prompts/project-summary-generator.md"),
 };
 
 const out = resolve(ROOT, "supabase/functions/enhance/_prompts.json");

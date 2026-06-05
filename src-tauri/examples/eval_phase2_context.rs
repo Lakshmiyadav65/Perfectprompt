@@ -120,6 +120,8 @@ fn fixture_foo() -> Project {
         description: "Tauri 2 + React 19 app".to_string(),
         links: vec!["https://github.com/example/foo".to_string()],
         path: None,
+        digest: None,
+        project_summary: None,
         created_at: "0s".to_string(),
         updated_at: "0s".to_string(),
     }

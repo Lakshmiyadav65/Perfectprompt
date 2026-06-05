@@ -120,6 +120,16 @@ pub struct HostedSuccess {
 struct HostedRequest<'a> {
     input_text: &'a str,
     route: &'a str,
+    /// Project Knowledge revamp (Layer 4): the client-built
+    /// `<context>...</context>` block including the
+    /// `<repository_digest>...</repository_digest>` payload when an
+    /// active project has a digest attached. The edge function
+    /// prepends this verbatim to the LLM user message before the
+    /// `<input>` tag. `None` when no project is active or when the
+    /// active project has no digest, so existing clients that don't
+    /// build a context block still serialise a minimal request body.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context_block: Option<&'a str>,
 }
 
 #[derive(Deserialize)]
@@ -140,13 +150,20 @@ struct HostedErrBody {
 
 /// POST to `{supabase_url}/functions/v1/enhance` with the user's JWT.
 ///
-/// `route` must be one of `"code"`, `"writing"`, `"generic"` — matches
-/// the edge function's `ROUTES` allow-list.
+/// `route` must be one of `"code"`, `"writing"`, `"generic"`, or
+/// `"polish"` — matches the edge function's `ROUTES` allow-list.
+///
+/// `context_block` is the client-built `<context>` wrapper (project
+/// facts + repository_digest). The edge function prepends it before
+/// the `<input>` tag in the LLM user message, so signed-in users get
+/// the same project-aware enhance experience as BYOK users. Pass
+/// `None` when no active project / no digest.
 pub async fn call(
     supabase_url: &str,
     user_jwt: &str,
     input_text: &str,
     route: &str,
+    context_block: Option<&str>,
 ) -> Result<HostedSuccess, HostedError> {
     let url = format!(
         "{}/functions/v1/enhance",
@@ -161,7 +178,11 @@ pub async fn call(
     let resp = client
         .post(&url)
         .bearer_auth(user_jwt)
-        .json(&HostedRequest { input_text, route })
+        .json(&HostedRequest {
+            input_text,
+            route,
+            context_block,
+        })
         .send()
         .await
         .map_err(|e| HostedError::Network(e.to_string()))?;

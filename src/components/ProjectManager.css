@@ -647,3 +647,405 @@
 .pm-refresh-timestamp {
   color: var(--pf-text-muted);
 }
+
+/* Card-level digest indicator. Surfaces digest presence in the
+   project list so the user sees at-a-glance which projects have rich
+   context vs which only have lightweight metadata. */
+.pm-card-digest {
+  margin-top: 6px;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+.pm-card-digest-on {
+  color: var(--pf-accent, #ff7a4d);
+}
+.pm-card-digest-off {
+  color: var(--pf-text-subtle);
+  font-style: italic;
+}
+
+/* ---------- Project Knowledge — repository digest panel ----------
+   Lives inside the edit modal between the project_scan refresh row
+   and the Project Name field. Visual weight matches .pm-refresh-row
+   so the two context sections read as siblings. */
+
+.pm-context-section {
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: var(--pf-radius-sm);
+  background: var(--pf-surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+}
+
+.pm-context-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.pm-context-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pf-text);
+}
+
+.pm-context-sub {
+  font-size: 11.5px;
+  color: var(--pf-text-subtle);
+  line-height: 1.45;
+}
+
+/* Empty state — two "Add ..." buttons side by side. */
+.pm-context-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Populated state — status rows + action buttons. */
+.pm-context-status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pm-context-status-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--pf-text-muted);
+}
+
+.pm-context-status-key {
+  display: inline-block;
+  min-width: 96px;
+  color: var(--pf-text-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Source label uses the mono font so paths / `owner/repo@branch`
+   strings stay readable even when they get long. */
+.pm-context-source-label {
+  font-family: var(--pf-font-mono);
+  font-size: 11.5px;
+  color: var(--pf-text);
+  word-break: break-all;
+}
+
+.pm-context-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.pm-context-error {
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: rgba(244, 67, 54, 0.08);
+  border: 1px solid rgba(244, 67, 54, 0.2);
+  color: var(--pf-danger, #f87171);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* ---------- DigestViewerModal — Layer 1 observability ----------
+   A separate modal layered on top of the edit form, exposing the
+   literal <repository_digest> text that gets sent to the LLM. Future
+   debug sessions look at THIS textarea instead of guessing whether
+   the digest reached the model. */
+.pm-digest-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(5, 5, 6, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.pm-digest-viewer {
+  width: min(900px, 100%);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--pf-surface, #1a1a18);
+  border: 1px solid var(--pf-border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7);
+  color: var(--pf-text);
+}
+
+.pm-digest-viewer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.pm-digest-viewer-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pm-digest-viewer-close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--pf-text-muted);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.pm-digest-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--pf-text);
+}
+
+.pm-digest-viewer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--pf-surface-2, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.pm-digest-viewer-meta-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--pf-text-muted);
+}
+
+.pm-digest-viewer-meta-key {
+  display: inline-block;
+  min-width: 110px;
+  color: var(--pf-text-subtle);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pm-digest-viewer-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.pm-digest-viewer-hint {
+  font-size: 11.5px;
+  color: var(--pf-text-subtle);
+  line-height: 1.45;
+}
+
+.pm-digest-viewer-text {
+  flex: 1;
+  min-height: 240px;
+  max-height: 400px;
+  width: 100%;
+  resize: vertical;
+  padding: 10px 12px;
+  background: var(--pf-bg, #0d0d0c);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  font-family: var(--pf-font-mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre;
+  overflow: auto;
+  outline: none;
+}
+
+.pm-digest-viewer-text:focus {
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+/* ---------- Project Knowledge rethink — summary status + editor ----
+   The summary status row lives inside the existing
+   .pm-context-section status card, between the digest stats and the
+   action buttons. The editor modal is a separate overlay (same
+   pattern as DigestViewerModal). */
+
+.pm-summary-status {
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pm-summary-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pm-summary-banner-warning {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: rgba(255, 200, 90, 0.08);
+  border: 1px solid rgba(255, 200, 90, 0.22);
+  color: #f4c069;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* ---- editor modal ---- */
+.pm-summary-editor-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(5, 5, 6, 0.78);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.pm-summary-editor {
+  width: min(880px, 100%);
+  max-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  background: var(--pf-surface, #1a1a18);
+  border: 1px solid var(--pf-border-strong, rgba(255, 255, 255, 0.1));
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 40px 80px -20px rgba(0, 0, 0, 0.7);
+  color: var(--pf-text);
+  overflow-y: auto;
+}
+
+.pm-summary-editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.pm-summary-editor-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.pm-summary-editor-meta {
+  font-size: 12px;
+  color: var(--pf-text-subtle);
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--pf-surface-2, rgba(255, 255, 255, 0.03));
+  border-radius: 6px;
+  line-height: 1.5;
+}
+
+.pm-summary-h1 {
+  width: 100%;
+  margin-bottom: 16px;
+  padding: 8px 10px;
+  background: var(--pf-bg, #0d0d0c);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 8px;
+  font-family: var(--pf-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  outline: none;
+}
+
+.pm-summary-h1:focus {
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 3px var(--pf-accent-ring);
+}
+
+.pm-summary-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.pm-summary-section-header {
+  font-family: var(--pf-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pf-accent, #ff7a4d);
+}
+
+.pm-summary-section-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--pf-bg, #0d0d0c);
+  color: var(--pf-text);
+  border: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: 6px;
+  font-family: var(--pf-font-mono);
+  font-size: 12px;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+}
+
+.pm-summary-section-textarea:focus {
+  border-color: var(--pf-accent);
+  box-shadow: 0 0 0 2px var(--pf-accent-ring);
+}
+
+.pm-summary-editor-footer {
+  position: sticky;
+  bottom: -22px;
+  margin: 14px -22px -22px;
+  padding: 12px 22px;
+  background: var(--pf-surface, #1a1a18);
+  border-top: 1px solid var(--pf-border-subtle, rgba(255, 255, 255, 0.06));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pm-summary-char-count {
+  font-size: 11.5px;
+  color: var(--pf-text-subtle);
+  font-family: var(--pf-font-mono);
+}
+
+.pm-summary-char-count.warn {
+  color: #f4c069;
+}
+
+.pm-summary-char-count.error {
+  color: var(--pf-danger, #f87171);
+}
+
+.pm-summary-editor-actions {
+  display: flex;
+  gap: 8px;
+}
