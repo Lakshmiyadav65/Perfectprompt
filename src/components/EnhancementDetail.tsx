@@ -178,6 +178,8 @@ function labelForRoute(route: string): string {
       return "Writing";
     case "generic":
       return "General";
+    case "polish":
+      return "Polish";
     default:
       return route;
   }

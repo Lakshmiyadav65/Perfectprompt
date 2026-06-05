@@ -33,6 +33,8 @@ use crate::projects::{self, Project};
 use crate::router::{self, RoutingDecision};
 use crate::trace::{self, TraceRecord};
 use crate::validate::{self, ValidationOutcome};
+use crate::voice_diff::{self, DriftVerdict};
+use crate::voice_fingerprint::{self, VoiceFingerprint};
 use crate::AppState;
 
 /// Input envelope into the pipeline. The hotkey/clarify callers
@@ -71,6 +73,13 @@ const GENERIC_MAX_TOKENS: u32 = 300;
 // diverge. Tighter sampling = more consistent rewrites. Code (0.3) and
 // Writing (0.6, where tone variance is legitimate) are unchanged.
 const GENERIC_TEMPERATURE: f32 = 0.3;
+
+// Polish route knobs. Tight max_tokens because polished output is
+// roughly the same length as the input; tight temperature because
+// polish is a grammar-and-clarity task, not a creative one.
+const POLISH_PROMPT: &str = "polish-enhancer.md";
+const POLISH_MAX_TOKENS: u32 = 300;
+const POLISH_TEMPERATURE: f32 = 0.2;
 
 pub async fn run<R: Runtime>(
     app: &AppHandle<R>,
@@ -315,7 +324,7 @@ pub async fn run<R: Runtime>(
     // `hosted:quota` event emitted by Stage D. BYOK users have no
     // quota counter at all.
     if !used_fallback
-        && matches!(tr.route.as_str(), "code" | "writing" | "generic")
+        && matches!(tr.route.as_str(), "code" | "writing" | "generic" | "polish")
     {
         enhancement_history::append(
             app,
@@ -333,6 +342,380 @@ pub async fn run<R: Runtime>(
         fallback_reason,
         trace: tr,
     })
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Polish pipeline — voice-preserving "clean up my message" path
+// ─────────────────────────────────────────────────────────────────────
+
+/// The polish pipeline. Mirrors [`run`] structurally but: (1) never
+/// routes through the domain router (polish is a user-chosen mode, not
+/// a classification), (2) fingerprints the input's voice and injects it
+/// as an LLM constraint, and (3) re-fingerprints the output and rejects
+/// if the model erased the user's voice (Stage 4). Triggered exclusively
+/// by the capsule's Polish icon via `hotkey::trigger_polish`.
+pub async fn run_polish<R: Runtime>(
+    app: &AppHandle<R>,
+    pi: PipelineInput,
+) -> Result<PipelineOutput> {
+    let started = Instant::now();
+    let mut tr = base_trace(&pi.raw_input);
+
+    // ── Stage A: Intake ───────────────────────────────────────────
+    // Same length/adversarial gates as enhance, but the route label is
+    // `polish_*` so trace readers can tell a polish-side intake reject
+    // from an enhance-side one at a glance.
+    let (normalized, raw_fp) = match intake::run(
+        &pi.raw_input,
+        &pi.active_app,
+        &intake::IntakeConfig::default(),
+    ) {
+        IntakeResult::Pass {
+            normalized,
+            fingerprint,
+            ..
+        } => (normalized, fingerprint),
+        IntakeResult::TooShort => {
+            tr.route = "polish_too_short".into();
+            tr.reject_reason = Some("input too short".into());
+            return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+        }
+        IntakeResult::TooLong => {
+            tr.route = "polish_too_long".into();
+            tr.reject_reason = Some("input too long".into());
+            return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+        }
+        IntakeResult::Adversarial { pattern_name } => {
+            tr.route = "polish_adversarial".into();
+            tr.reject_reason = Some(format!("adversarial:{pattern_name}"));
+            return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+        }
+    };
+
+    // Tag the route now so any failure from Stage B onwards traces as
+    // "polish" rather than the empty default.
+    tr.route = "polish".into();
+
+    // ── Stage B: Cache (polish: namespace) ────────────────────────
+    // The same EnhancementCache backs both pipelines. Prefix with
+    // "polish:" so an enhance-cached fingerprint never returns a
+    // polished output (or vice versa).
+    let polish_key = format!("polish:{raw_fp}");
+    let cache = &app.state::<AppState>().cache;
+    if let Some(cached) = cache.get(&polish_key) {
+        tr.route = "polish_cache_hit".into();
+        tr.cache_hit = true;
+        tr.final_pasted_output = cached.clone();
+        tr.total_latency_ms = started.elapsed().as_millis() as u64;
+        trace::append(app, &tr);
+        return Ok(PipelineOutput {
+            final_text: cached,
+            used_fallback: false,
+            fallback_reason: None,
+            trace: tr,
+        });
+    }
+
+    // ── Project context ───────────────────────────────────────────
+    // Polish injects the active project's <context> block so the
+    // polished message stays consistent with the project's vocabulary,
+    // technical terms, and proper nouns. The polish prompt is explicit
+    // that voice rules dominate — context only provides vocabulary,
+    // never a licence to rewrite into a different register.
+    let active_project = projects::active_project_for(app);
+    let context_block = build_context_block(app, active_project.as_ref());
+    let context_present = context_block
+        .as_deref()
+        .map(|s| !s.trim().is_empty())
+        .unwrap_or(false);
+    tr.context_present = context_present;
+
+    // ── Stage 1: Fingerprint the input's voice ────────────────────
+    // This single object is the source of truth for "voice" through
+    // the rest of the pipeline. Stage 2 reads it to build the LLM
+    // constraint block; Stage 4 re-fingerprints the output and diffs.
+    let input_fp = voice_fingerprint::fingerprint(&normalized);
+
+    // ── Stage 2: Build constraint-injected user message ───────────
+    // The voice signature block sits OUTSIDE <input> so the LLM reads
+    // it as guidance, not as data to rewrite. The context block (if
+    // present) is prepended so the polished output uses the project's
+    // vocabulary.
+    let voice_block = voice_fingerprint::render_voice_signature(&input_fp);
+    let user_message = match context_block.as_deref() {
+        Some(ctx) if !ctx.trim().is_empty() => {
+            format!("{ctx}\n\n{voice_block}\n\n<input>\n{normalized}\n</input>")
+        }
+        _ => format!("{voice_block}\n\n<input>\n{normalized}\n</input>"),
+    };
+
+    // ── Stage D: Single LLM call ──────────────────────────────────
+    // Hosted (signed-in) routes through the Supabase edge function so
+    // polish counts against the daily quota. BYOK uses the user's own
+    // Groq key. Both apply POLISH_PROMPT / POLISH_MAX_TOKENS /
+    // POLISH_TEMPERATURE.
+    let state = app.state::<AppState>();
+    let token = auth::current_token(state.inner());
+    let llm_started = Instant::now();
+    tr.llm_called = true;
+
+    let raw_output = if let (Some(jwt), Some(supabase_url)) = (token, hosted::supabase_url()) {
+        // Hosted path. The voice signature is bundled into input_text
+        // (the prompt treats it as guidance, and Stage 4 catches any
+        // drift).
+        let hosted_input = format!("{voice_block}\n\n{normalized}");
+        let hosted_result = hosted::call(&supabase_url, &jwt, &hosted_input, "polish").await;
+        tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
+        match hosted_result {
+            Ok(success) => {
+                emit_quota_update(app, &success.quota);
+                success.enhanced_text
+            }
+            Err(e) => {
+                let (outcome, reason, friendly) = classify_hosted_error(&e);
+                eprintln!("[polish] hosted call failed ({outcome}): {e}");
+                tr.validation_outcome = outcome;
+                tr.reject_reason = Some(reason);
+                return Ok(finalize_fallback_with(
+                    app,
+                    tr,
+                    &pi.raw_input,
+                    started,
+                    friendly,
+                ));
+            }
+        }
+    } else {
+        // BYOK path. The voice signature sits between the system prompt
+        // and the <input> block as polish-enhancer.md expects.
+        let system_prompt = match load_prompt(app, POLISH_PROMPT) {
+            Ok(p) => p,
+            Err(e) => {
+                eprintln!("[polish] failed to load prompt {POLISH_PROMPT}: {e}");
+                tr.reject_reason = Some("prompt load failed".into());
+                return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+            }
+        };
+        let llm_result = call_llm(
+            app,
+            &system_prompt,
+            &user_message,
+            POLISH_MAX_TOKENS,
+            POLISH_TEMPERATURE,
+        )
+        .await;
+        tr.llm_latency_ms = Some(llm_started.elapsed().as_millis() as u64);
+        match llm_result {
+            Ok(o) => o,
+            Err(e) => {
+                let (outcome, reason) = classify_llm_error(&e);
+                eprintln!("[polish] LLM call failed ({outcome}): {e}");
+                tr.validation_outcome = outcome;
+                tr.reject_reason = Some(reason);
+                return Ok(finalize_fallback(app, tr, &pi.raw_input, started));
+            }
+        }
+    };
+    tr.raw_llm_output = Some(raw_output.clone());
+
+    // ── Stage 4: Voice diff check ─────────────────────────────────
+    // Re-fingerprint the LLM output and compare to the input. If the
+    // LLM erased voice — REJECT and fall back to the user's original
+    // text. This is the contract that makes polish voice-preserving
+    // instead of formal-by-default.
+    let output_fp = voice_fingerprint::fingerprint(&raw_output);
+    match voice_diff::diff(&input_fp, &output_fp) {
+        DriftVerdict::Reject(reason) => {
+            eprintln!("[polish] rejected: {reason}");
+            tr.validation_outcome = "voice_drift".into();
+            tr.reject_reason = Some(reason);
+            return Ok(finalize_fallback_with(
+                app,
+                tr,
+                &pi.raw_input,
+                started,
+                "Kept original — polish would have changed your voice".into(),
+            ));
+        }
+        DriftVerdict::Accept => {}
+    }
+
+    // ── Stage E: Length / sanity validator ────────────────────────
+    // Polish output should be ≈ same length as input. The 3× cap is
+    // generous — room for grammar repairs that legitimately expand
+    // short cryptic inputs. min_output_chars=1 because polished output
+    // can legitimately compress to a couple words.
+    let validator_cfg = validate::ValidatorConfig {
+        max_length_ratio: 3.0,
+        min_output_chars: 1,
+        min_input_chars_for_ratio: 3,
+        ..Default::default()
+    };
+    let validation = validate::validate_and_repair(&raw_output, &normalized, &validator_cfg);
+    let (mid_text, used_fallback) = match validation {
+        ValidationOutcome::Repaired(s) => {
+            tr.validation_outcome = "repaired".into();
+            (s, false)
+        }
+        ValidationOutcome::Rejected(r) => {
+            eprintln!("[polish] validator rejected: {r}");
+            tr.validation_outcome = "rejected".into();
+            tr.reject_reason = Some(r);
+            (pi.raw_input.clone(), true)
+        }
+    };
+
+    // ── Stage 5: Polish-specific structural cleanup ───────────────
+    let final_text = if used_fallback {
+        mid_text
+    } else {
+        polish_structural_cleanup(&mid_text, &input_fp)
+    };
+
+    // ── Stage F: Cache + log + deliver ────────────────────────────
+    if !used_fallback {
+        cache.put(polish_key, final_text.clone());
+    }
+    tr.final_pasted_output = final_text.clone();
+    tr.total_latency_ms = started.elapsed().as_millis() as u64;
+    let fallback_reason = if used_fallback {
+        Some(friendly_reason(tr.reject_reason.as_deref().unwrap_or("")))
+    } else {
+        None
+    };
+    trace::append(app, &tr);
+
+    // Polish history entries are project-independent (polish is for
+    // personal comms, not project-bound prompts) so project_id and
+    // project_name are always None. The route="polish" tag lets the
+    // dashboard label them distinctly.
+    if !used_fallback {
+        enhancement_history::append(
+            app,
+            pi.raw_input.clone(),
+            final_text.clone(),
+            "polish".to_string(),
+            None,
+            None,
+        );
+    }
+
+    Ok(PipelineOutput {
+        final_text,
+        used_fallback,
+        fallback_reason,
+        trace: tr,
+    })
+}
+
+/// Stage 5 helper. Apply polish-specific structural strips beyond what
+/// the generic validator already does. Pure function — no I/O. The
+/// Stage 4 voice diff already rejects most of the failure modes that
+/// motivate this cleanup; the strips below are defense-in-depth for
+/// edge cases the fingerprinter undercounts (unusual greeting phrasing,
+/// markdown the LLM injects despite the prompt).
+fn polish_structural_cleanup(output: &str, input_fp: &VoiceFingerprint) -> String {
+    let mut s = output.trim().to_string();
+
+    // 1) Strip wrapping quotes/backticks (the validator strips fences
+    //    but not straight quotes around the entire output).
+    if s.chars().count() >= 2 {
+        let first = s.chars().next();
+        let last = s.chars().last();
+        let wrapped = matches!(
+            (first, last),
+            (Some('"'), Some('"')) | (Some('\''), Some('\'')) | (Some('`'), Some('`'))
+        );
+        if wrapped {
+            let mut chars: Vec<char> = s.chars().collect();
+            chars.remove(0);
+            chars.pop();
+            s = chars.into_iter().collect::<String>().trim().to_string();
+        }
+    }
+
+    // 2) Strip preambles. Common LLM tics: "Here is the polished
+    //    version:", "Polished: ...", "Sure! ...", "Of course! ...".
+    //    Cut at the first ':' or '\n', whichever comes first.
+    let lower_head: String = s.chars().take(40).collect::<String>().to_lowercase();
+    let preamble_prefixes = [
+        "here is", "here's", "polished:", "output:", "sure!", "of course!",
+    ];
+    let starts_with_preamble = preamble_prefixes.iter().any(|p| lower_head.starts_with(p));
+    if starts_with_preamble {
+        if let Some(idx) = s.find(|c: char| c == ':' || c == '\n') {
+            let after = &s[idx..];
+            let skip_len = after.chars().next().map(|c| c.len_utf8()).unwrap_or(1);
+            s = s[idx + skip_len..].trim().to_string();
+        }
+    }
+
+    // 3) Strip an injected greeting when the input didn't have one.
+    //    Stage 4 should have already rejected this; the strip here is
+    //    belt-and-braces for fingerprinter misses.
+    if !input_fp.has_greeting {
+        let lc = s.to_lowercase();
+        let greeting_starters = ["hi ", "hello ", "dear ", "hey ", "greetings"];
+        if greeting_starters.iter().any(|g| lc.starts_with(g)) {
+            if let Some(idx) = s.find(',') {
+                s = s[idx + 1..].trim().to_string();
+                // Re-capitalize the new first letter so the body still
+                // reads as a sentence.
+                if let Some(first) = s.chars().next() {
+                    if first.is_ascii_lowercase() {
+                        let mut chars: Vec<char> = s.chars().collect();
+                        chars[0] = first.to_ascii_uppercase();
+                        s = chars.into_iter().collect();
+                    }
+                }
+            }
+        }
+    }
+
+    // 4) Strip an injected signoff at the tail.
+    if !input_fp.has_signoff {
+        let signoff_tails = [
+            ", regards", ", best regards", ", yours", ", sincerely", ", thanks",
+        ];
+        let lc = s.to_lowercase();
+        for tail in &signoff_tails {
+            if let Some(idx) = lc.rfind(tail) {
+                if s.len().saturating_sub(idx) < 30 {
+                    s = s[..idx].trim_end().to_string();
+                    break;
+                }
+            }
+        }
+    }
+
+    // 5) Strip markdown. Polish inputs are always plain text in v1, so
+    //    any markdown in the output was injected by the LLM and should
+    //    be stripped to keep the polished message looking like a real
+    //    chat/email message.
+    while s.starts_with('#') || s.starts_with(" #") {
+        if let Some(nl) = s.find('\n') {
+            s = s[nl + 1..].trim_start().to_string();
+        } else {
+            break;
+        }
+    }
+    s = strip_markdown_emphasis(&s);
+
+    s.trim().to_string()
+}
+
+/// Two-pass markdown emphasis strip: **bold** → bold, then *italic* →
+/// italic. Bold first so a `**foo**` block isn't seen as two `*foo*`
+/// italics on the first pass.
+fn strip_markdown_emphasis(input: &str) -> String {
+    static BOLD: OnceLock<Regex> = OnceLock::new();
+    static ITALIC: OnceLock<Regex> = OnceLock::new();
+    let bold =
+        BOLD.get_or_init(|| Regex::new(r"\*\*([^*\n]+)\*\*").expect("static bold regex"));
+    let italic =
+        ITALIC.get_or_init(|| Regex::new(r"\*([^*\n]+)\*").expect("static italic regex"));
+    let stripped_bold = bold.replace_all(input, "$1");
+    italic.replace_all(&stripped_bold, "$1").into_owned()
 }
 
 // ─────────────────────────────────────────────────────────────────────

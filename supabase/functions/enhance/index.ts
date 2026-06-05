@@ -25,7 +25,7 @@ const GROQ_URL         = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL       = "llama-3.3-70b-versatile";
 const MAX_INPUT_CHARS  = 8000;
 const LLM_TIMEOUT_MS   = 30_000;
-const ROUTES: readonly Route[] = ["code", "writing", "generic"];
+const ROUTES: readonly Route[] = ["code", "writing", "generic", "polish"];
 
 // Shape returned by public.consume_daily_quota(uuid). Adds
 // subscription_active so the client can render "Pro · renews in N days"

@@ -16,6 +16,7 @@ const sources = {
   code:    resolve(ROOT, "prompts/code-enhancer.md"),
   writing: resolve(ROOT, "prompts/writing-enhancer.md"),
   generic: resolve(ROOT, "prompts/generic-enhancer.md"),
+  polish:  resolve(ROOT, "prompts/polish-enhancer.md"),
 };
 
 const out = resolve(ROOT, "supabase/functions/enhance/_prompts.json");

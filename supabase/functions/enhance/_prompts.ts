@@ -5,10 +5,11 @@
 
 import promptData from "./_prompts.json" with { type: "json" };
 
-export type Route = "code" | "writing" | "generic";
+export type Route = "code" | "writing" | "generic" | "polish";
 
 export const SYSTEM_PROMPTS: Record<Route, string> = {
   code:    promptData.code,
   writing: promptData.writing,
   generic: promptData.generic,
+  polish:  promptData.polish,
 };

@@ -29,6 +29,8 @@ mod trace;
 mod tray;
 mod updater;
 pub mod validate;
+pub mod voice_diff;
+pub mod voice_fingerprint;
 
 /// Receiver for the in-flight question-generation LLM call. The hotkey
 /// pipeline fires the call immediately after capture and stores the
@@ -163,6 +165,7 @@ pub fn run() {
             command_bar::open_main_window,
             github_analyze::analyze_github_repo,
             hotkey::trigger_enhance,
+            hotkey::trigger_polish,
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,

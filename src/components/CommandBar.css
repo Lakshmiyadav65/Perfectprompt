@@ -52,7 +52,10 @@ body.cb-route.cb-picker-open #root {
   position: absolute;
   top: -10px;
   left: 50%;
-  width: 96px;
+  /* Hit-area must cover the expanded pill width (132px for 4 icons)
+     so the hover trigger doesn't snap closed when the cursor sits
+     over a button near the right edge. */
+  width: 132px;
   height: 28px;
   transform: translateX(-50%);
   z-index: 0;
@@ -122,7 +125,10 @@ body.cb-route * {
 .cb-row:focus-within,
 .cb-shell:hover .cb-row,
 body.cb-route.cb-picker-open .cb-row {
-  width: 102px;
+  /* 4 icons × 26px + 3 gaps × 4px + 2 × 8px padding = 132px. The
+     160px-wide command-bar window has 28px of horizontal headroom
+     for the drop shadow, which is enough at the expanded width. */
+  width: 132px;
   height: 38px;
   padding: 5px 8px;
   gap: 4px;

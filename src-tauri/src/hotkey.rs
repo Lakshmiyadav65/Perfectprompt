@@ -342,3 +342,104 @@ async fn run_card_path<R: Runtime>(
 
     Ok(())
 }
+
+/// Tauri command — runs the polish pipeline on the user's current
+/// selection. Triggered exclusively by the floating capsule's Polish
+/// icon; no global hotkey (polishing a chat message is an explicit,
+/// deliberate action).
+///
+/// Mirrors `trigger_enhance`: restore the user's prior foreground window
+/// first (so the synthetic Ctrl+C reads the right app's selection), then
+/// let Windows settle before kicking off capture.
+#[tauri::command]
+pub async fn trigger_polish<R: Runtime>(
+    app: AppHandle<R>,
+) -> std::result::Result<(), String> {
+    if !foreground_tracker::restore_user_foreground_if_needed() {
+        return Err(
+            "no recent foreground window to capture from — focus an app first, then try again"
+                .into(),
+        );
+    }
+    tokio::time::sleep(std::time::Duration::from_millis(
+        foreground_tracker::FOCUS_RESTORE_SETTLE_MS,
+    ))
+    .await;
+
+    run_polish_pipeline(&app)
+        .await
+        .map_err(|e| format!("{e:#}"))
+}
+
+/// Polish path: structurally identical to `run_silent_path` (capture →
+/// status pill → pipeline → paste), but routes through
+/// `pipeline::run_polish` instead of `pipeline::run`. Polish is always
+/// silent — there's no question card, because polishing a chat message
+/// has no clarifying questions to ask.
+async fn run_polish_pipeline<R: Runtime>(app: &AppHandle<R>) -> Result<()> {
+    let t0 = Instant::now();
+
+    // Detect active app BEFORE clipboard capture for the same reason
+    // run_capture_pipeline does — synthetic Ctrl+C doesn't move focus on
+    // Windows, but doing this first keeps logs in trigger order.
+    let active_app = active_app::detect_active_app().unwrap_or_default();
+
+    let input = clipboard::capture_selection(app)
+        .await
+        .map_err(|e| anyhow!("capture failed: {e}"))?;
+    let t_capture = t0.elapsed();
+
+    if input.trim().is_empty() {
+        return Err(anyhow!("captured selection is empty"));
+    }
+
+    let input_chars = input.chars().count();
+    println!(
+        "[polish] {input_chars} chars captured in {}ms",
+        t_capture.as_millis()
+    );
+
+    // Mirror the silent path: stash the captured input on AppState so
+    // any command handler that reads pending_prompt sees the most recent
+    // capture, regardless of which mode produced it.
+    {
+        let state = app.state::<AppState>();
+        let mut pending = state.pending_prompt.lock().unwrap();
+        *pending = input.clone();
+    }
+
+    let _ = status_window::show_near_cursor(app);
+
+    let t_polish_start = Instant::now();
+    let pi = pipeline::PipelineInput {
+        raw_input: input.clone(),
+        active_app: active_app.process_name.clone(),
+    };
+    let output = pipeline::run_polish(app, pi)
+        .await
+        .map_err(|e| anyhow!("polish failed: {e:#}"))?;
+    let t_polish = t_polish_start.elapsed();
+    let _ = status_window::hide(app);
+
+    let t_paste_start = Instant::now();
+    clipboard::replace_selection(app, &output.final_text)
+        .await
+        .map_err(|e| anyhow!("paste failed: {e}"))?;
+    let t_paste = t_paste_start.elapsed();
+
+    if output.used_fallback {
+        if let Some(reason) = &output.fallback_reason {
+            tray::notify_fallback(app, reason);
+        }
+    }
+
+    println!(
+        "[latency] polish path click→pasted={}ms (polish={}ms paste={}ms) route={} fallback={}",
+        t0.elapsed().as_millis(),
+        t_polish.as_millis(),
+        t_paste.as_millis(),
+        output.trace.route,
+        output.used_fallback,
+    );
+    Ok(())
+}

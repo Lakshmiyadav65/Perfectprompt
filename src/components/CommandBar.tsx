@@ -157,6 +157,14 @@ export function CommandBar() {
     }
   }
 
+  async function handlePolish() {
+    try {
+      await invoke("trigger_polish");
+    } catch (e) {
+      console.error("polish trigger failed", e);
+    }
+  }
+
   async function handleHide() {
     // X is equivalent to flipping the sidebar toggle to OFF: the capsule
     // disappears AND the persisted "enabled" setting flips to false, so
@@ -223,6 +231,29 @@ export function CommandBar() {
             draggable={false}
             className="cb-enhance-logo"
           />
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn cb-polish-btn"
+          aria-label="Polish selected text"
+          onClick={() => void handlePolish()}
+          title="Polish message"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" />
+            <path d="M14 7l3 3" />
+            <path d="M19 3l.6 1.4L21 5l-1.4.6L19 7l-.6-1.4L17 5l1.4-.6L19 3z" />
+          </svg>
         </button>
         <button
           type="button"
