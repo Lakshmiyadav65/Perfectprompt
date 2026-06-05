@@ -32,7 +32,7 @@ export const supabase: SupabaseClient = createClient(
 /// browser's "Open PerfectPrompt?" launch dialog only by explicit
 /// click — feels intentional rather than an abrupt OS prompt.
 ///
-/// The page itself lives at docs/auth-success.html in this repo and
+/// The page itself lives at web/auth-success.html in this repo and
 /// forwards all query params (code, type=recovery, error) to
 /// `perfectprompt://auth/callback` when the user clicks Open.
 ///

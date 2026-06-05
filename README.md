@@ -280,4 +280,4 @@ This is a personal project, but if you want to:
 
 ## License
 
-MIT.
+Proprietary — All Rights Reserved. See [LICENSE](LICENSE).

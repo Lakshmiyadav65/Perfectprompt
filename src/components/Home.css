@@ -345,7 +345,7 @@
 }
 
 /* =========================================================
-   FLOW-STAGE animation — ported from docs/index.html
+   FLOW-STAGE animation — ported from web/index.html
    ("perfectprompt · live flow"). Timings/easing match the
    website exactly; sizes/paddings scaled to fit this card.
    Master cycle: 13s flow + 4s pause = 17s (Home.tsx re-keys

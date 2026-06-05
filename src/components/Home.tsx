@@ -273,7 +273,7 @@ export function Home({
         </div>
 
         {/* ===== DEMO CARD =====
-            Ported from docs/index.html's `.flow-stage` (the website's
+            Ported from web/index.html's `.flow-stage` (the website's
             "perfectprompt · live flow" animation). Markup mirrors the
             website 1:1; styles are in Home.css scaled to this card. */}
         <div className="ph-demo-card">
