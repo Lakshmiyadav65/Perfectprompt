@@ -445,8 +445,8 @@ export function Shell({ initial }: { initial: Route }) {
         <div className="pf-sidebar-bottom">
           {/* Usage card. Source-of-truth is consume_daily_quota +
               the profile row; the hook merges them. States rendered:
-                - free_under_limit  → "Free · 3 / 10 today"
-                - special_access    → "Special access · 3 / 15 today"
+                - free_under_limit  → "Free · 3 / 35 today"
+                - special_access    → "Special access · 3 / 50 today"
                 - free_at_limit     → "Daily limit reached" + Upgrade CTA
                 - pro_active        → "Pro · renews <date>"
                 - pro_lapsed        → "Subscription lapsed" + Resubscribe CTA

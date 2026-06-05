@@ -6,7 +6,7 @@ import { isSupabaseConfigured, supabase } from "../lib/supabase";
 /// Daily-free + monthly-pro tracker.
 ///
 /// Replaces the brief lifetime-trial model. Tiers:
-///   - free_hosted: 10 enhancements per IST day (+ extra_granted bonus)
+///   - free_hosted: 35 enhancements per IST day (+ extra_granted bonus)
 ///   - pro: unlimited while current_period_end > now() (active Razorpay subscription)
 ///   - unlimited: admin-grandfathered, always bypass
 ///
@@ -19,7 +19,14 @@ import { isSupabaseConfigured, supabase } from "../lib/supabase";
 /// BYOK / signed-out users render `status: "byok"` and the sidebar
 /// suppresses the usage card.
 
-const DAILY_FREE_LIMIT = 10;
+// "Free for all" launch promo (2026-06-05): the free daily cap is 35.
+// MUST stay in sync with public.daily_free_limit() in the Supabase
+// migrations (see 0004_free_for_all_35.sql). The server is authoritative
+// for live quota, but this constant drives two client-only things: the
+// mount-time sidebar paint before the first /enhance, and the
+// "Special access" admin-grant detection (server limit > this ⇒ grant).
+// If they drift, every free user gets mislabeled "Special access".
+const DAILY_FREE_LIMIT = 35;
 
 type PlanTier = "free_hosted" | "pro" | "unlimited" | string;
 
@@ -140,7 +147,7 @@ function deriveStatus(q: HostedQuota | null, extras: {
 
 /// Mount-time profile + daily_usage read → HostedQuota. Math mirrors
 /// what consume_daily_quota does server-side. Two reads instead of one
-/// so the sidebar paints the right "N / 10" before the user makes any
+/// so the sidebar paints the right "N / 35" before the user makes any
 /// /enhance call this session.
 function quotaFromProfile(row: {
   extra_granted: number | null;
@@ -212,7 +219,7 @@ export function useEnhancementUsage(): UsageState {
       // Parallel fetch: profile (plan_tier, period_end, extra_granted)
       // AND daily_usage row for today's IST date. RLS gates both to the
       // user's own rows. Profile drives tier; daily_usage drives the
-      // "N / 10" count for free users on launch.
+      // "N / 35" count for free users on launch.
       const today = istDateKey();
       const [profileResp, usageResp] = await Promise.all([
         supabase
