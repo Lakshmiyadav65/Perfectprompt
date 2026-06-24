@@ -8,6 +8,10 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig(async () => ({
   plugins: [react()],
 
+  // The .env (with the shared SUPABASE_* / VITE_SUPABASE_* values) lives at
+  // the repo root, one level above this frontend/ package, so point Vite there.
+  envDir: "..",
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors

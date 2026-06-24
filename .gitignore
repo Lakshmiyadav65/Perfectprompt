@@ -20,7 +20,7 @@ dist-ssr
 # Supabase CLI machine-local state (linked project ref, version pins,
 # pooler URL). Not secret on its own but per-machine; the CLI rewrites
 # these on every `supabase link` / `supabase db push`.
-supabase/.temp/
+backend/supabase/.temp/
 
 # Editor directories and files
 .vscode/*

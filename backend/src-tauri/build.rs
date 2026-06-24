@@ -46,8 +46,11 @@ fn bake_supabase_env() {
 fn load_repo_dotenv() -> std::collections::HashMap<String, String> {
     let mut map = std::collections::HashMap::new();
     let manifest_dir = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap_or_default());
-    // .env lives at the repo root, one level up from src-tauri/.
+    // .env lives at the repo root. After the frontend/backend split the
+    // crate sits at backend/src-tauri/, so the repo root is two levels up;
+    // the older one-up and same-dir paths are kept as fallbacks.
     let candidates = [
+        manifest_dir.join("../../.env"),
         manifest_dir.join("../.env"),
         manifest_dir.join(".env"),
     ];

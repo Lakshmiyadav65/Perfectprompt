@@ -62,11 +62,23 @@ The synthetic-input dispatch may be blocked by Electron-based apps that debounce
 
 ### Install dependencies
 
+The repository is split into three top-level folders:
+
+| Folder | Contents |
+|---|---|
+| `frontend/` | The React/Vite desktop UI + all Node tooling (this is where you run `npm` commands). |
+| `backend/` | The Rust/Tauri core (`backend/src-tauri/`), the system `backend/prompts/`, the Supabase cloud backend (`supabase/`), and `scripts/`. |
+| `landing/` | The marketing/landing site deployed to Vercel (was `web/`). |
+
 ```sh
-git clone https://github.com/Lakshmiyadav65/PromptEnhancer.git
-cd PromptEnhancer
+git clone https://github.com/Lakshmiyadav65/Perfectprompt.git
+cd Perfectprompt/frontend
 npm install
 ```
+
+> All `npm` / `tauri` commands are run from `frontend/`. The `tauri` script
+> transparently switches into `backend/` to find the Rust project, and Tauri's
+> `beforeDevCommand` builds the frontend back in `frontend/`.
 
 ### Provide your Groq API key
 
@@ -83,6 +95,7 @@ You can also set the key via the Settings window after launching the app — it 
 ### Run in dev mode
 
 ```sh
+cd frontend
 npm run tauri dev
 ```
 
@@ -120,12 +133,13 @@ Fire the hotkey 10–20 times across a range of inputs and grep the dev console 
 ### Build a release binary
 
 ```sh
+cd frontend
 npm run tauri build
 ```
 
 Output:
-- Windows: `src-tauri/target/release/perfectprompt.exe` plus an MSI installer in `src-tauri/target/release/bundle/msi/`.
-- macOS: `.app` bundle and `.dmg` in `src-tauri/target/release/bundle/`.
+- Windows: `backend/src-tauri/target/release/perfectprompt.exe` plus an MSI installer in `backend/src-tauri/target/release/bundle/msi/`.
+- macOS: `.app` bundle and `.dmg` in `backend/src-tauri/target/release/bundle/`.
 
 The binary is **not code-signed** — Windows SmartScreen / macOS Gatekeeper will warn on first run. v1 ships unsigned by design; signing is deferred to v2.
 
@@ -134,14 +148,14 @@ The binary is **not code-signed** — Windows SmartScreen / macOS Gatekeeper wil
 ## How it works (architecture)
 
 ```
-src/
+frontend/src/
 ├── components/
 │   ├── StatusIndicator.tsx + .css   ← Phase 5: floating "Enhancing…" pill (silent path)
 │   ├── Settings.tsx + .css          ← Phase 6: API key, hotkey, Smart Question Engine UI
 │   └── QuestionCard.tsx + .css      ← Phase 7: 360px chip card (Smart Question Engine)
 └── App.tsx                          ← hash routing: #/status, #/settings, #/question-card
 
-src-tauri/src/
+backend/src-tauri/src/
 ├── main.rs                          ← entry point
 ├── lib.rs                           ← plugin registration + setup hook + AppState
 ├── tray.rs                          ← Phase 1: system tray icon + menu
@@ -160,7 +174,7 @@ src-tauri/src/
 ├── generation.rs                    ← parallel LLM question generation (llama-3.1-8b)
 └── clarify.rs                       ← question-card IPC + [CONTEXT] block assembly
 
-prompts/
+backend/prompts/
 ├── code-enhancer.md                 ← system prompt for the Code route (~340 words)
 ├── writing-enhancer.md              ← system prompt for the Writing route (~390 words)
 ├── generic-enhancer.md              ← system prompt for the Generic route (~290 words)
@@ -238,17 +252,17 @@ The `.env` file overrides the saved API key when both are set — useful for dev
 
 ## The system prompts
 
-The actual *product* lives in `prompts/`. Everything else is plumbing.
+The actual *product* lives in `backend/prompts/`. Everything else is plumbing.
 
 Three route-specific prompts (one is loaded per LLM call by the orchestrator, based on the router's decision):
 
-- **`prompts/code-enhancer.md`** — Code route. Rewrites rough coding requests into precise prompts for a coding agent. Tightens explicit asks; redirects vague verbs to "investigate first". Never invents filenames, libraries, or APIs.
-- **`prompts/writing-enhancer.md`** — Writing route (emails, blog posts, tweets). Dominant rule: placeholder discipline. Missing facts (`{recipient_name}`, `{reasons_team_chose_postgres}`, `{company_one_liner}`) stay as placeholders rather than getting invented.
-- **`prompts/generic-enhancer.md`** — catch-all route (summarise, translate, explain). Critical rule: never *perform* the task; only rewrite the request as a spec.
+- **`backend/prompts/code-enhancer.md`** — Code route. Rewrites rough coding requests into precise prompts for a coding agent. Tightens explicit asks; redirects vague verbs to "investigate first". Never invents filenames, libraries, or APIs.
+- **`backend/prompts/writing-enhancer.md`** — Writing route (emails, blog posts, tweets). Dominant rule: placeholder discipline. Missing facts (`{recipient_name}`, `{reasons_team_chose_postgres}`, `{company_one_liner}`) stay as placeholders rather than getting invented.
+- **`backend/prompts/generic-enhancer.md`** — catch-all route (summarise, translate, explain). Critical rule: never *perform* the task; only rewrite the request as a spec.
 
 Plus one prompt for the parallel question-generation call:
 
-- **`prompts/questions-system-prompt.md`** — emits 2–4 clarifying-question JSON for the question-card. Loaded by `generation.rs`; out of scope for the enhancement pipeline.
+- **`backend/prompts/questions-system-prompt.md`** — emits 2–4 clarifying-question JSON for the question-card. Loaded by `generation.rs`; out of scope for the enhancement pipeline.
 
 The Step 7 conflict resolution between the brief's "delete the old meta-prompt" rule and the "don't touch the parallel question-gen call" rule produced this dedicated questions prompt. See `docs/migration-report.md` for the full decision trail. [docs/eval-protocol.md](docs/eval-protocol.md) is the script to validate any rewrite empirically.
 
