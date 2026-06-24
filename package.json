@@ -1,0 +1,12 @@
+{
+  "name": "perfectprompt-monorepo",
+  "private": true,
+  "version": "0.5.3",
+  "description": "Root launcher. Source lives in frontend/ (React UI) and backend/ (Rust core, prompts, supabase). These scripts just delegate into frontend/ so the whole app can be run from the repo root.",
+  "scripts": {
+    "dev": "cd frontend && npm run tauri dev",
+    "build": "cd frontend && npm run tauri build",
+    "tauri": "cd frontend && npm run tauri",
+    "install:frontend": "cd frontend && npm install"
+  }
+}
