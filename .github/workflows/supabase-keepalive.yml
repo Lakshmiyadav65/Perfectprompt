@@ -1,0 +1,47 @@
+name: Supabase keep-alive
+
+# Free-tier Supabase projects auto-pause after ~7 days of inactivity, which
+# makes <ref>.supabase.co stop resolving (NXDOMAIN) and takes the hosted tier
+# offline. This job issues a tiny PostgREST query once a day so the database
+# registers activity and never sits idle long enough to pause.
+#
+# The query hits an RLS-protected table, so it returns an empty array — we only
+# need the request to reach Postgres, not to read any data.
+#
+# NOTE: GitHub auto-disables scheduled workflows in a repo with no commits for
+# 60 days. This repo is actively developed, so that won't trigger; if the repo
+# ever goes quiet, re-enable the workflow from the Actions tab.
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # every day at 06:00 UTC
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase REST endpoint
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL or SUPABASE_ANON_KEY secret is not set."
+            exit 1
+          fi
+
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            "$SUPABASE_URL/rest/v1/profiles?limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+
+          echo "Keep-alive request returned HTTP $code"
+
+          if [ "$code" = "200" ]; then
+            echo "Project is awake."
+          else
+            echo "::error::Unexpected status $code — the project may be paused or the keys may be wrong."
+            exit 1
+          fi
