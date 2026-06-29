@@ -55,6 +55,108 @@
   max-width: 480px;
 }
 
+/* ---- Beta notice + waitlist banner ----
+   Prominent, accent-tinted strip pinned above the page header. The
+   left accent rule + soft accent fill make it read as "important, not
+   an error". Flips to a calmer surface treatment once the user joins. */
+.pm-beta-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 15px 18px;
+  margin-bottom: 24px;
+  border-radius: var(--pf-radius);
+  background: var(--pf-accent-soft);
+  border: 1px solid var(--pf-accent-strong);
+  border-left: 3px solid var(--pf-accent);
+}
+
+.pm-beta-icon {
+  flex-shrink: 0;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--pf-accent);
+  color: var(--pf-text-on-accent);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.pm-beta-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pm-beta-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--pf-text);
+  margin-bottom: 3px;
+}
+
+.pm-beta-text {
+  font-size: 13px;
+  color: var(--pf-text-muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pm-beta-error {
+  font-size: 12px;
+  color: var(--pf-danger);
+  margin: 7px 0 0;
+}
+
+.pm-beta-cta {
+  flex-shrink: 0;
+  align-self: center;
+  background: var(--pf-accent);
+  color: var(--pf-text-on-accent);
+  border: none;
+  padding: 9px 16px;
+  border-radius: var(--pf-radius-sm);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s var(--pf-ease), transform 0.12s var(--pf-ease);
+}
+
+.pm-beta-cta:hover:not(:disabled) {
+  background: var(--pf-accent-hover);
+  transform: translateY(-1px);
+}
+
+.pm-beta-cta:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Joined: drop the loud accent fill for a quiet confirmation, keep the
+   accent rule so the card still belongs to the same family. */
+.pm-beta-banner.is-joined {
+  background: var(--pf-surface);
+  border-color: var(--pf-border);
+  border-left-color: var(--pf-success);
+}
+
+.pm-beta-banner.is-joined .pm-beta-icon {
+  background: var(--pf-success);
+}
+
+@media (max-width: 620px) {
+  .pm-beta-banner {
+    flex-direction: column;
+  }
+  .pm-beta-cta {
+    align-self: stretch;
+  }
+}
+
 .pm-add-btn {
   background: var(--pf-text);
   border: none;

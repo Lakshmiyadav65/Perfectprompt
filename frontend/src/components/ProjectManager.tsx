@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useProjectWaitlist } from "../hooks/useProjectWaitlist";
 import "./ProjectManager.css";
 
 /// Project Knowledge digest — mirrors the Rust `RepoDigest` struct.
@@ -589,6 +590,11 @@ export function ProjectManager() {
 
   return (
     <div className="pm-container">
+      {/* Beta notice + waitlist — sets expectations that Projects is
+          still being finished and offers a one-click way to be told
+          when it ships. */}
+      <BetaWaitlistBanner />
+
       {/* Header */}
       <div className="pm-header">
         <div>
@@ -1053,6 +1059,61 @@ export function ProjectManager() {
           onRegenerate={() => void handleRegenerateSummary()}
           onClose={() => setSummaryEditorOpen(false)}
         />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BetaWaitlistBanner — "this feature is in beta, join the waitlist"
+// ─────────────────────────────────────────────────────────────────────
+//
+// Prominent, persistent notice pinned to the top of the Projects
+// screen. It sets the expectation that Projects is still being
+// finished and offers a one-click waitlist signup (backed by the
+// project_waitlist table, migration 0005). Once the user has joined,
+// the banner flips to a confirmed state on this and every future visit.
+
+function BetaWaitlistBanner() {
+  const { status, error, join } = useProjectWaitlist();
+  const joined = status === "joined";
+  const pending = status === "loading" || status === "joining";
+
+  return (
+    <div
+      className={`pm-beta-banner ${joined ? "is-joined" : ""}`}
+      role="status"
+      aria-live="polite"
+    >
+      <div className="pm-beta-icon" aria-hidden="true">
+        {joined ? "✓" : "✦"}
+      </div>
+
+      <div className="pm-beta-copy">
+        <div className="pm-beta-title">
+          {joined ? "You're on the waitlist" : "Projects is in Beta"}
+        </div>
+        <p className="pm-beta-text">
+          {joined
+            ? "Thanks for signing up — we'll email you the moment Projects is ready to launch."
+            : "We're still putting the finishing touches on this feature. Join the waitlist and we'll let you know the moment it launches."}
+        </p>
+        {error && (
+          <p className="pm-beta-error" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+
+      {!joined && (
+        <button
+          type="button"
+          className="pm-beta-cta"
+          onClick={() => void join()}
+          disabled={pending}
+        >
+          {status === "joining" ? "Joining…" : "Join the waitlist"}
+        </button>
       )}
     </div>
   );
