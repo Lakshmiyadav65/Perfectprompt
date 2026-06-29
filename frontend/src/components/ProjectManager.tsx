@@ -1,8 +1,14 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useProjectWaitlist } from "../hooks/useProjectWaitlist";
+import { useProjectWaitlist, type ProjectWaitlist } from "../hooks/useProjectWaitlist";
 import "./ProjectManager.css";
+
+/// Beta gate. While true, "+ Add Project" opens the "coming soon +
+/// waitlist" popup instead of the add form. Flip to false to re-open
+/// project creation when the feature leaves beta — no other change
+/// needed (openAddForm and the whole add/edit form stay wired up).
+const PROJECTS_CREATION_LOCKED = true;
 
 /// Project Knowledge digest — mirrors the Rust `RepoDigest` struct.
 /// The `source` discriminator is `tag = "kind"` on the Rust side, so
@@ -88,6 +94,13 @@ export function ProjectManager() {
   const [summaryEditorOpen, setSummaryEditorOpen] = useState(false);
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  // Beta gating — Projects is in beta and project creation isn't open
+  // yet. Clicking "+ Add Project" surfaces this modal (a "coming soon +
+  // waitlist" popup) instead of the add form. Shares one waitlist hook
+  // instance with the top banner so joining in either place keeps both
+  // in sync within the session.
+  const waitlist = useProjectWaitlist();
+  const [betaLockOpen, setBetaLockOpen] = useState(false);
 
   useEffect(() => {
     refresh();
@@ -593,7 +606,7 @@ export function ProjectManager() {
       {/* Beta notice + waitlist — sets expectations that Projects is
           still being finished and offers a one-click way to be told
           when it ships. */}
-      <BetaWaitlistBanner />
+      <BetaWaitlistBanner waitlist={waitlist} />
 
       {/* Header */}
       <div className="pm-header">
@@ -606,7 +619,14 @@ export function ProjectManager() {
             Add project descriptions to make prompt enhancements context-aware
           </p>
         </div>
-        <button className="pm-add-btn" onClick={openAddForm}>
+        {/* Project creation is gated during the beta — open the
+            "coming soon + waitlist" popup instead of the add form. */}
+        <button
+          className="pm-add-btn"
+          onClick={() =>
+            PROJECTS_CREATION_LOCKED ? setBetaLockOpen(true) : openAddForm()
+          }
+        >
           + Add Project
         </button>
       </div>
@@ -1033,6 +1053,15 @@ export function ProjectManager() {
         </div>
       )}
 
+      {/* Beta gate — "+ Add Project" opens this instead of the add
+          form while the feature is in beta. */}
+      {betaLockOpen && (
+        <BetaLockedModal
+          waitlist={waitlist}
+          onClose={() => setBetaLockOpen(false)}
+        />
+      )}
+
       {/* Project Knowledge revamp — Layer 1 observability surface.
           Shows the user EXACTLY what's being sent to the LLM. If
           lib/option.js (or whatever file they're debugging against)
@@ -1073,9 +1102,13 @@ export function ProjectManager() {
 // finished and offers a one-click waitlist signup (backed by the
 // project_waitlist table, migration 0005). Once the user has joined,
 // the banner flips to a confirmed state on this and every future visit.
+//
+// The waitlist hook is owned by the parent and passed in, so this
+// banner and the BetaLockedModal share one source of truth — joining
+// in either place updates both.
 
-function BetaWaitlistBanner() {
-  const { status, error, join } = useProjectWaitlist();
+function BetaWaitlistBanner({ waitlist }: { waitlist: ProjectWaitlist }) {
+  const { status, error, join } = waitlist;
   const joined = status === "joined";
   const pending = status === "loading" || status === "joining";
 
@@ -1115,6 +1148,84 @@ function BetaWaitlistBanner() {
           {status === "joining" ? "Joining…" : "Join the waitlist"}
         </button>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// BetaLockedModal — "+ Add Project" gate during the beta
+// ─────────────────────────────────────────────────────────────────────
+//
+// Project creation isn't open during the beta, so clicking "+ Add
+// Project" opens this popup instead of the add form. It explains why
+// and offers the same one-click waitlist signup as the banner (shared
+// hook state, so a join here also flips the banner to "joined").
+
+function BetaLockedModal({
+  waitlist,
+  onClose,
+}: {
+  waitlist: ProjectWaitlist;
+  onClose: () => void;
+}) {
+  const { status, error, join } = waitlist;
+  const joined = status === "joined";
+  const pending = status === "loading" || status === "joining";
+
+  // Esc-to-close, matching the other modals in this file.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="pm-form-overlay" onClick={onClose}>
+      <div
+        className="pm-beta-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Projects is in beta"
+      >
+        <div className={`pm-beta-modal-icon ${joined ? "is-joined" : ""}`} aria-hidden="true">
+          {joined ? "✓" : "🔒"}
+        </div>
+
+        <h3 className="pm-beta-modal-title">
+          {joined ? "You're on the waitlist" : "Adding projects is coming soon"}
+        </h3>
+
+        <p className="pm-beta-modal-text">
+          {joined
+            ? "Thanks for signing up — we'll email you the moment Projects opens up and you can start adding your own."
+            : "Projects is still in beta, so creating projects isn't available just yet. We're putting the finishing touches on it — join the waitlist and we'll let you know the moment it's ready."}
+        </p>
+
+        {error && (
+          <p className="pm-beta-modal-error" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="pm-beta-modal-actions">
+          <button type="button" className="pm-btn-cancel" onClick={onClose}>
+            {joined ? "Close" : "Maybe later"}
+          </button>
+          {!joined && (
+            <button
+              type="button"
+              className="pm-beta-cta"
+              onClick={() => void join()}
+              disabled={pending}
+            >
+              {status === "joining" ? "Joining…" : "Join the waitlist"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
