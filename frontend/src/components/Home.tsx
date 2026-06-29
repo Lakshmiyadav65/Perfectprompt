@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { EnhancementDetail, type EnhancementRecord } from "./EnhancementDetail";
+import { useProjectWaitlist } from "../hooks/useProjectWaitlist";
+import { BetaLockedModal } from "./BetaLockedModal";
 import "./Home.css";
 
 interface Project {
@@ -89,6 +91,11 @@ export function Home({
   const [demoKey, setDemoKey] = useState(0);
   const [recent, setRecent] = useState<EnhancementRecord[]>([]);
   const [selected, setSelected] = useState<EnhancementRecord | null>(null);
+  // Project creation is gated during the beta. The hero CTA opens the
+  // "coming soon + waitlist" popup directly instead of routing through
+  // the Projects screen.
+  const waitlist = useProjectWaitlist();
+  const [betaLockOpen, setBetaLockOpen] = useState(false);
 
   useEffect(() => {
     void refresh();
@@ -238,7 +245,7 @@ export function Home({
               <div className="ph-hero-cta-row">
                 <button
                   className="ph-btn ph-btn-primary"
-                  onClick={() => onNavigate("projects")}
+                  onClick={() => setBetaLockOpen(true)}
                 >
                   <FolderIcon />
                   Add project context
@@ -528,6 +535,15 @@ export function Home({
         <EnhancementDetail
           record={selected}
           onClose={() => setSelected(null)}
+        />
+      )}
+
+      {/* Beta gate — the hero "Add project context" CTA opens this
+          directly instead of routing to the Projects screen. */}
+      {betaLockOpen && (
+        <BetaLockedModal
+          waitlist={waitlist}
+          onClose={() => setBetaLockOpen(false)}
         />
       )}
     </div>

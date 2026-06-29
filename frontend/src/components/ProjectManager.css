@@ -157,79 +157,8 @@
   }
 }
 
-/* ---- Beta "coming soon" popup (the + Add Project gate) ----
-   Reuses .pm-form-overlay for the dimmed backdrop. Compact, centered
-   dialog distinct from the wide add/edit form. */
-.pm-beta-modal {
-  background: var(--pf-surface);
-  border: 1px solid var(--pf-border-strong);
-  border-radius: var(--pf-radius-lg);
-  padding: 30px 30px 24px;
-  width: 100%;
-  max-width: 440px;
-  box-shadow: var(--pf-shadow-lg);
-  color: var(--pf-text);
-  text-align: center;
-}
-
-.pm-beta-modal-icon {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 16px;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: var(--pf-accent-soft);
-  border: 1px solid var(--pf-accent-strong);
-  font-size: 22px;
-  line-height: 1;
-}
-
-.pm-beta-modal-icon.is-joined {
-  background: rgba(74, 222, 128, 0.14);
-  border-color: rgba(74, 222, 128, 0.4);
-  color: var(--pf-success);
-}
-
-.pm-beta-modal-title {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  margin: 0 0 8px;
-  color: var(--pf-text);
-}
-
-.pm-beta-modal-text {
-  font-size: 13.5px;
-  color: var(--pf-text-muted);
-  line-height: 1.6;
-  margin: 0 auto 20px;
-  max-width: 340px;
-}
-
-.pm-beta-modal-error {
-  font-size: 12px;
-  color: var(--pf-danger);
-  margin: -10px 0 16px;
-}
-
-.pm-beta-modal-actions {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-}
-
-/* The cancel button normally inherits padding from `.pm-form-footer
-   button`; this modal doesn't use that wrapper, so size it here to
-   match the accent CTA. */
-.pm-beta-modal-actions .pm-btn-cancel {
-  padding: 9px 16px;
-  border-radius: var(--pf-radius-sm);
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
+/* The Projects-screen "coming soon" popup lives in its own component
+   (BetaLockedModal.tsx + .css). Nothing to style here. */
 
 .pm-add-btn {
   background: var(--pf-text);

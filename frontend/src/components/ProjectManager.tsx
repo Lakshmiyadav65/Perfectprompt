@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useProjectWaitlist, type ProjectWaitlist } from "../hooks/useProjectWaitlist";
+import { BetaLockedModal } from "./BetaLockedModal";
 import "./ProjectManager.css";
 
 /// Beta gate. While true, "+ Add Project" opens the "coming soon +
@@ -1148,84 +1149,6 @@ function BetaWaitlistBanner({ waitlist }: { waitlist: ProjectWaitlist }) {
           {status === "joining" ? "Joining…" : "Join the waitlist"}
         </button>
       )}
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// BetaLockedModal — "+ Add Project" gate during the beta
-// ─────────────────────────────────────────────────────────────────────
-//
-// Project creation isn't open during the beta, so clicking "+ Add
-// Project" opens this popup instead of the add form. It explains why
-// and offers the same one-click waitlist signup as the banner (shared
-// hook state, so a join here also flips the banner to "joined").
-
-function BetaLockedModal({
-  waitlist,
-  onClose,
-}: {
-  waitlist: ProjectWaitlist;
-  onClose: () => void;
-}) {
-  const { status, error, join } = waitlist;
-  const joined = status === "joined";
-  const pending = status === "loading" || status === "joining";
-
-  // Esc-to-close, matching the other modals in this file.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  return (
-    <div className="pm-form-overlay" onClick={onClose}>
-      <div
-        className="pm-beta-modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Projects is in beta"
-      >
-        <div className={`pm-beta-modal-icon ${joined ? "is-joined" : ""}`} aria-hidden="true">
-          {joined ? "✓" : "🔒"}
-        </div>
-
-        <h3 className="pm-beta-modal-title">
-          {joined ? "You're on the waitlist" : "Adding projects is coming soon"}
-        </h3>
-
-        <p className="pm-beta-modal-text">
-          {joined
-            ? "Thanks for signing up — we'll email you the moment Projects opens up and you can start adding your own."
-            : "Projects is still in beta, so creating projects isn't available just yet. We're putting the finishing touches on it — join the waitlist and we'll let you know the moment it's ready."}
-        </p>
-
-        {error && (
-          <p className="pm-beta-modal-error" role="alert">
-            {error}
-          </p>
-        )}
-
-        <div className="pm-beta-modal-actions">
-          <button type="button" className="pm-btn-cancel" onClick={onClose}>
-            {joined ? "Close" : "Maybe later"}
-          </button>
-          {!joined && (
-            <button
-              type="button"
-              className="pm-beta-cta"
-              onClick={() => void join()}
-              disabled={pending}
-            >
-              {status === "joining" ? "Joining…" : "Join the waitlist"}
-            </button>
-          )}
-        </div>
-      </div>
     </div>
   );
 }
