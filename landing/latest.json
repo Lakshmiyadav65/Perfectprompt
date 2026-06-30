@@ -1,11 +1,11 @@
 {
-  "version": "0.5.3",
-  "notes": "Profile section: change your display name and upload a profile photo from the new Profile item in the account dropdown (or directly in Settings). Avatar is center-cropped to 256x256 and stored on your device — no backend involved. Sidebar chip shows the photo when set.",
-  "pub_date": "2026-05-26T10:35:00Z",
+  "version": "0.6.1",
+  "notes": "Polish mode: clean up any message in your own voice with the polish hotkey, without leaving the app. Project context (beta): enhancements that understand what you're building — join the waitlist from the Projects tab. Plus 35 free enhancements every day.",
+  "pub_date": "2026-06-30T05:36:54Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVRQVRQU0xQRXJJdWN0a0luWVlhSEQ4Y1FSdFBZWjRiNmlRT1ZQMGU0RnBVMGZlOVVSenRLNVJhWW5iaG5LR2pXcGNYcU1VdE1QRExWTmlJY2ltSHJEdzMxNmgraGR4QmdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzc5NzkxMjA2CWZpbGU6UGVyZmVjdFByb21wdF8wLjUuM194NjQtc2V0dXAuZXhlCmJCWlZGQ0k4NDFXRGY4SEdnT003UFJRSlJEbDFMSGJMKzAyenBoSkh1bGloR2Q1RnNKKzNVVmNsV2FuWFFicWdGdUdQV1dxOUZPV3ZxMTljRk1BWUJ3PT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.5.3/PerfectPrompt_0.5.3_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMmJsZXZsVFR1WHU0VnZodmxLNWNTS043QTlydHpjWmRyemNndCtBa3V1ZGNXU24yS2hZVjhDd29OeStPM011K3RFYnlkREJCNGVKazlvUjd2Ty90TzNYY0dzdUJmS0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzk3NjcyCWZpbGU6UGVyZmVjdFByb21wdF8wLjYuMV94NjQtc2V0dXAuZXhlCjlFRmJjVkNiN3F5dWozZVVtb1R5Rk1mMGVqbmxvRmRpNSt2YThpUnMyR28vOUYrRzZyM0ZrTmJ1Vy9OVG83a2N1Y25FQjFRWVduUDV3VExoVWRrMURnPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.6.1/PerfectPrompt_0.6.1_x64-setup.exe"
     }
   }
 }

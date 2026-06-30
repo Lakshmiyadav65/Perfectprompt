@@ -135,7 +135,7 @@
       "endpoints": [
         "https://perfectprompt-beta.vercel.app/latest.json"
       ],
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI5Qzg0QTNDOEJGNDRDMDAKUldRQVRQU0xQRXJJdVNtbzc5eGM2WEJvMGJuRTVEMmQ3eTlUN3IwaExMZSttM0ZqNGxWenBiRW0K",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDVFRUUzNDk1QUY1NzZFNzYKUldSMmJsZXZsVFR1WHZLMldsQ3l5bmZkWkJtUW41SEZVM0dtM0UyQUVhRy9mcWZ2KzVHdWNrV3cK",
       "windows": {
         "installMode": "passive"
       }
