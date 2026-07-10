@@ -2923,12 +2923,14 @@ name = "perfectprompt"
 version = "0.6.1"
 dependencies = [
  "anyhow",
+ "base64 0.22.1",
  "dotenvy",
  "enigo",
  "flate2",
  "futures-util",
  "ignore",
  "lru",
+ "png 0.17.16",
  "regex",
  "reqwest 0.12.28",
  "serde",

@@ -94,7 +94,7 @@
         "label": "command-bar",
         "url": "index.html#/command-bar",
         "title": "PerfectPrompt",
-        "width": 160,
+        "width": 190,
         "height": 60,
         "resizable": false,
         "visible": false,
@@ -119,6 +119,21 @@
         "skipTaskbar": true,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "annotate",
+        "url": "index.html#/annotate",
+        "title": "Annotate",
+        "width": 1280,
+        "height": 800,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": true
       }
     ],
     "security": {
@@ -151,7 +166,8 @@
       "../prompts/generic-enhancer.md": "prompts/generic-enhancer.md",
       "../prompts/questions-system-prompt.md": "prompts/questions-system-prompt.md",
       "../prompts/polish-enhancer.md": "prompts/polish-enhancer.md",
-      "../prompts/project-summary-generator.md": "prompts/project-summary-generator.md"
+      "../prompts/project-summary-generator.md": "prompts/project-summary-generator.md",
+      "../prompts/annotate-enhancer.md": "prompts/annotate-enhancer.md"
     },
     "icon": [
       "icons/32x32.png",

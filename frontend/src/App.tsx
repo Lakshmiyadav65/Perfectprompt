@@ -1,6 +1,7 @@
 import { StatusIndicator } from "./components/StatusIndicator";
 import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
+import { AnnotateOverlay } from "./components/AnnotateOverlay";
 import { CommandBar } from "./components/CommandBar";
 import { PasswordRecovery } from "./components/PasswordRecovery";
 import { PostAuthSetup } from "./components/PostAuthSetup";
@@ -19,6 +20,7 @@ function App() {
   if (hash === "#/status") return <StatusIndicator />;
   if (hash === "#/clarify") return <ClarifyPopup />;
   if (hash === "#/question-card") return <QuestionCard />;
+  if (hash === "#/annotate") return <AnnotateOverlay />;
   if (hash === "#/command-bar") return <CommandBar />;
   if (hash === "#/toast") return <Toast />;
 

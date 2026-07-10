@@ -16,6 +16,21 @@ use crate::AppState;
 
 pub const DEFAULT_HOTKEY: &str = "Alt+E";
 
+/// Default hotkey for the Visual Annotate overlay. Kept in the same
+/// single-modifier style as the enhance default (`Alt+E`) and distinct from
+/// it so both can register without conflict.
+pub const DEFAULT_ANNOTATE_HOTKEY: &str = "Alt+A";
+
+/// Parse-check a hotkey combo without registering it. Used by
+/// `settings::save_annotate_hotkey` to reject a bad combo before it's
+/// persisted (the annotate registration inside `register` only logs on a
+/// bad combo — it can't fail the whole enhance-hotkey re-registration).
+pub fn validate_combo(combo: &str) -> Result<()> {
+    Shortcut::from_str(combo)
+        .map(|_| ())
+        .map_err(|e| anyhow!("invalid hotkey {combo:?}: {e}"))
+}
+
 pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()> {
     let shortcut = Shortcut::from_str(combo)
         .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!("invalid hotkey {combo:?}: {e}")))?;
@@ -68,6 +83,38 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()
         Err(e) => println!(
             "[hotkey] registered {combo}; could not parse bypass {bypass_combo}: {e}"
         ),
+    }
+
+    // Visual Annotate hotkey. Registered here (not in a separate call site)
+    // so it survives every path that re-runs `register`: enhance-hotkey
+    // rebinds go through `reregister` (unregister_all → register), and the
+    // master pause toggle's `unregister_all` drops it uniformly with the
+    // rest. Best-effort — a bad/duplicate combo logs but never fails the
+    // enhance-hotkey registration.
+    let annotate_combo = settings::load(app).annotate_hotkey;
+    match Shortcut::from_str(&annotate_combo) {
+        Ok(annotate_shortcut) => {
+            let res = app.global_shortcut().on_shortcut(
+                annotate_shortcut,
+                |app_handle, _shortcut, event| {
+                    if event.state() != ShortcutState::Pressed {
+                        return;
+                    }
+                    println!("[hotkey] annotate pressed");
+                    let app = app_handle.clone();
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = crate::annotate::begin(&app).await {
+                            println!("[annotate] begin failed: {e:#}");
+                        }
+                    });
+                },
+            );
+            match res {
+                Ok(()) => println!("[hotkey] annotate registered: {annotate_combo}"),
+                Err(e) => println!("[hotkey] annotate {annotate_combo} failed: {e}"),
+            }
+        }
+        Err(e) => println!("[hotkey] could not parse annotate combo {annotate_combo}: {e}"),
     }
 
     Ok(())

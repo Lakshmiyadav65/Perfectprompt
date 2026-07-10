@@ -38,9 +38,19 @@ fn default_enabled() -> bool {
     true
 }
 
+fn default_annotate_hotkey() -> String {
+    hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub hotkey: String,
+    /// Global hotkey for the Visual Annotate overlay. `#[serde(default)]` so
+    /// settings.json files predating this feature still deserialise (they get
+    /// the `Alt+A` default). Registered alongside `hotkey` in
+    /// `hotkey::register`.
+    #[serde(default = "default_annotate_hotkey")]
+    pub annotate_hotkey: String,
     /// **DEPRECATED — DO NOT READ.** Legacy single-user API key from
     /// before per-user scoping landed (v0.4.1 and earlier). Kept on the
     /// struct so existing settings.json files still deserialise, but no
@@ -87,6 +97,7 @@ impl Default for UserSettings {
     fn default() -> Self {
         Self {
             hotkey: hotkey::DEFAULT_HOTKEY.to_string(),
+            annotate_hotkey: hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string(),
             api_key: None,
             api_keys: HashMap::new(),
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
@@ -306,6 +317,43 @@ pub fn save_hotkey<R: Runtime>(
     let mut settings = load(&app);
     settings.hotkey = trimmed;
     save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_annotate_hotkey<R: Runtime>(app: AppHandle<R>) -> String {
+    load(&app).annotate_hotkey
+}
+
+/// Persist a new Visual Annotate hotkey and re-register global shortcuts so
+/// it takes effect immediately. The combo is parse-validated first (the
+/// annotate registration inside `hotkey::register` only logs on a bad combo,
+/// so validation has to happen here). We persist before re-registering
+/// because `register` reads the annotate combo back from settings.json.
+#[tauri::command]
+pub fn save_annotate_hotkey<R: Runtime>(
+    app: AppHandle<R>,
+    combo: String,
+) -> std::result::Result<(), String> {
+    let trimmed = combo.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("hotkey combo cannot be empty".into());
+    }
+    hotkey::validate_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
+
+    let mut settings = load(&app);
+    let previous = settings.annotate_hotkey.clone();
+    settings.annotate_hotkey = trimmed;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+
+    // Re-register everything (enhance + bypass + annotate). If it fails, roll
+    // the annotate combo back so the persisted value matches what's live.
+    if let Err(e) = hotkey::reregister(&app, &settings.hotkey) {
+        settings.annotate_hotkey = previous;
+        let _ = save(&app, &settings);
+        let _ = hotkey::reregister(&app, &settings.hotkey);
+        return Err(format!("{e:#}"));
+    }
     Ok(())
 }
 

@@ -24,7 +24,7 @@ interface ProjectStore {
 /// can render inside our own webview. The wider layout matches the
 /// macOS-style picker UX with a toggle at the top, a list of options,
 /// and a configure footer.
-const CAPSULE_SIZE = new LogicalSize(160, 60);
+const CAPSULE_SIZE = new LogicalSize(190, 60);
 const PICKER_OPEN_SIZE = new LogicalSize(220, 200);
 
 /// Floating widget — single capsule with a project selector (sets the
@@ -165,6 +165,17 @@ export function CommandBar() {
     }
   }
 
+  async function handleAnnotate() {
+    // Annotate captures the whole screen (not the selection), and the
+    // backend hides this capsule before grabbing pixels, so — unlike
+    // enhance/polish — there's no foreground window to restore first.
+    try {
+      await invoke("start_annotation");
+    } catch (e) {
+      console.error("annotate trigger failed", e);
+    }
+  }
+
   async function handleHide() {
     // X is equivalent to flipping the sidebar toggle to OFF: the capsule
     // disappears AND the persisted "enabled" setting flips to false, so
@@ -253,6 +264,28 @@ export function CommandBar() {
             <path d="M3 21l3.5-1 11-11-2.5-2.5-11 11L3 21z" />
             <path d="M14 7l3 3" />
             <path d="M19 3l.6 1.4L21 5l-1.4.6L19 7l-.6-1.4L17 5l1.4-.6L19 3z" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn cb-annotate-btn"
+          aria-label="Annotate screen"
+          onClick={() => void handleAnnotate()}
+          title="Annotate the screen (same as Alt+A)"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10z" />
+            <circle cx="12" cy="11" r="2" />
           </svg>
         </button>
         <button

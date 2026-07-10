@@ -44,6 +44,16 @@ ignore = "0.4"
 tar = "0.4"
 flate2 = "1"
 
+# Visual Annotate feature — screen capture → PNG encode → base64 data URL.
+# `png` encodes the raw RGBA bytes pulled from GDI into a PNG (chosen over the
+# full `image` crate: it's the single codec we need, and image's transitive
+# tree — moxcms/bytemuck/num-traits — was heavy enough to OOM a fresh parallel
+# build). `base64` turns the PNG into a data: URL for the annotate overlay +
+# the Groq vision call. Screen capture itself is native Win32 GDI (no crate) —
+# see annotate.rs — so it reuses the `windows` deps already declared below.
+png = "0.17"
+base64 = "0.22"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 windows = { version = "0.61", features = [
     "Win32_UI_Input_KeyboardAndMouse",

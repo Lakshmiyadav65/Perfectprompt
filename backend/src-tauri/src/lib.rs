@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 mod active_app;
+mod annotate;
 mod app_classifier;
 mod auth;
 mod cache;
@@ -68,6 +69,12 @@ pub struct AppState {
     /// at any given moment. Without this scoping, user A's BYOK key
     /// would leak to user B after a sign-out / sign-in.
     pub current_user_id: std::sync::Mutex<Option<String>>,
+    /// Visual Annotate — the freshly-captured screenshot for the current
+    /// annotate session, as a `data:image/png;base64,...` URL. Set by
+    /// `annotate::begin` right before the overlay is shown; read by the
+    /// overlay via `get_annotation_capture`; cleared by `close_annotation`.
+    /// `None` when no annotate session is in flight.
+    pub pending_capture: std::sync::Mutex<Option<String>>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -84,6 +91,7 @@ pub fn run() {
             cache: cache::EnhancementCache::default(),
             session_token: std::sync::Mutex::new(None),
             current_user_id: std::sync::Mutex::new(None),
+            pending_capture: std::sync::Mutex::new(None),
         })
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PerfectPrompt is already running,
@@ -173,6 +181,13 @@ pub fn run() {
             github_analyze::analyze_github_repo,
             hotkey::trigger_enhance,
             hotkey::trigger_polish,
+            annotate::start_annotation,
+            annotate::get_annotation_capture,
+            annotate::run_annotation,
+            annotate::copy_text,
+            annotate::close_annotation,
+            settings::get_annotate_hotkey,
+            settings::save_annotate_hotkey,
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,
@@ -251,6 +266,7 @@ fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
         "status",
         "command-bar",
         "toast",
+        "annotate",
     ];
 
     for label in KEEP_ALIVE_LABELS {
