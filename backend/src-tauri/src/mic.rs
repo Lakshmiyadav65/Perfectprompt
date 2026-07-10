@@ -201,8 +201,9 @@ fn position_bottom_center<R: Runtime>(window: &tauri::WebviewWindow<R>) {
 // ─────────────────────────────────────────────────────────────────────
 
 /// Command form of [`begin`] used by the command-bar's Mic button (mouse
-/// users, no hotkey). Always Enhance mode — the flagship behaviour. The button
-/// is a click-toggle: a second press while recording routes to [`stop_mic`].
+/// users, no hotkey). Always Enhance mode — the flagship behaviour. Focus is
+/// handled uniformly at paste time in [`transcribe_and_enhance`] (the mic pill
+/// itself grabs foreground once shown), so no per-entry-point restore here.
 #[tauri::command]
 pub fn start_mic<R: Runtime>(app: AppHandle<R>) -> std::result::Result<(), String> {
     begin(&app, MicMode::Enhance).map_err(|e| format!("{e:#}"))
@@ -291,9 +292,24 @@ async fn transcribe_inner<R: Runtime>(
         mode.as_str()
     );
 
-    // Detect the app the user was dictating into. The push-to-talk keypress
-    // never stole focus, so the foreground is still the user's target window —
-    // this keeps the trace/history record and cache fingerprint accurate.
+    // Restore the user's real target window BEFORE we do anything focus- or
+    // paste-sensitive. Showing the always-on-top mic pill made it the
+    // foreground window (even with `focus:false`), so without this both the
+    // active-app detection below and the final Ctrl+V would target our own
+    // pill instead of the user's field. Same restore `trigger_enhance` does
+    // before its synthetic Ctrl+C; the foreground tracker filters out our own
+    // app windows, so it hands back the field the user was actually in.
+    let restored = crate::foreground_tracker::restore_user_foreground_if_needed();
+    if !restored {
+        eprintln!("[mic] no tracked user window to restore — pasting into current foreground");
+    }
+    tokio::time::sleep(Duration::from_millis(
+        crate::foreground_tracker::FOCUS_RESTORE_SETTLE_MS,
+    ))
+    .await;
+
+    // Now that focus is back on the user's window, detect it for the trace /
+    // history record / cache fingerprint.
     let active_app = crate::active_app::detect_active_app().unwrap_or_default();
     let pi = crate::pipeline::PipelineInput {
         raw_input: transcript,
@@ -306,9 +322,9 @@ async fn transcribe_inner<R: Runtime>(
     }
     .map_err(|e| anyhow!("pipeline failed: {e:#}"))?;
 
-    // Paste at the cursor. The listening pill is non-focusable (like the status
-    // pill shown during a normal enhance), so the user's field keeps focus and
-    // the synthetic Ctrl+V lands there.
+    // Paste at the cursor. Focus was handed back to the user's field above, and
+    // the pill is only always-on-top (not focused), so the synthetic Ctrl+V
+    // lands in their editor while the pill stays visible showing the result.
     crate::clipboard::replace_selection(app, &output.final_text)
         .await
         .map_err(|e| anyhow!("paste failed: {e}"))?;
