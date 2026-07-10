@@ -24,8 +24,8 @@ interface ProjectStore {
 /// can render inside our own webview. The wider layout matches the
 /// macOS-style picker UX with a toggle at the top, a list of options,
 /// and a configure footer.
-const CAPSULE_SIZE = new LogicalSize(190, 60);
-const PICKER_OPEN_SIZE = new LogicalSize(220, 200);
+const CAPSULE_SIZE = new LogicalSize(222, 60);
+const PICKER_OPEN_SIZE = new LogicalSize(240, 200);
 
 /// Floating widget — single capsule with a project selector (sets the
 /// active project that the developer-mode enhancer pulls context from),
@@ -176,6 +176,18 @@ export function CommandBar() {
     }
   }
 
+  async function handleMic() {
+    // Mouse-user entry point for Mic (Enhance mode). The keyboard flow is
+    // push-to-talk (hold Alt+M); a click can't be "held", so this starts a
+    // recording that the user stops from the floating mic pill's Stop button.
+    // start_mic hides this capsule while recording (like annotate).
+    try {
+      await invoke("start_mic");
+    } catch (e) {
+      console.error("mic trigger failed", e);
+    }
+  }
+
   async function handleHide() {
     // X is equivalent to flipping the sidebar toggle to OFF: the capsule
     // disappears AND the persisted "enabled" setting flips to false, so
@@ -286,6 +298,29 @@ export function CommandBar() {
           >
             <path d="M12 21s-6-5.3-6-10a6 6 0 1 1 12 0c0 4.7-6 10-6 10z" />
             <circle cx="12" cy="11" r="2" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          className="cb-icon-btn cb-mic-btn"
+          aria-label="Dictate with Mic"
+          onClick={() => void handleMic()}
+          title="Speak a prompt (hold Alt+M for push-to-talk)"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="14"
+            height="14"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <rect x="9" y="2" width="6" height="12" rx="3" />
+            <path d="M5 11a7 7 0 0 0 14 0" />
+            <path d="M12 18v3" />
           </svg>
         </button>
         <button

@@ -2,7 +2,7 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "Default capabilities for PerfectPrompt windows",
-  "windows": ["main", "status", "settings", "command-bar", "toast"],
+  "windows": ["main", "status", "settings", "command-bar", "toast", "mic"],
   "permissions": [
     "core:default",
     "core:window:default",

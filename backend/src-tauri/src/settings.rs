@@ -42,6 +42,10 @@ fn default_annotate_hotkey() -> String {
     hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string()
 }
 
+fn default_mic_hotkey() -> String {
+    hotkey::DEFAULT_MIC_HOTKEY.to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub hotkey: String,
@@ -51,6 +55,13 @@ pub struct UserSettings {
     /// `hotkey::register`.
     #[serde(default = "default_annotate_hotkey")]
     pub annotate_hotkey: String,
+    /// Push-to-talk hotkey for Mic (voice → perfect prompt). Held down while
+    /// speaking; the `Shift+`-prefixed variant routes to clean dictation
+    /// instead of full enhancement. `#[serde(default)]` so pre-Mic
+    /// settings.json files still deserialise (they get the `Alt+M` default).
+    /// Registered alongside `hotkey` in `hotkey::register`.
+    #[serde(default = "default_mic_hotkey")]
+    pub mic_hotkey: String,
     /// **DEPRECATED — DO NOT READ.** Legacy single-user API key from
     /// before per-user scoping landed (v0.4.1 and earlier). Kept on the
     /// struct so existing settings.json files still deserialise, but no
@@ -98,6 +109,7 @@ impl Default for UserSettings {
         Self {
             hotkey: hotkey::DEFAULT_HOTKEY.to_string(),
             annotate_hotkey: hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string(),
+            mic_hotkey: hotkey::DEFAULT_MIC_HOTKEY.to_string(),
             api_key: None,
             api_keys: HashMap::new(),
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
@@ -350,6 +362,40 @@ pub fn save_annotate_hotkey<R: Runtime>(
     // the annotate combo back so the persisted value matches what's live.
     if let Err(e) = hotkey::reregister(&app, &settings.hotkey) {
         settings.annotate_hotkey = previous;
+        let _ = save(&app, &settings);
+        let _ = hotkey::reregister(&app, &settings.hotkey);
+        return Err(format!("{e:#}"));
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn get_mic_hotkey<R: Runtime>(app: AppHandle<R>) -> String {
+    load(&app).mic_hotkey
+}
+
+/// Persist a new Mic push-to-talk hotkey and re-register global shortcuts so
+/// it takes effect immediately. Same shape as `save_annotate_hotkey`: validate
+/// the combo, persist before re-registering (because `register` reads the mic
+/// combo back from settings.json), and roll back on failure.
+#[tauri::command]
+pub fn save_mic_hotkey<R: Runtime>(
+    app: AppHandle<R>,
+    combo: String,
+) -> std::result::Result<(), String> {
+    let trimmed = combo.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("hotkey combo cannot be empty".into());
+    }
+    hotkey::validate_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
+
+    let mut settings = load(&app);
+    let previous = settings.mic_hotkey.clone();
+    settings.mic_hotkey = trimmed;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+
+    if let Err(e) = hotkey::reregister(&app, &settings.hotkey) {
+        settings.mic_hotkey = previous;
         let _ = save(&app, &settings);
         let _ = hotkey::reregister(&app, &settings.hotkey);
         return Err(format!("{e:#}"));

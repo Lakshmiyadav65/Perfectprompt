@@ -18,6 +18,7 @@ pub mod github_analyze;
 mod hosted;
 mod hotkey;
 pub mod intake;
+mod mic;
 pub mod pipeline;
 pub mod project_scan;
 pub mod project_summary;
@@ -75,6 +76,10 @@ pub struct AppState {
     /// overlay via `get_annotation_capture`; cleared by `close_annotation`.
     /// `None` when no annotate session is in flight.
     pub pending_capture: std::sync::Mutex<Option<String>>,
+    /// Mic — push-to-talk voice capture state. Tracks whether a capture is in
+    /// flight so key-repeat and staggered chord release can't start a second
+    /// recording. See [`mic::MicSession`].
+    pub mic: std::sync::Mutex<mic::MicSession>,
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -92,6 +97,7 @@ pub fn run() {
             session_token: std::sync::Mutex::new(None),
             current_user_id: std::sync::Mutex::new(None),
             pending_capture: std::sync::Mutex::new(None),
+            mic: std::sync::Mutex::new(mic::MicSession::default()),
         })
         // Single-instance: when the user double-clicks the desktop icon
         // (or relaunches in any way) while PerfectPrompt is already running,
@@ -188,6 +194,13 @@ pub fn run() {
             annotate::close_annotation,
             settings::get_annotate_hotkey,
             settings::save_annotate_hotkey,
+            mic::start_mic,
+            mic::stop_mic,
+            mic::mic_is_recording,
+            mic::close_mic,
+            mic::transcribe_and_enhance,
+            settings::get_mic_hotkey,
+            settings::save_mic_hotkey,
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,
@@ -267,6 +280,7 @@ fn install_keep_alive_close_handlers<R: Runtime>(app: &AppHandle<R>) {
         "command-bar",
         "toast",
         "annotate",
+        "mic",
     ];
 
     for label in KEEP_ALIVE_LABELS {

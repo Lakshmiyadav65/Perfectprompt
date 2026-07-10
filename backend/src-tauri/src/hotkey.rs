@@ -21,6 +21,12 @@ pub const DEFAULT_HOTKEY: &str = "Alt+E";
 /// it so both can register without conflict.
 pub const DEFAULT_ANNOTATE_HOTKEY: &str = "Alt+A";
 
+/// Default push-to-talk hotkey for Mic (voice → perfect prompt). Held down
+/// while speaking. Same single-modifier style as the others and distinct so
+/// all three register without conflict. The `Shift+`-prefixed variant (see
+/// `bypass_variant`) routes to clean dictation instead of full enhancement.
+pub const DEFAULT_MIC_HOTKEY: &str = "Alt+M";
+
 /// Parse-check a hotkey combo without registering it. Used by
 /// `settings::save_annotate_hotkey` to reject a bad combo before it's
 /// persisted (the annotate registration inside `register` only logs on a
@@ -117,7 +123,50 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()
         Err(e) => println!("[hotkey] could not parse annotate combo {annotate_combo}: {e}"),
     }
 
+    // Mic push-to-talk. Two chords, both handling Pressed (start capture) and
+    // Released (stop + transcribe): the bare combo enhances, the Shift variant
+    // dictates. Registered here for the same reason as annotate — so it
+    // survives every path that re-runs `register`. Best-effort: a bad/duplicate
+    // combo logs but never fails the enhance-hotkey registration.
+    let mic_combo = settings::load(app).mic_hotkey;
+    register_mic_chord(app, &mic_combo, crate::mic::MicMode::Enhance);
+    register_mic_chord(app, &bypass_variant(&mic_combo), crate::mic::MicMode::Dictate);
+
     Ok(())
+}
+
+/// Register one push-to-talk chord for Mic. On `Pressed` we begin capture in
+/// `mode`; on `Released` we stop it. Both edges are needed (unlike the other
+/// hotkeys, which only act on `Pressed`) because push-to-talk is defined by the
+/// hold. Best-effort — logs and returns on any parse/registration failure.
+fn register_mic_chord<R: Runtime>(app: &AppHandle<R>, combo: &str, mode: crate::mic::MicMode) {
+    let shortcut = match Shortcut::from_str(combo) {
+        Ok(s) => s,
+        Err(e) => {
+            println!("[hotkey] could not parse mic combo {combo:?} ({mode:?}): {e}");
+            return;
+        }
+    };
+    let res = app
+        .global_shortcut()
+        .on_shortcut(shortcut, move |app_handle, _shortcut, event| {
+            match event.state() {
+                ShortcutState::Pressed => {
+                    // Key-repeat fires this repeatedly while held; mic::begin
+                    // de-dupes via its recording guard.
+                    if let Err(e) = crate::mic::begin(app_handle, mode) {
+                        println!("[mic] begin failed: {e:#}");
+                    }
+                }
+                ShortcutState::Released => {
+                    crate::mic::end(app_handle);
+                }
+            }
+        });
+    match res {
+        Ok(()) => println!("[hotkey] mic registered: {combo} ({mode:?})"),
+        Err(e) => println!("[hotkey] mic {combo} ({mode:?}) failed: {e}"),
+    }
 }
 
 /// Returns the Shift-modified variant of `combo`. We avoid duplicating an

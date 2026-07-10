@@ -94,7 +94,7 @@
         "label": "command-bar",
         "url": "index.html#/command-bar",
         "title": "PerfectPrompt",
-        "width": 190,
+        "width": 222,
         "height": 60,
         "resizable": false,
         "visible": false,
@@ -134,6 +134,21 @@
         "skipTaskbar": true,
         "shadow": false,
         "focus": true
+      },
+      {
+        "label": "mic",
+        "url": "index.html#/mic",
+        "title": "PerfectPrompt Mic",
+        "width": 300,
+        "height": 84,
+        "resizable": false,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "focus": false
       }
     ],
     "security": {

@@ -2,6 +2,7 @@ import { StatusIndicator } from "./components/StatusIndicator";
 import { ClarifyPopup } from "./components/ClarifyPopup";
 import { QuestionCard } from "./components/QuestionCard";
 import { AnnotateOverlay } from "./components/AnnotateOverlay";
+import { MicOverlay } from "./components/MicOverlay";
 import { CommandBar } from "./components/CommandBar";
 import { PasswordRecovery } from "./components/PasswordRecovery";
 import { PostAuthSetup } from "./components/PostAuthSetup";
@@ -21,6 +22,7 @@ function App() {
   if (hash === "#/clarify") return <ClarifyPopup />;
   if (hash === "#/question-card") return <QuestionCard />;
   if (hash === "#/annotate") return <AnnotateOverlay />;
+  if (hash === "#/mic") return <MicOverlay />;
   if (hash === "#/command-bar") return <CommandBar />;
   if (hash === "#/toast") return <Toast />;
 
