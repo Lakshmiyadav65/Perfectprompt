@@ -559,6 +559,13 @@ pub async fn run_polish<R: Runtime>(
         max_length_ratio: 3.0,
         min_output_chars: 1,
         min_input_chars_for_ratio: 3,
+        // Dictation preserves the user's own conversational voice, so DON'T
+        // reject outputs that open with "Hi,"/"Hello"/etc. That rule exists
+        // to stop the *enhance* path emitting chatbot answers; on the polish
+        // path it wrongly nukes a correctly-cleaned dictation back to the raw
+        // transcript (observed live: "Hi, I want to change the front-end
+        // colour" rejected as "looks like an answer, not a prompt").
+        reject_executed_task: false,
         ..Default::default()
     };
     let validation = validate::validate_and_repair(&raw_output, &normalized, &validator_cfg);

@@ -50,6 +50,13 @@ pub struct ValidatorConfig {
     /// rewriter (e.g. "make it faster" → 80 chars), so the ratio signal
     /// is noisy. Default 800.
     pub min_input_chars_for_outsource: usize,
+    /// Whether to run [`reject_if_likely_executed_task`] — the rule that
+    /// rejects conversational openers ("Hi,", "Hello", …) and executed
+    /// translations. Correct for the *enhance* path (an engineered prompt
+    /// should never open conversationally), but WRONG for the *polish /
+    /// dictation* path, whose entire job is to preserve the user's
+    /// conversational voice. Default true; polish sets it false.
+    pub reject_executed_task: bool,
 }
 
 impl Default for ValidatorConfig {
@@ -60,6 +67,7 @@ impl Default for ValidatorConfig {
             min_input_chars_for_ratio: 5,
             min_length_ratio: 0.33,
             min_input_chars_for_outsource: 800,
+            reject_executed_task: true,
         }
     }
 }
@@ -115,8 +123,10 @@ pub fn validate_and_repair(
     if let Some(reason) = reject_if_outsources_content(&s, original_input, cfg) {
         return ValidationOutcome::Rejected(reason);
     }
-    if let Some(reason) = reject_if_likely_executed_task(&s, original_input) {
-        return ValidationOutcome::Rejected(reason);
+    if cfg.reject_executed_task {
+        if let Some(reason) = reject_if_likely_executed_task(&s, original_input) {
+            return ValidationOutcome::Rejected(reason);
+        }
     }
 
     ValidationOutcome::Repaired(s)
@@ -565,6 +575,40 @@ mod tests {
             "refactor the user service",
         );
         assert!(r.is_none());
+    }
+
+    // ── reject_executed_task flag (polish vs enhance) ───────────────
+
+    #[test]
+    fn polish_config_keeps_conversational_dictation() {
+        // Dictation legitimately opens with "Hi," — with the flag off (the
+        // polish config) the validator must NOT nuke it back to the raw
+        // transcript. This is the exact live failure that made Dictate a
+        // no-op: "Hi, I want to change the front-end colour" got rejected.
+        let raw = "Hi, I want to change the front-end colour.";
+        let input = "so hi i want to change the front end colour";
+        let cfg = ValidatorConfig {
+            reject_executed_task: false,
+            ..Default::default()
+        };
+        let outcome = validate_and_repair(raw, input, &cfg);
+        assert!(
+            matches!(outcome, ValidationOutcome::Repaired(_)),
+            "polish config should accept conversational dictation, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn enhance_config_still_rejects_conversational_opener() {
+        // The default (enhance) config must still reject chatbot-style
+        // openers — this rule is why the flag defaults to true.
+        let raw = "Hi, I want to change the front-end colour.";
+        let input = "make the enhance path emit a conversational answer";
+        let outcome = validate_and_repair(raw, input, &ValidatorConfig::default());
+        assert!(
+            matches!(outcome, ValidationOutcome::Rejected(_)),
+            "enhance config should still reject conversational openers, got {outcome:?}"
+        );
     }
 
     // ── End-to-end pipeline tests ───────────────────────────────────

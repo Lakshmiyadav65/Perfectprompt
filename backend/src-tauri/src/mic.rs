@@ -287,9 +287,10 @@ async fn transcribe_inner<R: Runtime>(
         return Err(anyhow!("Didn't catch any speech — try again."));
     }
     println!(
-        "[mic] transcript ({} chars) → {} pipeline",
+        "[mic] transcript ({} chars) → {} pipeline: {:?}",
         transcript.chars().count(),
-        mode.as_str()
+        mode.as_str(),
+        trim_for_log(&transcript, 240)
     );
 
     // Restore the user's real target window BEFORE we do anything focus- or
@@ -335,7 +336,11 @@ async fn transcribe_inner<R: Runtime>(
         }
     }
 
-    println!("[mic] pasted {} chars", output.final_text.len());
+    println!(
+        "[mic] pasted {} chars: {:?}",
+        output.final_text.len(),
+        trim_for_log(&output.final_text, 240)
+    );
     Ok(output.final_text)
 }
 
