@@ -27,6 +27,7 @@ mod question_bank;
 pub mod repo_digest;
 pub mod router;
 mod settings;
+mod space_ptt;
 mod status_window;
 mod toast_window;
 mod trace;
@@ -201,6 +202,8 @@ pub fn run() {
             mic::transcribe_and_enhance,
             settings::get_mic_hotkey,
             settings::save_mic_hotkey,
+            settings::get_space_ptt,
+            settings::set_space_ptt,
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,
@@ -236,6 +239,16 @@ pub fn run() {
                 hotkey::register(app.handle(), &user_settings.hotkey)?;
             } else {
                 println!("[hotkey] start-up: master toggle is OFF — not registering");
+            }
+
+            // Hold-Space push-to-talk (low-level keyboard hook). Store the
+            // concrete app handle once, then install only if both the master
+            // toggle and the space-PTT setting are on. Uninstalled by the
+            // master pause path (settings::set_hotkey_enabled) so the tray
+            // "Pause" is a hard off-switch for the hook.
+            space_ptt::set_app(app.handle());
+            if user_settings.enabled && user_settings.space_ptt_enabled {
+                space_ptt::install();
             }
             install_keep_alive_close_handlers(app.handle());
             // Start the foreground tracker so the capsule's Enhance icon

@@ -4,6 +4,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { ApiKeySetupChecklist } from "./ApiKeySetupChecklist";
+import { Toggle } from "./Toggle";
 import { useAuth } from "../hooks/useAuth";
 import { useDisplayName } from "../hooks/useDisplayName";
 import { useAvatar, fileToResizedDataUrl } from "../hooks/useAvatar";
@@ -47,6 +48,12 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [hotkey, setHotkey] = useState("Alt+E");
   const [hotkeyMsg, setHotkeyMsg] = useState<Msg>(null);
   const [recording, setRecording] = useState(false);
+  // Voice input: mic push-to-talk combo + the hold-Space PTT toggle.
+  const [micHotkey, setMicHotkey] = useState("Alt+M");
+  const [micRecording, setMicRecording] = useState(false);
+  const [micHotkeyMsg, setMicHotkeyMsg] = useState<Msg>(null);
+  const [spacePtt, setSpacePtt] = useState(false);
+  const [spacePttMsg, setSpacePttMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
   const apiKeySectionRef = useRef<HTMLElement>(null);
@@ -123,8 +130,38 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       setKeyStatus(status);
       const hk = await invoke<string>("get_hotkey");
       setHotkey(hk);
+      const mhk = await invoke<string>("get_mic_hotkey");
+      setMicHotkey(mhk);
+      const ptt = await invoke<boolean>("get_space_ptt");
+      setSpacePtt(ptt);
     } catch (e) {
       console.error("refresh failed:", e);
+    }
+  }
+
+  async function saveMicHotkey() {
+    setBusy("mic-hotkey");
+    setMicHotkeyMsg(null);
+    try {
+      await invoke("save_mic_hotkey", { combo: micHotkey });
+      setMicHotkeyMsg({ ok: true, text: `Registered ${micHotkey}` });
+    } catch (e) {
+      setMicHotkeyMsg({ ok: false, text: String(e) });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleSpacePtt(next: boolean) {
+    // Optimistic: flip immediately so the switch feels instant, then persist.
+    // On failure, roll back and surface the error.
+    setSpacePtt(next);
+    setSpacePttMsg(null);
+    try {
+      await invoke("set_space_ptt", { enabled: next });
+    } catch (e) {
+      setSpacePtt(!next);
+      setSpacePttMsg({ ok: false, text: String(e) });
     }
   }
 
@@ -238,6 +275,29 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
   }, [recording]);
+
+  // Same capture-on-keydown, for the mic (voice) push-to-talk combo field.
+  useEffect(() => {
+    if (!micRecording) return;
+    const handler = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const parts: string[] = [];
+      if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
+      if (e.altKey) parts.push("Alt");
+      if (e.shiftKey) parts.push("Shift");
+      const k = e.key;
+      if (["Control", "Alt", "Shift", "Meta", "OS", "Hyper"].includes(k)) {
+        return; // wait for a non-modifier
+      }
+      const keyName = k.length === 1 ? k.toUpperCase() : k;
+      parts.push(keyName);
+      setMicHotkey(parts.join("+"));
+      setMicRecording(false);
+    };
+    window.addEventListener("keydown", handler, true);
+    return () => window.removeEventListener("keydown", handler, true);
+  }, [micRecording]);
 
   if (!keyStatus) {
     return (
@@ -369,6 +429,58 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         {hotkeyMsg && (
           <p className={hotkeyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
             {hotkeyMsg.text}
+          </p>
+        )}
+      </section>
+
+      <section>
+        <h2>Voice input</h2>
+        <p className="pf-hint">
+          Hold the push-to-talk combo to speak; release to enhance. Add Shift to
+          the combo to dictate (clean transcription) instead. Click the field,
+          then press the combo you want.
+        </p>
+        <div className="pf-row">
+          <input
+            value={micRecording ? "Press a key combo…" : micHotkey}
+            readOnly
+            onFocus={() => setMicRecording(true)}
+            onBlur={() => setMicRecording(false)}
+            className={micRecording ? "pf-recording" : ""}
+            disabled={busy === "mic-hotkey"}
+          />
+          <button
+            onClick={saveMicHotkey}
+            disabled={busy === "mic-hotkey" || micRecording}
+          >
+            Save
+          </button>
+        </div>
+        {micHotkeyMsg && (
+          <p className={micHotkeyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
+            {micHotkeyMsg.text}
+          </p>
+        )}
+
+        <div className="pf-row pf-space-ptt-row">
+          <div className="pf-space-ptt-label">
+            <span className="pf-space-ptt-title">Hold Right Ctrl to talk</span>
+            <span className="pf-hint">
+              Hold the <strong>Right Ctrl</strong> key to voice-enhance; release
+              to finish. It's a non-typing key, so this never affects your
+              normal typing. Turn it off here (or pause PerfectPrompt from the
+              tray) any time.
+            </span>
+          </div>
+          <Toggle
+            checked={spacePtt}
+            onChange={(next) => void toggleSpacePtt(next)}
+            ariaLabel="Hold Space to talk"
+          />
+        </div>
+        {spacePttMsg && (
+          <p className={spacePttMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
+            {spacePttMsg.text}
           </p>
         )}
       </section>

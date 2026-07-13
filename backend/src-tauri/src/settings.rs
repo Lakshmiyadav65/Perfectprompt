@@ -46,6 +46,14 @@ fn default_mic_hotkey() -> String {
     hotkey::DEFAULT_MIC_HOTKEY.to_string()
 }
 
+fn default_space_ptt_enabled() -> bool {
+    // Off by default: hold-Space PTT installs a low-level keyboard hook that
+    // intercepts EVERY spacebar press, so it must be an explicit opt-in the
+    // user turns on when ready (Settings → "Hold Space to talk"), never a
+    // surprise that changes their typing mid-session.
+    false
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserSettings {
     pub hotkey: String,
@@ -62,6 +70,13 @@ pub struct UserSettings {
     /// Registered alongside `hotkey` in `hotkey::register`.
     #[serde(default = "default_mic_hotkey")]
     pub mic_hotkey: String,
+    /// Hold-Space push-to-talk for voice-enhance (the low-level keyboard hook
+    /// in `space_ptt.rs`). Separate from `enabled` so the user can turn just
+    /// this off without pausing the whole app. Defaults on (the user asked for
+    /// spacebar voice). `#[serde(default)]` so pre-feature settings.json still
+    /// deserialise.
+    #[serde(default = "default_space_ptt_enabled")]
+    pub space_ptt_enabled: bool,
     /// **DEPRECATED — DO NOT READ.** Legacy single-user API key from
     /// before per-user scoping landed (v0.4.1 and earlier). Kept on the
     /// struct so existing settings.json files still deserialise, but no
@@ -110,6 +125,7 @@ impl Default for UserSettings {
             hotkey: hotkey::DEFAULT_HOTKEY.to_string(),
             annotate_hotkey: hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string(),
             mic_hotkey: hotkey::DEFAULT_MIC_HOTKEY.to_string(),
+            space_ptt_enabled: default_space_ptt_enabled(),
             api_key: None,
             api_keys: HashMap::new(),
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
@@ -598,6 +614,31 @@ fn dedupe_lower(items: Vec<String>) -> Vec<String> {
 }
 
 #[tauri::command]
+pub fn get_space_ptt<R: Runtime>(app: AppHandle<R>) -> bool {
+    load(&app).space_ptt_enabled
+}
+
+/// Toggle hold-Space push-to-talk. Persists the flag and installs/uninstalls
+/// the low-level keyboard hook immediately. Only installs when the master
+/// toggle is also on (a paused app registers nothing system-wide).
+#[tauri::command]
+pub fn set_space_ptt<R: Runtime>(
+    app: AppHandle<R>,
+    enabled: bool,
+) -> std::result::Result<(), String> {
+    let mut settings = load(&app);
+    settings.space_ptt_enabled = enabled;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+
+    if enabled && settings.enabled {
+        crate::space_ptt::install();
+    } else {
+        crate::space_ptt::uninstall();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_hotkey_enabled<R: Runtime>(app: AppHandle<R>) -> bool {
     load(&app).enabled
 }
@@ -619,8 +660,13 @@ pub fn set_hotkey_enabled<R: Runtime>(
     if enabled {
         hotkey::reregister(&app, &settings.hotkey).map_err(|e| format!("{e:#}"))?;
         println!("[hotkey] enabled — registered {}", settings.hotkey);
+        if settings.space_ptt_enabled {
+            crate::space_ptt::install();
+        }
     } else {
         hotkey::unregister_all(&app);
+        // Pause is the hard off-switch for the keyboard hook too.
+        crate::space_ptt::uninstall();
     }
     Ok(())
 }

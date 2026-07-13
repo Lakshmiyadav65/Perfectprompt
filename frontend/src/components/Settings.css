@@ -693,3 +693,24 @@
   color: var(--pf-text, #e8e6e3);
   font-weight: 600;
 }
+
+/* Voice input — hold-Space push-to-talk toggle row. */
+.pf-space-ptt-row {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+.pf-space-ptt-label {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 400px;
+}
+.pf-space-ptt-title {
+  font-weight: 600;
+  color: var(--pf-text, #e8e6e3);
+}
+.pf-space-ptt-row .pf-space-ptt-label .pf-hint {
+  margin: 0;
+}
