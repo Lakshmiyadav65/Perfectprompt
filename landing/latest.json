@@ -1,11 +1,11 @@
 {
-  "version": "0.6.1",
-  "notes": "Polish mode: clean up any message in your own voice with the polish hotkey, without leaving the app. Project context (beta): enhancements that understand what you're building — join the waitlist from the Projects tab. Plus 35 free enhancements every day.",
-  "pub_date": "2026-06-30T05:36:54Z",
+  "version": "0.7.0",
+  "notes": "🎤 Voice: hold your hotkey (or Right Ctrl), speak, and a polished prompt lands right at your cursor. 🖼️ Visual Annotate: screenshot anything, drop pins, and turn it into structured context for your coding agent. Plus a faithful-rewrite upgrade so casual phrasing stays true to what you meant.",
+  "pub_date": "2026-07-14T06:33:00Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMmJsZXZsVFR1WHU0VnZodmxLNWNTS043QTlydHpjWmRyemNndCtBa3V1ZGNXU24yS2hZVjhDd29OeStPM011K3RFYnlkREJCNGVKazlvUjd2Ty90TzNYY0dzdUJmS0FnPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzgyNzk3NjcyCWZpbGU6UGVyZmVjdFByb21wdF8wLjYuMV94NjQtc2V0dXAuZXhlCjlFRmJjVkNiN3F5dWozZVVtb1R5Rk1mMGVqbmxvRmRpNSt2YThpUnMyR28vOUYrRzZyM0ZrTmJ1Vy9OVG83a2N1Y25FQjFRWVduUDV3VExoVWRrMURnPT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.6.1/PerfectPrompt_0.6.1_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMmJsZXZsVFR1WHE2b2xHQzRvY0NFN1N1eU85aFR2YkhjNEZtWDllai84eE9xdFJOaS91QlVEK2FrMkJjanlGaWkrT1lwR2UvNFVnZjJIMWRWYXRVb3QxRXZTOGFvekFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MDEwNzYyCWZpbGU6UGVyZmVjdFByb21wdF8wLjcuMF94NjQtc2V0dXAuZXhlClZOeFJKSXBIaStXdC80OFU1NnRLUk93SzI1N3M2TVVOMTZ6cVRHYUU3ZUNLQzBuUVhUdHZYN3UrUW5vSENsM3B0eWdlZ1JHNFZQd2xObkdJWS9IVUJnPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.7.0/PerfectPrompt_0.7.0_x64-setup.exe"
     }
   }
 }
