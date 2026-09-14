@@ -455,7 +455,7 @@ pub async fn test_connection<R: Runtime>(app: AppHandle<R>) -> ConnectionTest {
     };
 
     let body = json!({
-        "model": "llama-3.3-70b-versatile",
+        "model": crate::enhance::MODEL,
         "max_tokens": 8,
         "messages": [{ "role": "user", "content": "ping" }]
     });

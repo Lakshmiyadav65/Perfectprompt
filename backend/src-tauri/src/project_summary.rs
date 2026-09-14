@@ -51,7 +51,7 @@ pub const GENERATOR_PROMPT_FILE: &str = "project-summary-generator.md";
 /// Refresh clicks don't produce wildly different summaries —
 /// reduces user confusion ("which one was right?") and makes
 /// regression debugging tractable.
-const GEN_MODEL_LABEL: &str = "llama-3.3-70b-versatile";
+const GEN_MODEL_LABEL: &str = crate::enhance::MODEL;
 const GEN_MAX_TOKENS: u32 = 1_200;
 const GEN_TEMPERATURE: f32 = 0.1;
 

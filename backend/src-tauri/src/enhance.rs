@@ -10,7 +10,13 @@ use crate::{clipboard, projects, settings};
 
 const ENV_VAR: &str = "GROQ_API_KEY";
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL: &str = "llama-3.3-70b-versatile";
+/// Groq retired llama-3.3-70b-versatile (404 model_not_found, Sep 2026).
+pub const MODEL: &str = "openai/gpt-oss-120b";
+/// gpt-oss is a reasoning model: its hidden reasoning tokens count against
+/// `max_tokens`. Keep effort low for latency and add headroom on top of each
+/// route's output budget so rewrites aren't truncated.
+pub const REASONING_EFFORT: &str = "low";
+pub const REASONING_HEADROOM: u32 = 512;
 const REQUEST_TIMEOUT_SECS: u64 = 30;
 
 /// Typed Groq client error. Stage D in `pipeline::run` matches on this
@@ -106,6 +112,7 @@ struct ChatRequest<'a> {
     model: &'a str,
     max_tokens: u32,
     temperature: f32,
+    reasoning_effort: &'a str,
     messages: Vec<Message<'a>>,
 }
 
@@ -113,6 +120,7 @@ struct ChatRequest<'a> {
 struct ChatRequestJson<'a> {
     model: &'a str,
     max_tokens: u32,
+    reasoning_effort: &'a str,
     messages: Vec<Message<'a>>,
     response_format: ResponseFormat,
 }
@@ -178,8 +186,9 @@ pub async fn call_llm<R: Runtime>(
 
     let body = ChatRequest {
         model: MODEL,
-        max_tokens,
+        max_tokens: max_tokens + REASONING_HEADROOM,
         temperature,
+        reasoning_effort: REASONING_EFFORT,
         messages: vec![
             Message {
                 role: "system",
@@ -260,7 +269,8 @@ You MUST respond with valid JSON in the following format containing exactly one 
 
         let body = ChatRequestJson {
             model: MODEL,
-            max_tokens: 1024,
+            max_tokens: 1024 + REASONING_HEADROOM,
+            reasoning_effort: REASONING_EFFORT,
             messages: vec![
                 Message {
                     role: "system",

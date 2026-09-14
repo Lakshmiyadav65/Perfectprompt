@@ -11,10 +11,11 @@ use crate::question_bank::{Domain, GeneratedQuestion, ImpactDimension, QuestionT
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 
 /// Faster, cheaper model for the classification-style question-generation
-/// task (PRD §13 Q4). The enhancement call keeps the 70B model.
-const MODEL: &str = "llama-3.1-8b-instant";
+/// task (PRD §13 Q4). The enhancement call keeps the larger model. Groq
+/// retired llama-3.1-8b-instant (Sep 2026).
+const MODEL: &str = "openai/gpt-oss-20b";
 
-const MAX_TOKENS: u32 = 768;
+const MAX_TOKENS: u32 = 768 + crate::enhance::REASONING_HEADROOM;
 
 /// PRD §6.5: question generation must give up at 3s so the card can fall
 /// back to the static bank.
@@ -34,6 +35,7 @@ struct ChatRequest<'a> {
     messages: Vec<Message<'a>>,
     response_format: ResponseFormat,
     temperature: f32,
+    reasoning_effort: &'a str,
 }
 
 #[derive(Serialize)]
@@ -118,6 +120,7 @@ pub async fn generate_questions_via_llm<R: Runtime>(
         model: MODEL,
         max_tokens: MAX_TOKENS,
         temperature: 0.2,
+        reasoning_effort: crate::enhance::REASONING_EFFORT,
         messages: vec![
             Message {
                 role: "system",

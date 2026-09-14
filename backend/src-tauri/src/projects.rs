@@ -672,7 +672,7 @@ async fn try_generate_and_store_summary<R: Runtime>(
                 markdown: md,
                 generated_at: now_iso_8601(),
                 user_edited: false,
-                generator_model: "llama-3.3-70b-versatile".to_string(),
+                generator_model: crate::enhance::MODEL.to_string(),
             };
             if let Err(e) = persist_summary(app, project_id, summary) {
                 eprintln!(
@@ -799,7 +799,7 @@ pub async fn regenerate_project_summary<R: Runtime>(
         markdown: md,
         generated_at: now_iso_8601(),
         user_edited: false,
-        generator_model: "llama-3.3-70b-versatile".to_string(),
+        generator_model: crate::enhance::MODEL.to_string(),
     };
     persist_summary(&app, &project_id, summary.clone())
         .map_err(|e| format!("{e:#}"))?;

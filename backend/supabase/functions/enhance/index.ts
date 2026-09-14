@@ -22,7 +22,9 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { SYSTEM_PROMPTS, type Route } from "./_prompts.ts";
 
 const GROQ_URL         = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL       = "llama-3.3-70b-versatile";
+// Groq retired llama-3.3-70b-versatile (Sep 2026). gpt-oss is a reasoning
+// model; its reasoning tokens count against max_tokens, hence low effort.
+const GROQ_MODEL       = "openai/gpt-oss-120b";
 const MAX_INPUT_CHARS  = 8000;
 const LLM_TIMEOUT_MS   = 30_000;
 // Project Knowledge revamp (Layer 4) — accept a client-built <context>
@@ -174,6 +176,7 @@ Deno.serve(async (req) => {
         model:       GROQ_MODEL,
         temperature: 0.2,
         max_tokens:  2048,
+        reasoning_effort: "low",
         messages: [
           { role: "system", content: systemPrompt },
           {

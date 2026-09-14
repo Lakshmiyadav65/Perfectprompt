@@ -43,9 +43,10 @@ const ANNOTATE_PROMPT_FILE: &str = "annotate-enhancer.md";
 
 const API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 /// Groq multimodal model. Kept as a single const so a Groq model-id change
-/// is a one-line edit. Llama-4 Scout is Groq's current vision workhorse; the
-/// older `llama-3.2-*-vision` previews were decommissioned.
-const VISION_MODEL: &str = "meta-llama/llama-4-scout-17b-16e-instruct";
+/// is a one-line edit. Llama-4 Scout was retired (Sep 2026); Qwen 3.8 is the
+/// multimodal model Groq still lists. Its thinking is disabled below so the
+/// answer isn't prefixed with reasoning.
+const VISION_MODEL: &str = "qwen/qwen3.8-27b";
 const VISION_MAX_TOKENS: u32 = 1500;
 const VISION_TEMPERATURE: f32 = 0.3;
 /// Vision calls carry a base64 image + can produce a long structured answer,
@@ -260,6 +261,7 @@ async fn call_vision_llm<R: Runtime>(
         "model": VISION_MODEL,
         "max_tokens": VISION_MAX_TOKENS,
         "temperature": VISION_TEMPERATURE,
+        "reasoning_effort": "none",
         "messages": [
             { "role": "system", "content": system_prompt },
             { "role": "user", "content": [

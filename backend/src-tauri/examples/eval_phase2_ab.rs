@@ -42,7 +42,7 @@ use perfectprompt_lib::router::{self, RoutingDecision};
 use perfectprompt_lib::validate::{self, ValidationOutcome, ValidatorConfig};
 
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL: &str = "llama-3.3-70b-versatile";
+const MODEL: &str = "openai/gpt-oss-120b";
 const HTTP_TIMEOUT_SECS: u64 = 60;
 const ACTIVE_APP: &str = "ab-harness";
 
