@@ -1,11 +1,11 @@
 {
-  "version": "0.7.0",
-  "notes": "🎤 Voice: hold your hotkey (or Right Ctrl), speak, and a polished prompt lands right at your cursor. 🖼️ Visual Annotate: screenshot anything, drop pins, and turn it into structured context for your coding agent. Plus a faithful-rewrite upgrade so casual phrasing stays true to what you meant.",
-  "pub_date": "2026-07-14T06:33:00Z",
+  "version": "0.7.1",
+  "notes": "Fixes enhancing, Test connection and question cards failing with a \"model not found\" error after Groq retired its older AI models. Also stops the voice hotkey setting from accepting keys that would block normal typing.",
+  "pub_date": "2026-09-14T13:27:52Z",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMmJsZXZsVFR1WHE2b2xHQzRvY0NFN1N1eU85aFR2YkhjNEZtWDllai84eE9xdFJOaS91QlVEK2FrMkJjanlGaWkrT1lwR2UvNFVnZjJIMWRWYXRVb3QxRXZTOGFvekFVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg0MDEwNzYyCWZpbGU6UGVyZmVjdFByb21wdF8wLjcuMF94NjQtc2V0dXAuZXhlClZOeFJKSXBIaStXdC80OFU1NnRLUk93SzI1N3M2TVVOMTZ6cVRHYUU3ZUNLQzBuUVhUdHZYN3UrUW5vSENsM3B0eWdlZ1JHNFZQd2xObkdJWS9IVUJnPT0K",
-      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.7.0/PerfectPrompt_0.7.0_x64-setup.exe"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSMmJsZXZsVFR1WGdKSDJYZXhMYXYrRjJmMGY5MDh3ZCtya2I1c2FnenlERENpTC9DL1lkMXNlN0NzSDBJNFo4UFc4OWkyS0UrUlMvazBJcTJ0NGdNdVQwWmcxay9BeXdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzg5MzkyNDI0CWZpbGU6UGVyZmVjdFByb21wdF8wLjcuMV94NjQtc2V0dXAuZXhlClhqMGF4TFpRWEE1c2M1cDVRbE1zbXkzWVkrM0VrdnozdEJRSmZ2REo5UVdwc0xPbmc3UkdBYTd2ZWZxOWFVbm9KdG10dTZqSFZqRFNnTFNNMWt5QURBPT0K",
+      "url": "https://github.com/Lakshmiyadav65/Perfectprompt/releases/download/v0.7.1/PerfectPrompt_0.7.1_x64-setup.exe"
     }
   }
 }
