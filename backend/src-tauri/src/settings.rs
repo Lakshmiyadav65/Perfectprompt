@@ -338,6 +338,7 @@ pub fn save_hotkey<R: Runtime>(
     if trimmed.is_empty() {
         return Err("hotkey combo cannot be empty".into());
     }
+    hotkey::validate_user_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
     // Validate by re-registering. If parse/registration fails, surface that error
     // and don't persist the bad combo.
     hotkey::reregister(&app, &trimmed).map_err(|e| format!("{e:#}"))?;
@@ -367,7 +368,7 @@ pub fn save_annotate_hotkey<R: Runtime>(
     if trimmed.is_empty() {
         return Err("hotkey combo cannot be empty".into());
     }
-    hotkey::validate_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
+    hotkey::validate_user_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
 
     let mut settings = load(&app);
     let previous = settings.annotate_hotkey.clone();
@@ -403,7 +404,7 @@ pub fn save_mic_hotkey<R: Runtime>(
     if trimmed.is_empty() {
         return Err("hotkey combo cannot be empty".into());
     }
-    hotkey::validate_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
+    hotkey::validate_user_combo(&trimmed).map_err(|e| format!("{e:#}"))?;
 
     let mut settings = load(&app);
     let previous = settings.mic_hotkey.clone();

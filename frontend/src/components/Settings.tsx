@@ -34,6 +34,45 @@ type UpdateState =
   | { kind: "error" };
 type Msg = { ok: boolean; text: string } | null;
 
+const NAMED_CODES = new Set([
+  "Space", "Enter", "Tab", "Backspace", "Delete", "Insert", "Home", "End",
+  "PageUp", "PageDown", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+  "Period", "Comma", "Slash", "Backslash", "Semicolon", "Quote", "Minus",
+  "Equal", "BracketLeft", "BracketRight", "Backquote",
+]);
+
+// Build a global-shortcut accelerator from a keydown. Reads e.code (the
+// physical key), not e.key, which Alt/Shift and keyboard layouts turn into
+// symbols like "." that register as a bare, typing-hijacking hotkey. Shift is
+// reserved: the app adds it itself for the bypass/Dictate variant.
+function comboFromKeyEvent(
+  e: KeyboardEvent,
+): { combo: string } | { error: string } | null {
+  if (["Control", "Alt", "Shift", "Meta", "OS", "Hyper", "AltGraph"].includes(e.key)) {
+    return null;
+  }
+  const code = e.code;
+  let key: string | null = null;
+  if (/^Key[A-Z]$/.test(code)) key = code.slice(3);
+  else if (/^Digit[0-9]$/.test(code)) key = code.slice(5);
+  else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) key = code;
+  else if (NAMED_CODES.has(code)) key = code;
+  if (!key) return { error: `That key (${e.key}) can't be used — try a letter or number.` };
+
+  const isFKey = /^F\d+$/.test(key);
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !isFKey) {
+    return { error: "Hold Ctrl or Alt with the key, e.g. Alt+V or Ctrl+Alt+Space." };
+  }
+  if (e.shiftKey) {
+    return { error: "Leave out Shift — it's added automatically for the second mode." };
+  }
+  const parts: string[] = [];
+  if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
+  if (e.altKey) parts.push("Alt");
+  parts.push(key);
+  return { combo: parts.join("+") };
+}
+
 interface SettingsProps {
   /// When set, Settings scrolls + focuses the matching section on
   /// mount. Caller (Shell) is responsible for clearing it via
@@ -257,20 +296,16 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     const handler = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
-
-      const parts: string[] = [];
-      if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
-      if (e.altKey) parts.push("Alt");
-      if (e.shiftKey) parts.push("Shift");
-
-      const k = e.key;
-      if (["Control", "Alt", "Shift", "Meta", "OS", "Hyper"].includes(k)) {
-        return; // wait for non-modifier
+      const result = comboFromKeyEvent(e);
+      if (!result) return; // modifier only — wait for the real key
+      if ("error" in result) {
+        setHotkeyMsg({ ok: false, text: result.error });
+        return;
       }
-      const keyName = k.length === 1 ? k.toUpperCase() : k;
-      parts.push(keyName);
-      setHotkey(parts.join("+"));
+      setHotkeyMsg(null);
+      setHotkey(result.combo);
       setRecording(false);
+      (document.activeElement as HTMLElement | null)?.blur();
     };
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);
@@ -282,18 +317,16 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     const handler = (e: KeyboardEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const parts: string[] = [];
-      if (e.ctrlKey || e.metaKey) parts.push("CommandOrControl");
-      if (e.altKey) parts.push("Alt");
-      if (e.shiftKey) parts.push("Shift");
-      const k = e.key;
-      if (["Control", "Alt", "Shift", "Meta", "OS", "Hyper"].includes(k)) {
-        return; // wait for a non-modifier
+      const result = comboFromKeyEvent(e);
+      if (!result) return; // modifier only — wait for the real key
+      if ("error" in result) {
+        setMicHotkeyMsg({ ok: false, text: result.error });
+        return;
       }
-      const keyName = k.length === 1 ? k.toUpperCase() : k;
-      parts.push(keyName);
-      setMicHotkey(parts.join("+"));
+      setMicHotkeyMsg(null);
+      setMicHotkey(result.combo);
       setMicRecording(false);
+      (document.activeElement as HTMLElement | null)?.blur();
     };
     window.addEventListener("keydown", handler, true);
     return () => window.removeEventListener("keydown", handler, true);

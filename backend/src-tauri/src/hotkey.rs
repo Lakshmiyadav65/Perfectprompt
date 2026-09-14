@@ -37,6 +37,30 @@ pub fn validate_combo(combo: &str) -> Result<()> {
         .map_err(|e| anyhow!("invalid hotkey {combo:?}: {e}"))
 }
 
+/// Reject combos that would hijack ordinary typing system-wide: a global
+/// shortcut needs Ctrl/Alt/Super (Shift alone still types), except F-keys.
+pub fn validate_user_combo(combo: &str) -> Result<()> {
+    validate_combo(combo)?;
+    let parts: Vec<&str> = combo.split('+').map(str::trim).collect();
+    let has_modifier = parts.iter().any(|p| {
+        matches!(
+            p.to_ascii_lowercase().as_str(),
+            "commandorcontrol" | "cmdorctrl" | "control" | "ctrl" | "alt" | "option"
+                | "super" | "cmd" | "command" | "meta"
+        )
+    });
+    let is_fkey = parts.last().map_or(false, |k| {
+        let k = k.to_ascii_uppercase();
+        k.len() > 1 && k.starts_with('F') && k[1..].parse::<u8>().is_ok()
+    });
+    if !has_modifier && !is_fkey {
+        return Err(anyhow!(
+            "hotkey {combo:?} needs Ctrl or Alt, otherwise it would block normal typing"
+        ));
+    }
+    Ok(())
+}
+
 pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()> {
     let shortcut = Shortcut::from_str(combo)
         .map_err(|e| tauri::Error::Anyhow(anyhow::anyhow!("invalid hotkey {combo:?}: {e}")))?;
@@ -128,7 +152,11 @@ pub fn register<R: Runtime>(app: &AppHandle<R>, combo: &str) -> tauri::Result<()
     // dictates. Registered here for the same reason as annotate — so it
     // survives every path that re-runs `register`. Best-effort: a bad/duplicate
     // combo logs but never fails the enhance-hotkey registration.
-    let mic_combo = settings::load(app).mic_hotkey;
+    let mut mic_combo = settings::load(app).mic_hotkey;
+    if let Err(e) = validate_user_combo(&mic_combo) {
+        println!("[hotkey] ignoring unsafe mic combo ({e:#}) — using {DEFAULT_MIC_HOTKEY}");
+        mic_combo = DEFAULT_MIC_HOTKEY.to_string();
+    }
     register_mic_chord(app, &mic_combo, crate::mic::MicMode::Enhance);
     register_mic_chord(app, &bypass_variant(&mic_combo), crate::mic::MicMode::Dictate);
 
