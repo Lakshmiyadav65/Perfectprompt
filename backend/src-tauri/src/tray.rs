@@ -7,7 +7,7 @@ use tauri::{
 use crate::toast_window;
 
 pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
-    let home_item = MenuItem::with_id(app, "home", "Open Promptastra", true, None::<&str>)?;
+    let home_item = MenuItem::with_id(app, "home", "Open PromptAstra", true, None::<&str>)?;
     let projects_item = MenuItem::with_id(app, "projects", "Projects", true, None::<&str>)?;
     let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
     let question_card_item = MenuItem::with_id(
@@ -17,7 +17,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         true,
         None::<&str>,
     )?;
-    let quit_item = MenuItem::with_id(app, "quit", "Quit Promptastra", true, None::<&str>)?;
+    let quit_item = MenuItem::with_id(app, "quit", "Quit PromptAstra", true, None::<&str>)?;
     let menu = Menu::with_items(
         app,
         &[
@@ -36,7 +36,7 @@ pub fn build<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 
     TrayIconBuilder::with_id("main-tray")
         .icon(icon)
-        .tooltip("Promptastra")
+        .tooltip("PromptAstra")
         .menu(&menu)
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -94,7 +94,7 @@ pub fn notify_fallback<R: Runtime>(app: &AppHandle<R>, message: &str) {
     // 3) Show the app-styled toast window. The OS-native
     //    `tauri-plugin-notification` path is intentionally NOT used
     //    here — it produced a generic Windows Action Center toast
-    //    that didn't match the Promptastra dark UI. The in-app toast
+    //    that didn't match the PromptAstra dark UI. The in-app toast
     //    matches the rest of the app's visual language.
     if let Err(e) = toast_window::show(app) {
         eprintln!("[fallback] toast window show failed: {e:#}");
@@ -108,7 +108,7 @@ pub fn notify_fallback<R: Runtime>(app: &AppHandle<R>, message: &str) {
         let _ = tauri::async_runtime::spawn(async move {
             tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
             if let Some(t) = app2.tray_by_id("main-tray") {
-                let _ = t.set_tooltip(Some("Promptastra"));
+                let _ = t.set_tooltip(Some("PromptAstra"));
             }
         });
     }

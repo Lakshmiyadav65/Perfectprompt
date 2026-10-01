@@ -1,4 +1,4 @@
-# Promptastra
+# PromptAstra
 
 > A system-tray prompt enhancer. Press a global hotkey anywhere on your computer to turn rough prompts into precise ones — works in any app where you can select text.
 
@@ -10,13 +10,13 @@ Built with Tauri 2 + Rust + React + TypeScript.
 
 1. Select rough prompt text in any app (Notepad, Brave, VS Code chat, terminal, anywhere).
 2. Press the global hotkey (default `Ctrl+Alt+E` on Windows, `Cmd+Option+E` on macOS).
-3. Promptastra captures the selection and runs the **Smart Question Engine** (see below). The result is pasted back over your selection.
+3. PromptAstra captures the selection and runs the **Smart Question Engine** (see below). The result is pasted back over your selection.
 
 Think Wispr Flow, but for written prompts to coding agents (Claude Code, Cursor, ChatGPT) instead of voice.
 
 ### Two paths after the hotkey
 
-Promptastra scores the captured input for "enhancement ambiguity" and branches:
+PromptAstra scores the captured input for "enhancement ambiguity" and branches:
 
 - **Silent fast-path** (`score < threshold`, or `question_mode = Silent`, or **`Shift`+hotkey**): one LLM call, a small "Enhancing…" pill near your cursor, the enhanced text replaces your selection in ~2–3 seconds.
 - **Question-card path** (`score ≥ threshold`, or `question_mode = Always ask`): a 360px floating card appears with 2–4 chip questions about audience / tone / goal / constraints / format. Pick the most defensible answers (Enter submits, Escape skips, arrow keys navigate), and the enhanced prompt — informed by your answers — replaces your selection.
@@ -46,7 +46,7 @@ The core round-trip works on Windows for both the silent fast-path (`Ctrl+Alt+E`
 
 ## Apps known not to work / unconfirmed
 
-The synthetic-input dispatch may be blocked by Electron-based apps that debounce or filter `WM_KEYDOWN` events. Running Promptastra as administrator can sometimes work around UIPI-related blocks. To be expanded with real-world data once more users test it.
+The synthetic-input dispatch may be blocked by Electron-based apps that debounce or filter `WM_KEYDOWN` events. Running PromptAstra as administrator can sometimes work around UIPI-related blocks. To be expanded with real-world data once more users test it.
 
 ---
 
@@ -103,14 +103,14 @@ The first build is slow (~2 minutes — pulling and compiling Rust dependencies)
 
 You should see:
 
-- A small Promptastra tray icon appear in the system tray.
+- A small PromptAstra tray icon appear in the system tray.
 - Console output: `[env] loaded …/.env` and `[hotkey] registered: CommandOrControl+Alt+E`.
 
 ### Use it
 
 1. Select some rough prompt text in any app (e.g., type `fix the dashboard` in Notepad and select it).
 2. Press **`Ctrl+Alt+E`**.
-3. Depending on how ambiguous Promptastra thinks your input is:
+3. Depending on how ambiguous PromptAstra thinks your input is:
    - For specific inputs (e.g. *"refactor the user service to use async/await instead of promise chains"*): a small "Enhancing…" pill appears near your cursor, and your selection is replaced with the rewrite in 1–3 seconds.
    - For ambiguous inputs (e.g. *"fix the dashboard"*): a 360px **question card** appears with 2–4 chip questions. Pick the most defensible answers (Tab between fields, arrow keys between chips, Space to select, Enter to submit, Escape to skip), and the enhanced prompt — informed by your answers — replaces your selection.
 4. Hold **`Shift`** while pressing the hotkey to skip the card for a single invocation, regardless of mode.
@@ -222,7 +222,7 @@ Open via the tray menu → **Settings**.
 - **Smart Question Engine**:
   - **Mode**: `Adaptive` (default — show the card only when the complexity score crosses the threshold), `Always ask` (card on every hotkey), or `Silent` (never show the card, go straight to enhance + paste).
   - **Ambiguity threshold** (only in Adaptive mode): slider 0.00–1.00. Lower = ask more often. Default 0.60.
-  - The privacy note links to Groq's data policy — question text, your answers, and the assembled `[CONTEXT]` block are kept in memory only by Promptastra, but they are sent to Groq as part of the LLM call.
+  - The privacy note links to Groq's data policy — question text, your answers, and the assembled `[CONTEXT]` block are kept in memory only by PromptAstra, but they are sent to Groq as part of the LLM call.
 - **`Shift`+hotkey bypass** — hold Shift while pressing the hotkey to skip the card for a single invocation, regardless of mode. Same effect as `Silent` for that one call.
 
 ### Settings storage location

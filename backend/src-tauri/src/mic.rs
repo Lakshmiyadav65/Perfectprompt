@@ -3,7 +3,7 @@
 //! Where Annotate captures the *screen* and Enhance captures the *clipboard
 //! selection*, Mic captures the user's *voice*. Wispr-Flow-style: hold a
 //! push-to-talk hotkey, speak, release — the words come back as clean text at
-//! the cursor. Because this is Promptastra (not a plain dictation app), the
+//! the cursor. Because this is PromptAstra (not a plain dictation app), the
 //! transcript is then run through the exact same enhancement engine the hotkey
 //! flow uses, so rough speech becomes a structured, high-quality prompt.
 //!

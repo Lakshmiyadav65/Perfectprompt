@@ -101,7 +101,7 @@ pub fn run() {
             mic: std::sync::Mutex::new(mic::MicSession::default()),
         })
         // Single-instance: when the user double-clicks the desktop icon
-        // (or relaunches in any way) while Promptastra is already running,
+        // (or relaunches in any way) while PromptAstra is already running,
         // bring the existing main window to the foreground instead of
         // spawning a second tray + hotkey owner. The closure receives the
         // CLI args of the second instance. On Windows, OAuth deep-link
@@ -231,7 +231,7 @@ pub fn run() {
 
             tray::build(app.handle())?;
             // Honour the persisted master toggle on startup. When the
-            // user has paused Promptastra, we still build the tray and
+            // user has paused PromptAstra, we still build the tray and
             // window but skip global-shortcut registration so the
             // hotkey is genuinely dormant. Flipping the toggle back on
             // from the sidebar re-registers it.
@@ -271,7 +271,7 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 
-/// Promptastra is a system-tray app, so the auxiliary windows must outlive
+/// PromptAstra is a system-tray app, so the auxiliary windows must outlive
 /// the user clicking their X buttons. Tauri 2's default behavior on
 /// `CloseRequested` is to *destroy* the WebviewWindow, after which
 /// `get_webview_window(label)` returns `None` and the tray menu can no

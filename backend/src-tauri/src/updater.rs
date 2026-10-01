@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 /// in-app updater, only through the landing-page download.
 const RELEASES_API_URL: &str =
     "https://api.github.com/repos/Lakshmiyadav65/Perfectprompt/releases/latest";
-const USER_AGENT: &str = "Promptastra-UpdateCheck";
+const USER_AGENT: &str = "PromptAstra-UpdateCheck";
 const CURRENT_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Deserialize)]

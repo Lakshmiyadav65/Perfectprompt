@@ -104,7 +104,7 @@ export function SignupGate() {
         <div className="pf-gate-card">
           <div className="pf-gate-brand">
             <div className="pf-gate-brand-mark" aria-hidden="true" />
-            <span className="pf-gate-brand-name">Promptastra</span>
+            <span className="pf-gate-brand-name">PromptAstra</span>
           </div>
           <h1 className="pf-gate-title">Check your email</h1>
           <p className="pf-gate-sub">
@@ -129,7 +129,7 @@ export function SignupGate() {
         <div className="pf-gate-card">
           <div className="pf-gate-brand">
             <div className="pf-gate-brand-mark" aria-hidden="true" />
-            <span className="pf-gate-brand-name">Promptastra</span>
+            <span className="pf-gate-brand-name">PromptAstra</span>
           </div>
           <h1 className="pf-gate-title">One more step</h1>
           <p className="pf-gate-sub">
@@ -154,12 +154,12 @@ export function SignupGate() {
   const titles: Record<Mode, { title: string; sub: string; cta: string }> = {
     signin: {
       title: "Welcome back",
-      sub: "Sign in to continue using Promptastra.",
+      sub: "Sign in to continue using PromptAstra.",
       cta: "Sign in",
     },
     signup: {
       title: "Create your account",
-      sub: "Start enhancing your writing instantly with Promptastra.",
+      sub: "Start enhancing your writing instantly with PromptAstra.",
       cta: "Sign up",
     },
     reset: {
@@ -175,7 +175,7 @@ export function SignupGate() {
       <div className="pf-gate-card">
         <div className="pf-gate-brand">
           <div className="pf-gate-brand-mark" aria-hidden="true" />
-          <span className="pf-gate-brand-name">Promptastra</span>
+          <span className="pf-gate-brand-name">PromptAstra</span>
         </div>
 
         <h1 className="pf-gate-title">{t.title}</h1>

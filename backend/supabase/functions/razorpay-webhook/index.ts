@@ -1,4 +1,4 @@
-// Promptastra razorpay-webhook edge function.
+// PromptAstra razorpay-webhook edge function.
 //
 // Razorpay POSTs subscription lifecycle events to this URL whenever one
 // of our created subscriptions transitions state. The function:

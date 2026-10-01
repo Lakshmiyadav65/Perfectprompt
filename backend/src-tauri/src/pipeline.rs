@@ -1252,7 +1252,7 @@ pub(crate) fn classify_hosted_error(err: &HostedError) -> (String, String, Strin
             "fallback_quota".into(),
             "hosted_quota_exhausted".into(),
             format!(
-                "Daily limit reached ({}/{}) — open Promptastra to upgrade or wait for midnight IST.",
+                "Daily limit reached ({}/{}) — open PromptAstra to upgrade or wait for midnight IST.",
                 q.used,
                 q.limit.unwrap_or(0),
             ),
@@ -1260,7 +1260,7 @@ pub(crate) fn classify_hosted_error(err: &HostedError) -> (String, String, Strin
         HostedError::Network(_) => (
             "n/a".into(),
             format!("hosted_network: {err}"),
-            "Couldn't reach Promptastra servers — try again or sign out to use your own key."
+            "Couldn't reach PromptAstra servers — try again or sign out to use your own key."
                 .into(),
         ),
         HostedError::InvalidResponse(_) | HostedError::Other { .. } => (
