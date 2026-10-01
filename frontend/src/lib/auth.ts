@@ -86,7 +86,7 @@ export async function signInWithPassword(
 }
 
 /// Send a password-reset email. The link Supabase emails points at
-/// our deep-link callback URL; clicking it boots Promptflow back
+/// our deep-link callback URL; clicking it boots Promptastra back
 /// into a "set a new password" flow (not yet wired — for now the
 /// link will simply sign the user in, which is enough to recover
 /// access).

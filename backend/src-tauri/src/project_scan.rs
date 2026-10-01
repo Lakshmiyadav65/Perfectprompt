@@ -734,7 +734,7 @@ tempfile = "3"
         fs::create_dir_all(dir.join("src").join("components")).unwrap();
         write(
             &dir.join("README.md"),
-            "# Promptflow\n\nA system-tray prompt enhancer.\nPress a hotkey, get a better prompt.\n",
+            "# Promptastra\n\nA system-tray prompt enhancer.\nPress a hotkey, get a better prompt.\n",
         );
 
         let s = scan_project_summary(&dir).expect("summary built");
@@ -762,7 +762,7 @@ tempfile = "3"
             s.file_layout
         );
         assert!(s.readme_excerpt.contains("system-tray prompt enhancer"));
-        assert!(!s.readme_excerpt.contains("# Promptflow"), "headers should be stripped");
+        assert!(!s.readme_excerpt.contains("# Promptastra"), "headers should be stripped");
 
         cleanup(&dir);
     }

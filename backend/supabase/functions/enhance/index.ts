@@ -1,4 +1,4 @@
-// Promptflow /enhance edge function.
+// Promptastra /enhance edge function.
 //
 // Auth: requires a Supabase user JWT (the Tauri client signs in via OAuth,
 // then sends `Authorization: Bearer <access_token>`).

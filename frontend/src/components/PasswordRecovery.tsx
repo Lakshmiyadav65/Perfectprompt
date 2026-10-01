@@ -65,11 +65,11 @@ export function PasswordRecovery() {
         <div className="pf-gate-card">
           <div className="pf-gate-brand">
             <div className="pf-gate-brand-mark" aria-hidden="true" />
-            <span className="pf-gate-brand-name">Promptflow</span>
+            <span className="pf-gate-brand-name">Promptastra</span>
           </div>
           <h1 className="pf-gate-title">Password updated</h1>
           <p className="pf-gate-sub">
-            You're all set. Taking you into Promptflow…
+            You're all set. Taking you into Promptastra…
           </p>
         </div>
       </div>
@@ -81,7 +81,7 @@ export function PasswordRecovery() {
       <div className="pf-gate-card">
         <div className="pf-gate-brand">
           <div className="pf-gate-brand-mark" aria-hidden="true" />
-          <span className="pf-gate-brand-name">Promptflow</span>
+          <span className="pf-gate-brand-name">Promptastra</span>
         </div>
 
         <h1 className="pf-gate-title">Set a new password</h1>

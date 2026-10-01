@@ -1,8 +1,8 @@
 [package]
 name = "perfectprompt"
 version = "0.7.1"
-description = "Promptflow — system-tray prompt enhancer"
-authors = ["Promptflow"]
+description = "Promptastra — system-tray prompt enhancer"
+authors = ["Promptastra"]
 edition = "2021"
 
 [lib]

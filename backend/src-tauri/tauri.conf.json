@@ -14,7 +14,7 @@
       {
         "label": "main",
         "url": "index.html#/home",
-        "title": "Promptflow",
+        "title": "Promptastra",
         "width": 1100,
         "height": 720,
         "minWidth": 880,
@@ -27,7 +27,7 @@
       {
         "label": "status",
         "url": "index.html#/status",
-        "title": "Promptflow Status",
+        "title": "Promptastra Status",
         "width": 220,
         "height": 70,
         "decorations": false,
@@ -42,7 +42,7 @@
       {
         "label": "settings",
         "url": "index.html#/settings",
-        "title": "Promptflow Settings",
+        "title": "Promptastra Settings",
         "width": 540,
         "height": 720,
         "resizable": true,
@@ -66,7 +66,7 @@
       {
         "label": "projects",
         "url": "index.html#/projects",
-        "title": "Promptflow — Projects",
+        "title": "Promptastra — Projects",
         "width": 700,
         "height": 600,
         "resizable": true,
@@ -93,7 +93,7 @@
       {
         "label": "command-bar",
         "url": "index.html#/command-bar",
-        "title": "Promptflow",
+        "title": "Promptastra",
         "width": 222,
         "height": 60,
         "resizable": false,
@@ -108,7 +108,7 @@
       {
         "label": "toast",
         "url": "index.html#/toast",
-        "title": "Promptflow Toast",
+        "title": "Promptastra Toast",
         "width": 360,
         "height": 96,
         "resizable": false,
@@ -138,7 +138,7 @@
       {
         "label": "mic",
         "url": "index.html#/mic",
-        "title": "Promptflow Mic",
+        "title": "Promptastra Mic",
         "width": 300,
         "height": 84,
         "resizable": false,

@@ -1,4 +1,4 @@
-// Promptflow verify-subscription edge function.
+// Promptastra verify-subscription edge function.
 //
 // Self-healing endpoint that reconciles a user's profile row against
 // Razorpay's authoritative subscription state. Used when the webhook

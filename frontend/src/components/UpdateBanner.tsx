@@ -107,7 +107,7 @@ export function UpdateBanner({ version, releaseUrl: _releaseUrl, onDismiss }: Pr
         <>
           <div className="pf-update-banner-title">New update available</div>
           <div className="pf-update-banner-message">
-            Promptflow {version} is ready to install.
+            Promptastra {version} is ready to install.
           </div>
           <div className="pf-update-banner-actions">
             <button
@@ -147,7 +147,7 @@ export function UpdateBanner({ version, releaseUrl: _releaseUrl, onDismiss }: Pr
         <>
           <div className="pf-update-banner-title">Update ready</div>
           <div className="pf-update-banner-message">
-            Restarting Promptflow to finish…
+            Restarting Promptastra to finish…
           </div>
         </>
       )}

@@ -72,7 +72,7 @@ export function PostAuthSetup() {
       <div className="pf-gate-card">
         <div className="pf-gate-brand">
           <div className="pf-gate-brand-mark" aria-hidden="true" />
-          <span className="pf-gate-brand-name">Promptflow</span>
+          <span className="pf-gate-brand-name">Promptastra</span>
         </div>
 
         <div className="pf-gate-success-badge">
@@ -97,7 +97,7 @@ export function PostAuthSetup() {
                 onClick={handleContinue}
                 disabled={busy}
               >
-                Continue to Promptflow
+                Continue to Promptastra
               </button>
             </div>
           </>

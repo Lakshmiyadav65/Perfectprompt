@@ -342,7 +342,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
 
   return (
     <div className="pf-settings">
-      <h1>Promptflow Settings</h1>
+      <h1>Promptastra Settings</h1>
 
       <ApiKeySetupChecklist
         keyStatus={keyStatus}
@@ -501,7 +501,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
             <span className="pf-hint">
               Hold the <strong>Right Ctrl</strong> key to voice-enhance; release
               to finish. It's a non-typing key, so this never affects your
-              normal typing. Turn it off here (or pause Promptflow from the
+              normal typing. Turn it off here (or pause Promptastra from the
               tray) any time.
             </span>
           </div>
@@ -521,7 +521,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       <section>
         <h2>Updates</h2>
         <p className="pf-hint">
-          Check GitHub for a newer release of Promptflow.
+          Check GitHub for a newer release of Promptastra.
         </p>
 
         <div className="pf-update-card">
@@ -671,7 +671,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
             className="pf-support-button"
             onClick={() => {
               const subject = encodeURIComponent(
-                "Promptflow support",
+                "Promptastra support",
               );
               const body = encodeURIComponent(
                 "Hi,\n\n" +
