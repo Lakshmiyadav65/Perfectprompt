@@ -300,7 +300,7 @@ export function ApiKeySetupChecklist({
         <>
           <div className="pf-setup-done" role="status">
             <CheckMark />
-            <span>All set — PerfectPrompt is ready to enhance.</span>
+            <span>All set — Promptflow is ready to enhance.</span>
           </div>
           <div className="pf-setup-manage">
             <button

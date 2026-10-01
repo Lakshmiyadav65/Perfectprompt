@@ -208,7 +208,7 @@ export function CommandBar() {
       <div
         className="cb-row"
         role="toolbar"
-        aria-label="PerfectPrompt command bar"
+        aria-label="Promptflow command bar"
         tabIndex={0}
       >
         <button
@@ -337,7 +337,7 @@ export function CommandBar() {
       </div>
 
       {pickerOpen && (
-        <div className="cb-picker-pop" role="dialog" aria-label="PerfectPrompt picker">
+        <div className="cb-picker-pop" role="dialog" aria-label="Promptflow picker">
           <div className="cb-picker-section" role="listbox" aria-label="Active project">
             <button
               type="button"

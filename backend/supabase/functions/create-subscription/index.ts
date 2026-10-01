@@ -1,4 +1,4 @@
-// PerfectPrompt create-subscription edge function.
+// Promptflow create-subscription edge function.
 //
 // Replaces the lifetime-payment create-payment-link function from the
 // previous model. Creates a Razorpay Subscription against a pre-existing

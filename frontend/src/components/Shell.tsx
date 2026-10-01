@@ -25,7 +25,7 @@ const APP_VERSION: string = (pkg as { version: string }).version;
 /// without Supabase, function not deployed yet, transient network error).
 /// Users get to email support so payment can still happen by hand.
 const SUBSCRIPTION_FALLBACK =
-  "mailto:enviguide.official@gmail.com?subject=PerfectPrompt%20Pro%20%E2%80%94%20%E2%82%B999%2Fmonth";
+  "mailto:enviguide.official@gmail.com?subject=Promptflow%20Pro%20%E2%80%94%20%E2%82%B999%2Fmonth";
 
 /// Ask create-subscription for a fresh Razorpay subscription checkout
 /// URL. If the user already has an active subscription, the function
@@ -401,7 +401,7 @@ export function Shell({ initial }: { initial: Route }) {
       <aside className="pf-sidebar">
         <div className="pf-brand">
           <BrandMark />
-          <div className="pf-brand-name">PerfectPrompt</div>
+          <div className="pf-brand-name">Promptflow</div>
         </div>
 
         <nav className="pf-nav" aria-label="Primary">
@@ -582,7 +582,7 @@ export function Shell({ initial }: { initial: Route }) {
                 onClick={() => void handleToggle()}
                 disabled={toggling || !ready}
                 aria-label={enabled ? "Pause" : "Activate"}
-                title={enabled ? "Pause PerfectPrompt" : "Activate PerfectPrompt"}
+                title={enabled ? "Pause Promptflow" : "Activate Promptflow"}
               >
                 <span className="pf-toggle-mini-dot" />
               </button>

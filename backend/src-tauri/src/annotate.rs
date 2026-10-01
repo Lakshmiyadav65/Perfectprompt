@@ -2,7 +2,7 @@
 //!
 //! Agentation lives inside the browser DOM: you click a page element and it
 //! emits structured context (selector, source path, React tree) for a coding
-//! agent. PerfectPrompt lives on the desktop and works across every app, so
+//! agent. Promptflow lives on the desktop and works across every app, so
 //! we can't read the DOM — instead we:
 //!
 //!   1. Freeze-capture the monitor under the cursor (native Win32 GDI).

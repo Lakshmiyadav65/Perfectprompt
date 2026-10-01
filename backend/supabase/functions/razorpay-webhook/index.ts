@@ -1,4 +1,4 @@
-// PerfectPrompt razorpay-webhook edge function.
+// Promptflow razorpay-webhook edge function.
 //
 // Razorpay POSTs subscription lifecycle events to this URL whenever one
 // of our created subscriptions transitions state. The function:

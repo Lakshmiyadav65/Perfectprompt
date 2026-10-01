@@ -648,7 +648,7 @@ export function ProjectManager() {
           <div className="pm-empty-icon">📁</div>
           <h3>No projects yet</h3>
           <p>
-            Add a project description so PerfectPrompt knows what you're building.
+            Add a project description so Promptflow knows what you're building.
             The AI will generate smarter questions and more relevant prompts.
           </p>
         </div>
@@ -945,7 +945,7 @@ export function ProjectManager() {
             <label>Project Name</label>
             <input
               type="text"
-              placeholder="e.g. PerfectPrompt, MyShopApp, PortfolioSite..."
+              placeholder="e.g. Promptflow, MyShopApp, PortfolioSite..."
               value={formName}
               onChange={(e) => setFormName(e.target.value)}
               disabled={busy}

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use crate::active_app::ActiveAppContext;
 use crate::settings::AppClassificationSettings;
 
-/// How PerfectPrompt should treat the active app for the upcoming
+/// How Promptflow should treat the active app for the upcoming
 /// enhancement (FR-002 of the context-aware-enhancement feature).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

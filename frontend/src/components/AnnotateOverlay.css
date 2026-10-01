@@ -1,5 +1,5 @@
 /* Visual Annotate overlay — full-screen, dark, forge-flame accent.
-   Reads PerfectPrompt design tokens (tokens.css). */
+   Reads Promptflow design tokens (tokens.css). */
 
 body.annotate-route,
 body.annotate-route #root {

@@ -60,7 +60,7 @@ function blobToBase64(blob: Blob): Promise<string> {
 }
 
 const MODE_LABEL: Record<MicMode, string> = {
-  enhance: "Perfect prompt",
+  enhance: "Promptflow",
   dictate: "Dictation",
 };
 
@@ -316,7 +316,7 @@ export function MicOverlay() {
 function micErrorMessage(err: unknown): string {
   const name = (err as { name?: string })?.name ?? "";
   if (name === "NotAllowedError" || name === "SecurityError") {
-    return "Microphone blocked. Allow mic access for PerfectPrompt in Windows Settings → Privacy → Microphone, then try again.";
+    return "Microphone blocked. Allow mic access for Promptflow in Windows Settings → Privacy → Microphone, then try again.";
   }
   if (name === "NotFoundError" || name === "OverconstrainedError") {
     return "No microphone found. Plug one in and try again.";

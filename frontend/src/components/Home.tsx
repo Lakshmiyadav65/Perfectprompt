@@ -281,14 +281,14 @@ export function Home({
 
         {/* ===== DEMO CARD =====
             Ported from web/index.html's `.flow-stage` (the website's
-            "perfectprompt · live flow" animation). Markup mirrors the
+            "promptflow · live flow" animation). Markup mirrors the
             website 1:1; styles are in Home.css scaled to this card. */}
         <div className="ph-demo-card">
           <div className="ph-demo-bar">
             <div className="ph-demo-lights">
               <span /><span /><span />
             </div>
-            <span className="ph-demo-lbl">perfectprompt · live flow</span>
+            <span className="ph-demo-lbl">promptflow · live flow</span>
             <div className="ph-stage-progress" aria-hidden>
               <span className="ph-pdot p1" />
               <span className="ph-pdot p2" />

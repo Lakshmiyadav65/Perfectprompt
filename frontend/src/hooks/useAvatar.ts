@@ -12,7 +12,7 @@ import { useCallback, useEffect, useState } from "react";
 ///      no async filesystem read in the hot path of the sidebar chip.
 ///
 /// Cross-window sync via the `storage` event + a custom in-window event,
-/// mirroring useDisplayName so the chip in every PerfectPrompt window
+/// mirroring useDisplayName so the chip in every Promptflow window
 /// stays consistent without polling.
 
 const STORAGE_KEY = "pf.avatar_data_url";
