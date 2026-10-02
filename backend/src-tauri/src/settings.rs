@@ -77,6 +77,11 @@ pub struct UserSettings {
     /// deserialise.
     #[serde(default = "default_space_ptt_enabled")]
     pub space_ptt_enabled: bool,
+    /// Tap Ctrl+Alt (no other key) to enhance — the poller in
+    /// `ctrl_alt_tap.rs`. Off by default so existing members don't get a new
+    /// trigger by surprise; `#[serde(default)]` keeps older files loading.
+    #[serde(default)]
+    pub ctrl_alt_tap_enabled: bool,
     /// **DEPRECATED — DO NOT READ.** Legacy single-user API key from
     /// before per-user scoping landed (v0.4.1 and earlier). Kept on the
     /// struct so existing settings.json files still deserialise, but no
@@ -126,6 +131,7 @@ impl Default for UserSettings {
             annotate_hotkey: hotkey::DEFAULT_ANNOTATE_HOTKEY.to_string(),
             mic_hotkey: hotkey::DEFAULT_MIC_HOTKEY.to_string(),
             space_ptt_enabled: default_space_ptt_enabled(),
+            ctrl_alt_tap_enabled: false,
             api_key: None,
             api_keys: HashMap::new(),
             question_threshold: DEFAULT_QUESTION_THRESHOLD,
@@ -640,6 +646,31 @@ pub fn set_space_ptt<R: Runtime>(
 }
 
 #[tauri::command]
+pub fn get_ctrl_alt_tap<R: Runtime>(app: AppHandle<R>) -> bool {
+    load(&app).ctrl_alt_tap_enabled
+}
+
+/// Toggle tap-Ctrl+Alt-to-enhance. Persists the flag and starts/stops the
+/// poller immediately; like the other triggers it only runs while the master
+/// toggle is on.
+#[tauri::command]
+pub fn set_ctrl_alt_tap<R: Runtime>(
+    app: AppHandle<R>,
+    enabled: bool,
+) -> std::result::Result<(), String> {
+    let mut settings = load(&app);
+    settings.ctrl_alt_tap_enabled = enabled;
+    save(&app, &settings).map_err(|e| format!("{e:#}"))?;
+
+    if enabled && settings.enabled {
+        crate::ctrl_alt_tap::install();
+    } else {
+        crate::ctrl_alt_tap::uninstall();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn get_hotkey_enabled<R: Runtime>(app: AppHandle<R>) -> bool {
     load(&app).enabled
 }
@@ -664,10 +695,14 @@ pub fn set_hotkey_enabled<R: Runtime>(
         if settings.space_ptt_enabled {
             crate::space_ptt::install();
         }
+        if settings.ctrl_alt_tap_enabled {
+            crate::ctrl_alt_tap::install();
+        }
     } else {
         hotkey::unregister_all(&app);
-        // Pause is the hard off-switch for the keyboard hook too.
+        // Pause is the hard off-switch for the keyboard pollers too.
         crate::space_ptt::uninstall();
+        crate::ctrl_alt_tap::uninstall();
     }
     Ok(())
 }

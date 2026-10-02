@@ -28,6 +28,7 @@ pub mod repo_digest;
 pub mod router;
 mod settings;
 mod space_ptt;
+mod ctrl_alt_tap;
 mod status_window;
 mod toast_window;
 mod trace;
@@ -204,6 +205,8 @@ pub fn run() {
             settings::save_mic_hotkey,
             settings::get_space_ptt,
             settings::set_space_ptt,
+            settings::get_ctrl_alt_tap,
+            settings::set_ctrl_alt_tap,
             auth::set_session_token,
             auth::clear_session_token,
             auth::get_auth_status,
@@ -249,6 +252,10 @@ pub fn run() {
             space_ptt::set_app(app.handle());
             if user_settings.enabled && user_settings.space_ptt_enabled {
                 space_ptt::install();
+            }
+            ctrl_alt_tap::set_app(app.handle());
+            if user_settings.enabled && user_settings.ctrl_alt_tap_enabled {
+                ctrl_alt_tap::install();
             }
             install_keep_alive_close_handlers(app.handle());
             // Start the foreground tracker so the capsule's Enhance icon

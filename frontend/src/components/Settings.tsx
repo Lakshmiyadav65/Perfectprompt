@@ -97,6 +97,8 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [micHotkeyMsg, setMicHotkeyMsg] = useState<Msg>(null);
   const [spacePtt, setSpacePtt] = useState(false);
   const [spacePttMsg, setSpacePttMsg] = useState<Msg>(null);
+  const [ctrlAltTap, setCtrlAltTap] = useState(false);
+  const [ctrlAltTapMsg, setCtrlAltTapMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
   const apiKeySectionRef = useRef<HTMLElement>(null);
@@ -177,6 +179,8 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       setMicHotkey(mhk);
       const ptt = await invoke<boolean>("get_space_ptt");
       setSpacePtt(ptt);
+      const tap = await invoke<boolean>("get_ctrl_alt_tap");
+      setCtrlAltTap(tap);
     } catch (e) {
       console.error("refresh failed:", e);
     }
@@ -205,6 +209,18 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     } catch (e) {
       setSpacePtt(!next);
       setSpacePttMsg({ ok: false, text: String(e) });
+    }
+  }
+
+  async function toggleCtrlAltTap(next: boolean) {
+    // Same optimistic flip-then-persist as toggleSpacePtt.
+    setCtrlAltTap(next);
+    setCtrlAltTapMsg(null);
+    try {
+      await invoke("set_ctrl_alt_tap", { enabled: next });
+    } catch (e) {
+      setCtrlAltTap(!next);
+      setCtrlAltTapMsg({ ok: false, text: String(e) });
     }
   }
 
@@ -466,6 +482,27 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         {hotkeyMsg && (
           <p className={hotkeyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
             {hotkeyMsg.text}
+          </p>
+        )}
+
+        <div className="pf-row pf-space-ptt-row">
+          <div className="pf-space-ptt-label">
+            <span className="pf-space-ptt-title">Tap Ctrl+Alt to enhance</span>
+            <span className="pf-hint">
+              Press and release <strong>Ctrl+Alt</strong> together, with no
+              other key, to enhance the selected text. Ctrl+Alt shortcuts and
+              AltGr typing (@, €) keep working; use the left Alt key.
+            </span>
+          </div>
+          <Toggle
+            checked={ctrlAltTap}
+            onChange={(next) => void toggleCtrlAltTap(next)}
+            ariaLabel="Tap Ctrl+Alt to enhance"
+          />
+        </div>
+        {ctrlAltTapMsg && (
+          <p className={ctrlAltTapMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
+            {ctrlAltTapMsg.text}
           </p>
         )}
       </section>
