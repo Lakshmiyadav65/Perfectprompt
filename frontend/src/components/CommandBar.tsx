@@ -27,6 +27,10 @@ interface ProjectStore {
 const CAPSULE_SIZE = new LogicalSize(222, 60);
 const PICKER_OPEN_SIZE = new LogicalSize(240, 200);
 
+/// The project picker is parked for now: its button is hidden and the
+/// project list isn't polled. Flip to true to bring it back.
+const SHOW_PROJECT_PICKER = false;
+
 /// Floating widget — single capsule with a project selector (sets the
 /// active project that the developer-mode enhancer pulls context from),
 /// an enhance button, and a dismiss button. Always-on-top, no taskbar
@@ -54,6 +58,7 @@ export function CommandBar() {
   }, []);
 
   useEffect(() => {
+    if (!SHOW_PROJECT_PICKER) return;
     void refreshProjects();
     // Poll so the picker reflects projects added/edited in the main
     // window.
@@ -211,6 +216,7 @@ export function CommandBar() {
         aria-label="PromptAstra command bar"
         tabIndex={0}
       >
+        {SHOW_PROJECT_PICKER && (
         <button
           type="button"
           className={`cb-icon-btn cb-project-wrap ${store.active_project_id ? "active" : ""}`}
@@ -238,6 +244,7 @@ export function CommandBar() {
           </svg>
           {store.active_project_id && <span className="cb-project-dot" aria-hidden="true" />}
         </button>
+        )}
         <button
           type="button"
           className="cb-icon-btn cb-enhance-btn"
