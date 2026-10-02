@@ -38,7 +38,8 @@ pub fn validate_combo(combo: &str) -> Result<()> {
 }
 
 /// Reject combos that would hijack ordinary typing system-wide: a global
-/// shortcut needs Ctrl/Alt/Super (Shift alone still types), except F-keys.
+/// shortcut needs Ctrl/Alt/Super (Shift alone still types), except keys that
+/// type nothing — F-keys, Insert, Pause and Scroll Lock — which may stand alone.
 pub fn validate_user_combo(combo: &str) -> Result<()> {
     validate_combo(combo)?;
     let parts: Vec<&str> = combo.split('+').map(str::trim).collect();
@@ -49,13 +50,15 @@ pub fn validate_user_combo(combo: &str) -> Result<()> {
                 | "super" | "cmd" | "command" | "meta"
         )
     });
-    let is_fkey = parts.last().map_or(false, |k| {
+    let is_solo_safe = parts.last().map_or(false, |k| {
         let k = k.to_ascii_uppercase();
-        k.len() > 1 && k.starts_with('F') && k[1..].parse::<u8>().is_ok()
+        let is_fkey = k.len() > 1 && k.starts_with('F') && k[1..].parse::<u8>().is_ok();
+        is_fkey || matches!(k.as_str(), "INSERT" | "PAUSE" | "SCROLLLOCK")
     });
-    if !has_modifier && !is_fkey {
+    if !has_modifier && !is_solo_safe {
         return Err(anyhow!(
-            "hotkey {combo:?} needs Ctrl or Alt, otherwise it would block normal typing"
+            "hotkey {combo:?} needs Ctrl or Alt, otherwise it would block normal typing \
+             (single F-keys, Insert, Pause and Scroll Lock are fine on their own)"
         ));
     }
     Ok(())
@@ -229,6 +232,20 @@ mod tests {
         // double-add the modifier — the main and bypass coincide.
         let already = "Shift+CommandOrControl+Alt+E";
         assert_eq!(bypass_variant(already), already);
+    }
+
+    #[test]
+    fn validate_user_combo_allows_non_typing_single_keys() {
+        for combo in ["F8", "F24", "Insert", "Pause", "ScrollLock", "Alt+E", "CommandOrControl+Alt+K"] {
+            assert!(validate_user_combo(combo).is_ok(), "{combo} should be allowed");
+        }
+    }
+
+    #[test]
+    fn validate_user_combo_rejects_single_typing_keys() {
+        for combo in [".", "E", "Space", "Period", "Home", "Shift+E"] {
+            assert!(validate_user_combo(combo).is_err(), "{combo} should be rejected");
+        }
     }
 
     #[test]

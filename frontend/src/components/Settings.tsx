@@ -38,8 +38,11 @@ const NAMED_CODES = new Set([
   "Space", "Enter", "Tab", "Backspace", "Delete", "Insert", "Home", "End",
   "PageUp", "PageDown", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
   "Period", "Comma", "Slash", "Backslash", "Semicolon", "Quote", "Minus",
-  "Equal", "BracketLeft", "BracketRight", "Backquote",
+  "Equal", "BracketLeft", "BracketRight", "Backquote", "Pause", "ScrollLock",
 ]);
+
+// Keys that type nothing, so they're safe as a single-key global hotkey.
+const SOLO_SAFE = /^(F([1-9]|1[0-9]|2[0-4])|Insert|Pause|ScrollLock)$/;
 
 // Build a global-shortcut accelerator from a keydown. Reads e.code (the
 // physical key), not e.key, which Alt/Shift and keyboard layouts turn into
@@ -57,11 +60,12 @@ function comboFromKeyEvent(
   else if (/^Digit[0-9]$/.test(code)) key = code.slice(5);
   else if (/^F([1-9]|1[0-9]|2[0-4])$/.test(code)) key = code;
   else if (NAMED_CODES.has(code)) key = code;
-  if (!key) return { error: `That key (${e.key}) can't be used — try a letter or number.` };
+  if (!key) return { error: `That key (${e.key}) can't be used — try F8, Insert, or Alt+V.` };
 
-  const isFKey = /^F\d+$/.test(key);
-  if (!e.ctrlKey && !e.altKey && !e.metaKey && !isFKey) {
-    return { error: "Hold Ctrl or Alt with the key, e.g. Alt+V or Ctrl+Alt+Space." };
+  if (!e.ctrlKey && !e.altKey && !e.metaKey && !SOLO_SAFE.test(key)) {
+    return {
+      error: `${e.key} on its own would stop it typing everywhere. Use a single F-key, Insert, Pause or Scroll Lock — or hold Ctrl/Alt with it.`,
+    };
   }
   if (e.shiftKey) {
     return { error: "Leave out Shift — it's added automatically for the second mode." };
@@ -443,8 +447,8 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       <section>
         <h2>Global Hotkey</h2>
         <p className="pf-hint">
-          Click the field, then press the combo you want. Save re-registers it
-          system-wide.
+          Click the field, then press a single key like F8, Insert or Pause —
+          or a combo like Alt+E. Save re-registers it system-wide.
         </p>
         <div className="pf-row">
           <input
@@ -471,7 +475,7 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         <p className="pf-hint">
           Hold the push-to-talk combo to speak; release to enhance. Add Shift to
           the combo to dictate (clean transcription) instead. Click the field,
-          then press the combo you want.
+          then press a single key like F9 or Scroll Lock, or a combo like Alt+M.
         </p>
         <div className="pf-row">
           <input
