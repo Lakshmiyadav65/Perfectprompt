@@ -97,8 +97,8 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
   const [micHotkeyMsg, setMicHotkeyMsg] = useState<Msg>(null);
   const [spacePtt, setSpacePtt] = useState(false);
   const [spacePttMsg, setSpacePttMsg] = useState<Msg>(null);
-  const [ctrlAltTap, setCtrlAltTap] = useState(false);
-  const [ctrlAltTapMsg, setCtrlAltTapMsg] = useState<Msg>(null);
+  const [ctrlAltPtt, setCtrlAltPtt] = useState(false);
+  const [ctrlAltPttMsg, setCtrlAltPttMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [updateState, setUpdateState] = useState<UpdateState>({ kind: "idle" });
   const apiKeySectionRef = useRef<HTMLElement>(null);
@@ -179,8 +179,8 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
       setMicHotkey(mhk);
       const ptt = await invoke<boolean>("get_space_ptt");
       setSpacePtt(ptt);
-      const tap = await invoke<boolean>("get_ctrl_alt_tap");
-      setCtrlAltTap(tap);
+      const caPtt = await invoke<boolean>("get_ctrl_alt_ptt");
+      setCtrlAltPtt(caPtt);
     } catch (e) {
       console.error("refresh failed:", e);
     }
@@ -212,15 +212,15 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
     }
   }
 
-  async function toggleCtrlAltTap(next: boolean) {
+  async function toggleCtrlAltPtt(next: boolean) {
     // Same optimistic flip-then-persist as toggleSpacePtt.
-    setCtrlAltTap(next);
-    setCtrlAltTapMsg(null);
+    setCtrlAltPtt(next);
+    setCtrlAltPttMsg(null);
     try {
-      await invoke("set_ctrl_alt_tap", { enabled: next });
+      await invoke("set_ctrl_alt_ptt", { enabled: next });
     } catch (e) {
-      setCtrlAltTap(!next);
-      setCtrlAltTapMsg({ ok: false, text: String(e) });
+      setCtrlAltPtt(!next);
+      setCtrlAltPttMsg({ ok: false, text: String(e) });
     }
   }
 
@@ -484,27 +484,6 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
             {hotkeyMsg.text}
           </p>
         )}
-
-        <div className="pf-row pf-space-ptt-row">
-          <div className="pf-space-ptt-label">
-            <span className="pf-space-ptt-title">Tap Ctrl+Alt to enhance</span>
-            <span className="pf-hint">
-              Press and release <strong>Ctrl+Alt</strong> together, with no
-              other key, to enhance the selected text. Ctrl+Alt shortcuts and
-              AltGr typing (@, €) keep working; use the left Alt key.
-            </span>
-          </div>
-          <Toggle
-            checked={ctrlAltTap}
-            onChange={(next) => void toggleCtrlAltTap(next)}
-            ariaLabel="Tap Ctrl+Alt to enhance"
-          />
-        </div>
-        {ctrlAltTapMsg && (
-          <p className={ctrlAltTapMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
-            {ctrlAltTapMsg.text}
-          </p>
-        )}
       </section>
 
       <section>
@@ -533,6 +512,27 @@ export function Settings({ focusTarget, onFocusHandled }: SettingsProps = {}) {
         {micHotkeyMsg && (
           <p className={micHotkeyMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
             {micHotkeyMsg.text}
+          </p>
+        )}
+
+        <div className="pf-row pf-space-ptt-row">
+          <div className="pf-space-ptt-label">
+            <span className="pf-space-ptt-title">Hold Ctrl+Alt to talk</span>
+            <span className="pf-hint">
+              Hold <strong>Ctrl+Alt</strong> (left Alt) to voice-enhance;
+              release to finish. Ctrl+Alt shortcuts like Ctrl+Alt+E and AltGr
+              typing (@, €) keep working.
+            </span>
+          </div>
+          <Toggle
+            checked={ctrlAltPtt}
+            onChange={(next) => void toggleCtrlAltPtt(next)}
+            ariaLabel="Hold Ctrl+Alt to talk"
+          />
+        </div>
+        {ctrlAltPttMsg && (
+          <p className={ctrlAltPttMsg.ok ? "pf-msg pf-ok" : "pf-msg pf-err"}>
+            {ctrlAltPttMsg.text}
           </p>
         )}
 

@@ -299,7 +299,7 @@ pub async fn trigger_enhance<R: Runtime>(
         .map_err(|e| format!("{e:#}"))
 }
 
-pub(crate) async fn run_capture_pipeline<R: Runtime>(
+async fn run_capture_pipeline<R: Runtime>(
     app: &AppHandle<R>,
     force_bypass: bool,
 ) -> Result<()> {

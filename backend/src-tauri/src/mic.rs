@@ -283,7 +283,9 @@ async fn transcribe_inner<R: Runtime>(
 
     let transcript = transcribe(app, audio, &mime).await?;
     let transcript = transcript.trim().to_string();
-    if transcript.is_empty() {
+    // Whisper answers a silent clip with bare punctuation like "." — treat
+    // that as no speech so an accidental hold never pastes a stray character.
+    if !transcript.chars().any(char::is_alphanumeric) {
         return Err(anyhow!("Didn't catch any speech — try again."));
     }
     println!(
